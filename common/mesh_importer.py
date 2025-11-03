@@ -608,7 +608,6 @@ class MeshImporter:
         # Credit to Rayvy
         # Изменим имя текстуры, чтобы оно точно совпадало с шаблоном (Change the texture name to match the template exactly)
         material_name = f"{mesh_name}_Material"
-        # texture_name = f"{mesh_name}-DiffuseMap.jpg"
 
         if "." in mesh_name:
             mesh_name_split = str(mesh_name).split(".")[0].split("-")
@@ -623,20 +622,8 @@ class MeshImporter:
         # 查找是否存在满足条件的转换好的tga贴图文件
         texture_path = None
         
-        texture_suffix = "-DiffuseMap.tga"
-        # 查找是否存在满足条件的转换好的tga贴图文件
+        texture_suffix = "_DiffuseMap.dds"
         texture_path = TextureUtils.find_texture(texture_prefix, texture_suffix, directory)
-        # 如果不存在，试试查找jpg文件
-        if texture_path is None:
-            texture_suffix = "_DiffuseMap.jpg"
-            # 查找jpg文件，如果这里没找到的话后面也是正常的，但是这里如果找到了就能起到兼容旧版本jpg文件的作用
-            texture_path = TextureUtils.find_texture(texture_prefix, texture_suffix, directory)
-
-        # 如果还不存在，试试查找png文件
-        if texture_path is None:
-            texture_suffix = "_DiffuseMap.png"
-            # 查找jpg文件，如果这里没找到的话后面也是正常的，但是这里如果找到了就能起到兼容旧版本jpg文件的作用
-            texture_path = TextureUtils.find_texture(texture_prefix, texture_suffix, directory)
 
         # Nico: 这里如果没有检测到对应贴图则不创建材质，也不新建BSDF
         # 否则会造成合并模型后，UV编辑界面选择不同材质的UV会跳到不同UV贴图界面导致无法正常编辑的问题
@@ -674,6 +661,8 @@ class MeshImporter:
                 
                     # 链接Color到基础色
                     material.node_tree.links.new(bsdf.inputs['Base Color'], tex_image.outputs['Color'])
+                    # 链接Alpha到Alpha
+                    material.node_tree.links.new(bsdf.inputs['Alpha'], tex_image.outputs['Alpha'])
 
                 # Применение материала к мешу (Materials applied to bags)
                 if obj.data.materials:

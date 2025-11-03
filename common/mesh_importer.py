@@ -248,14 +248,14 @@ class MeshImporter:
         MeshImporter.set_import_attributes(obj=obj, mbf=mbf)
         MeshImporter.initialize_mesh(mesh, mbf)
 
+        
+
         blend_indices = {}
         blend_weights = {}
         texcoords = {}
         shapekeys = {}
         use_normals = False
         normals = []
-
-
 
 
         for element in mbf.fmt_file.elements:
@@ -456,6 +456,9 @@ class MeshImporter:
 
         # 根据vb文件的顶点数设置mesh的顶点数
         mesh.vertices.add(mbf.vb_vertex_count)
+
+        # Blender 5.1 Alpha某次更新后，必须得加这么一句，不然的话导入就是点集，原理未知反正加上就行了，不管那么多了。
+        mesh.update()
 
     @classmethod
     def import_uv_layers(cls,mesh, obj, texcoords):

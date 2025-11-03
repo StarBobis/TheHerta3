@@ -24,16 +24,19 @@ from .config.properties_import_model import Properties_ImportModel
 from .config.properties_generate_mod import Properties_GenerateMod
 from .config.properties_wwmi import Properties_WWMI
 from .config.properties_extract_model import Properties_ExtractModel
-
+from .config.plugin_config import PluginConfig
 
 bl_info = {
-    "name": "TheHerta",
-    "description": "TheHerta",
+    "name": "TheHerta3",
+    "description": "SSMT3.0 Series's Blender Plugin.",
     "blender": (5, 1, 0),
     "version": (3, 0, 1),
     "location": "View3D",
     "category": "Generic"
 }
+
+
+PluginConfig.set_bl_info(bl_info)
 
 
 class UpdaterPanel(bpy.types.Panel):

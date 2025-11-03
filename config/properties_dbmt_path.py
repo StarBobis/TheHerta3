@@ -39,8 +39,8 @@ class Properties_DBMT_Path(bpy.types.PropertyGroup):
         return bpy.context.scene.dbmt_path.path
 
     use_specified_dbmt :bpy.props.BoolProperty(
-        name="使用指定的SSMT-Package路径",
-        description="使用指定的SSMT-Package路径，方便灵活控制，一般不需要勾选，默认使用当前打开的SSMT设置好的SSMT-Package路径",
+        name="使用指定的SSMT缓存文件夹",
+        description="使用指定的SSMT缓存文件夹路径，方便灵活控制，一般不需要勾选，默认使用当前打开的SSMT设置好的SSMT缓存文件夹路径",
         default=False
     ) # type: ignore
 

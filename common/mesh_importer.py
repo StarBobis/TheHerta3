@@ -377,6 +377,9 @@ class MeshImporter:
         MeshImporter.set_import_rotate_angle(obj=obj, mbf=mbf)
         MeshImporter.set_import_scale(obj=obj, mbf=mbf)
 
+        # 刷新视图以得到流畅的导入逐渐增多的视觉效果
+        bpy.context.view_layer.update()
+
         TimerUtils.End("Import 3Dmigoto Raw")
 
         return obj

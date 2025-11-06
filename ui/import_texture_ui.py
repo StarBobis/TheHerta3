@@ -22,7 +22,7 @@ class SSMT_ImportTexture_ImageListItem(PropertyGroup):
     filepath: StringProperty(name="File Path") # type: ignore
 
 # 自定义UI列表显示图片和缩略图
-class SSMT_ImportTexture_IMAGE_UL_List(UIList):
+class SSMT_UL_FastImportTextureList(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
         pcoll = preview_collections["main"]
         

@@ -40,7 +40,7 @@ PluginConfig.set_bl_info(bl_info)
 class UpdaterPanel(bpy.types.Panel):
     """Update Panel"""
     bl_label = "检查版本更新"
-    bl_idname = "Herta_PT_UpdaterPanel"
+    bl_idname = "HERTA_PT_UpdaterPanel"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_context = "objectmode"
@@ -167,7 +167,7 @@ register_classes = (
 
     SSMTSelectGenerateModFolder,
 
-    SSMT_ImportTexture_IMAGE_UL_List,
+    SSMT_UL_FastImportTextureList,
     SSMT_ImportTexture_ImageListItem,
     SSMT_ImportTexture_VIEW3D_PT_ImageMaterialPanel,
     SSMT_ImportTexture_WM_OT_ApplyImageToMaterial,
@@ -264,8 +264,8 @@ def unregister():
                 if kmi.idname in [SSMTImportAllFromCurrentWorkSpaceV3.bl_idname, SSMTGenerateMod.bl_idname]:
                     km.keymap_items.remove(kmi)
     
-    for clss in reversed(cls):
-        bpy.utils.unregister_class(clss)
+    # for clss in reversed(cls):
+    #     bpy.utils.unregister_class(clss)
 
     
 

@@ -95,9 +95,9 @@ class ModModelYYSLS:
         
         d3d11GameType = draw_ib_model.d3d11GameType
 
-        for count_i in range(len(draw_ib_model.import_config.part_name_list)):
+        for count_i,part_name in enumerate(draw_ib_model.import_config.part_name_list):
             match_first_index = draw_ib_model.import_config.match_first_index_list[count_i]
-            part_name = draw_ib_model.import_config.part_name_list[count_i]
+            # part_name = draw_ib_model.import_config.part_name_list[count_i]
 
             style_part_name = "Component" + part_name
 
@@ -142,15 +142,12 @@ class ModModelYYSLS:
 
             # Add slot style texture slot replace.
             if not Properties_GenerateMod.forbid_auto_texture_ini():
-                slot_texture_replace_dict = draw_ib_model.import_config.PartName_SlotTextureReplaceDict_Dict.get(part_name,None)
+                texture_markup_info_list = draw_ib_model.import_config.partname_texturemarkinfolist_dict.get(part_name,None)
                 # It may not have auto texture
-                if slot_texture_replace_dict is not None:
-                    for slot,texture_replace in slot_texture_replace_dict.items():
-
-                        if texture_replace.style == "Slot":
-                            texture_filter_index_indent = ""
-
-                            texture_override_ib_section.append(texture_filter_index_indent + self.vlr_filter_index_indent + slot + " = " + texture_replace.resource_name)
+                if texture_markup_info_list is not None:
+                    for texture_markup_info in texture_markup_info_list:
+                        if texture_markup_info.mark_type == "Slot":
+                            texture_override_ib_section.append(self.vlr_filter_index_indent + texture_markup_info.mark_slot + " = " + texture_markup_info.get_resource_name())
 
             # 如果不使用GPU-Skinning即为Object类型，此时需要在ib下面替换对应槽位
             if not d3d11GameType.GPU_PreSkinning:

@@ -331,9 +331,9 @@ class ModModelGIMI:
         draw_ib = draw_ib_model.draw_ib
         d3d11GameType = draw_ib_model.d3d11GameType
 
-        for count_i in range(len(draw_ib_model.import_config.part_name_list)):
+        for count_i,part_name in enumerate(draw_ib_model.import_config.part_name_list):
             match_first_index = draw_ib_model.import_config.match_first_index_list[count_i]
-            part_name = draw_ib_model.import_config.part_name_list[count_i]
+            # part_name = draw_ib_model.import_config.part_name_list[count_i]
 
             style_part_name = "Component" + part_name
             ib_resource_name = "Resource_" + draw_ib + "_" + style_part_name

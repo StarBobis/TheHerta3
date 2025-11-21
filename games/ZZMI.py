@@ -1,7 +1,10 @@
-import bpy
-import math
+'''
+ZZMI
+'''
 
-from ..common.migoto_format import M_Key, M_DrawIndexed, M_Condition,D3D11GameType
+import math
+import bpy
+
 from ..config.main_config import GlobalConfig, LogicName
 from ..common.draw_ib_model import DrawIBModel
 
@@ -11,7 +14,22 @@ from ..config.properties_generate_mod import Properties_GenerateMod
 from ..common.m_ini_helper import M_IniHelperV2,M_IniHelperV3
 from ..common.m_ini_helper_gui import M_IniHelperGUI
 
+
+class ZZMITextureMarkName:
+    '''
+    ZZMI的固定标记名称
+    '''
+    DiffuseMap = "DiffuseMap"
+    NormalMap = "NormalMap"
+    LightMap = "LightMap"
+    MaterialMap = "MaterialMap"
+    StockingMap = "StockingMap"
+
+
 class ModModelZZMI:
+    '''
+    ZZMI生成Mod模板
+    '''
     def __init__(self,workspace_collection:bpy.types.Collection):
         # (1) 统计全局分支模型
         self.branch_model = BranchModel(workspace_collection=workspace_collection)
@@ -87,20 +105,20 @@ class ModModelZZMI:
 
         config_ini_builder.append_section(texture_override_vb_section)
 
-    def add_unity_vs_texture_override_ib_sections(self,config_ini_builder:M_IniBuilder,commandlist_ini_builder:M_IniBuilder,draw_ib_model:DrawIBModel):
+    def add_unity_vs_texture_override_ib_sections(self,config_ini_builder:M_IniBuilder,draw_ib_model:DrawIBModel):
         texture_override_ib_section = M_IniSection(M_SectionType.TextureOverrideIB)
         draw_ib = draw_ib_model.draw_ib
         
-        d3d11GameType = draw_ib_model.d3d11GameType
+        d3d11_game_type = draw_ib_model.d3d11GameType
 
         texture_override_ib_section.append("[TextureOverride_IB_" + draw_ib + "]")
         texture_override_ib_section.append("hash = " + draw_ib)
         texture_override_ib_section.append("handling = skip")
         texture_override_ib_section.new_line()
 
-        for count_i in range(len(draw_ib_model.import_config.part_name_list)):
+        for count_i,part_name in enumerate(draw_ib_model.import_config.part_name_list):
             match_first_index = draw_ib_model.import_config.match_first_index_list[count_i]
-            part_name = draw_ib_model.import_config.part_name_list[count_i]
+            # part_name = draw_ib_model.import_config.part_name_list[count_i]
             style_part_name = "Component" + part_name
             texture_override_name_suffix = "IB_" + draw_ib + "_" + draw_ib_model.draw_ib_alias + "_" + style_part_name
 
@@ -132,74 +150,62 @@ class ModModelZZMI:
 
             print("Test: ZZZ")
             if GlobalConfig.logic_name == LogicName.ZZMI:
-                '''
-                绝区零的SlotFix必须得按照他的使用顺序来，由波斯猫辛苦测试得出，比如正确的顺序为：
-
-                1. Resource\ZZMI\Diffuse = ref DiffuseMap (也就是SlotFix代码部分)
-                2. run = CommandList\\ZZMI\\SetTextures
-                3. ps-t4 = ResourceNormalMap (也就是普通的槽位替换部分)
-                4. run = CommandListSkinTexture 
-
-                不按照这个顺序来，则贴图显示就会有BUG。
-                '''
+                # 绝区零的SlotFix必须得按照他的使用顺序来，由波斯猫辛苦测试得出，比如正确的顺序为：
+                # 1. Resource\ZZMI\Diffuse = ref DiffuseMap (也就是SlotFix代码部分)
+                # 2. run = CommandList\\ZZMI\\SetTextures
+                # 3. ps-t4 = ResourceNormalMap (也就是普通的槽位替换部分)
+                # 4. run = CommandListSkinTexture
+                # 不按照这个顺序来，则贴图显示就会有BUG。
                 
                 if not Properties_GenerateMod.forbid_auto_texture_ini():
-                    slot_texture_replace_dict = draw_ib_model.import_config.PartName_SlotTextureReplaceDict_Dict.get(part_name,None)
+                    texture_markup_info_list = draw_ib_model.import_config.partname_texturemarkinfolist_dict.get(part_name,None)
                     # It may not have auto texture
-                    if slot_texture_replace_dict is not None:
-                        for slot,texture_replace in slot_texture_replace_dict.items():
-                            print(texture_replace.resource_name)
-                            if texture_replace.style == "Slot":
-                                if texture_replace.resource_name.endswith("DiffuseMap") and Properties_GenerateMod.zzz_use_slot_fix():
-                                    texture_override_ib_section.append("Resource\\ZZMI\\Diffuse = ref " + texture_replace.resource_name)
-                                elif texture_replace.resource_name.endswith("NormalMap") and Properties_GenerateMod.zzz_use_slot_fix():
-                                    texture_override_ib_section.append("Resource\\ZZMI\\NormalMap = ref " + texture_replace.resource_name)
-                                elif texture_replace.resource_name.endswith("LightMap") and Properties_GenerateMod.zzz_use_slot_fix():
-                                    texture_override_ib_section.append("Resource\\ZZMI\\LightMap = ref " + texture_replace.resource_name)
-                                elif texture_replace.resource_name.endswith("MaterialMap") and Properties_GenerateMod.zzz_use_slot_fix():
-                                    texture_override_ib_section.append("Resource\\ZZMI\\MaterialMap = ref " + texture_replace.resource_name)
-                                elif texture_replace.resource_name.endswith("StockingMap") and Properties_GenerateMod.zzz_use_slot_fix():
-                                    texture_override_ib_section.append("Resource\\ZZMI\\WengineFx = ref " + texture_replace.resource_name)
+                    if texture_markup_info_list is not None:
+                        for texture_markup_info in texture_markup_info_list:
+                            if texture_markup_info.mark_type == "Slot":
+                                if texture_markup_info.mark_name == "DiffuseMap" and Properties_GenerateMod.zzz_use_slot_fix():
+                                    texture_override_ib_section.append("Resource\\ZZMI\\Diffuse = ref " + texture_markup_info.get_resource_name())
+                                elif texture_markup_info.mark_name == "NormalMap" and Properties_GenerateMod.zzz_use_slot_fix():
+                                    texture_override_ib_section.append("Resource\\ZZMI\\NormalMap = ref " + texture_markup_info.get_resource_name())
+                                elif texture_markup_info.mark_name == "LightMap" and Properties_GenerateMod.zzz_use_slot_fix():
+                                    texture_override_ib_section.append("Resource\\ZZMI\\LightMap = ref " + texture_markup_info.get_resource_name())
+                                elif texture_markup_info.mark_name == "MaterialMap" and Properties_GenerateMod.zzz_use_slot_fix():
+                                    texture_override_ib_section.append("Resource\\ZZMI\\MaterialMap = ref " + texture_markup_info.get_resource_name())
+                                elif texture_markup_info.mark_name == "StockingMap" and Properties_GenerateMod.zzz_use_slot_fix():
+                                    texture_override_ib_section.append("Resource\\ZZMI\\WengineFx = ref " + texture_markup_info.get_resource_name())
                                 
                         texture_override_ib_section.append("run = CommandList\\ZZMI\\SetTextures")
 
-                        for slot,texture_replace in slot_texture_replace_dict.items():
-                            print(texture_replace.resource_name)
-                            if texture_replace.style == "Slot":
-                                if texture_replace.resource_name.endswith("DiffuseMap") and Properties_GenerateMod.zzz_use_slot_fix():
+                        for texture_markup_info in texture_markup_info_list:
+                            
+                            if texture_markup_info.mark_type == "Slot":
+                                if texture_markup_info.mark_name == "DiffuseMap" and Properties_GenerateMod.zzz_use_slot_fix():
                                     pass
-                                elif texture_replace.resource_name.endswith("NormalMap") and Properties_GenerateMod.zzz_use_slot_fix():
+                                elif texture_markup_info.mark_name == "NormalMap" and Properties_GenerateMod.zzz_use_slot_fix():
                                     pass
-                                elif texture_replace.resource_name.endswith("LightMap") and Properties_GenerateMod.zzz_use_slot_fix():
+                                elif texture_markup_info.mark_name == "LightMap" and Properties_GenerateMod.zzz_use_slot_fix():
                                     pass
-                                elif texture_replace.resource_name.endswith("MaterialMap") and Properties_GenerateMod.zzz_use_slot_fix():
+                                elif texture_markup_info.mark_name == "MaterialMap" and Properties_GenerateMod.zzz_use_slot_fix():
                                     pass
-                                elif texture_replace.resource_name.endswith("StockingMap") and Properties_GenerateMod.zzz_use_slot_fix():
+                                elif texture_markup_info.mark_name == "StockingMap" and Properties_GenerateMod.zzz_use_slot_fix():
                                     pass
                                 else:
-                                    texture_filter_index_indent = ""
-                 
-
-                                    texture_override_ib_section.append(texture_filter_index_indent + self.vlr_filter_index_indent + slot + " = " + texture_replace.resource_name)
+                                    texture_override_ib_section.append(self.vlr_filter_index_indent + texture_markup_info.mark_slot + " = " + texture_markup_info.get_resource_name())
 
                          
 
-                slot_texture_replace_dict = draw_ib_model.import_config.PartName_SlotTextureReplaceDict_Dict.get(part_name,None)
-                if slot_texture_replace_dict is not None:
+                texture_markup_info_list = draw_ib_model.import_config.partname_texturemarkinfolist_dict.get(part_name,None)
+                if texture_markup_info_list is not None:
                     texture_override_ib_section.append("run = CommandListSkinTexture")
             else:
                 # Add slot style texture slot replace.
                 if not Properties_GenerateMod.forbid_auto_texture_ini():
-                    slot_texture_replace_dict = draw_ib_model.import_config.PartName_SlotTextureReplaceDict_Dict.get(part_name,None)
+                    texture_markup_info_list = draw_ib_model.import_config.partname_texturemarkinfolist_dict.get(part_name,None)
                     # It may not have auto texture
-                    if slot_texture_replace_dict is not None:
-                        for slot,texture_replace in slot_texture_replace_dict.items():
-                            print(texture_replace.resource_name)
-                            if texture_replace.style == "Slot":
-                                texture_filter_index_indent = ""
-                           
-
-                                texture_override_ib_section.append(texture_filter_index_indent + self.vlr_filter_index_indent + slot + " = " + texture_replace.resource_name)
+                    if texture_markup_info_list is not None:
+                        for texture_markup_info in texture_markup_info_list:
+                            if texture_markup_info.mark_type == "Slot":
+                                texture_override_ib_section.append(self.vlr_filter_index_indent + texture_markup_info.mark_slot + " = " + texture_markup_info.get_resource_name())
 
 
             # DrawIndexed部分
@@ -372,214 +378,13 @@ class ModModelZZMI:
                 texture_override_vb_section.new_line()
             config_ini_builder.append_section(texture_override_vb_section)
             
-            
-    def add_unity_cs_texture_override_ib_sections(self,config_ini_builder:M_IniBuilder,commandlist_ini_builder:M_IniBuilder,draw_ib_model:DrawIBModel):
-        texture_override_ib_section = M_IniSection(M_SectionType.TextureOverrideIB)
-        draw_ib = draw_ib_model.draw_ib
-        d3d11GameType = draw_ib_model.d3d11GameType
 
-        for count_i in range(len(draw_ib_model.import_config.part_name_list)):
-            match_first_index = draw_ib_model.import_config.match_first_index_list[count_i]
-            part_name = draw_ib_model.import_config.part_name_list[count_i]
-
-            style_part_name = "Component" + part_name
-            ib_resource_name = "Resource_" + draw_ib + "_" + style_part_name
-            texture_override_ib_namesuffix = "IB_" + draw_ib + "_" + draw_ib_model.draw_ib_alias + "_" + style_part_name
-            
-            texture_override_ib_section.append("[TextureOverride_" + texture_override_ib_namesuffix + "]")
-            texture_override_ib_section.append("hash = " + draw_ib)
-            texture_override_ib_section.append("match_first_index = " + match_first_index)
-            texture_override_ib_section.append("checktextureoverride = vb1")
-            
-            # add slot check
-            if not Properties_GenerateMod.forbid_auto_texture_ini():
-                slot_texture_replace_dict = draw_ib_model.import_config.PartName_SlotTextureReplaceDict_Dict.get(part_name,None)
-                # It may not have auto texture
-                if slot_texture_replace_dict is not None:
-                    for slot,texture_replace in slot_texture_replace_dict.items():
-
-                        if texture_replace.style == "Hash":
-                            texture_override_ib_section.append("checktextureoverride = " + slot)
-
-            if self.vlr_filter_index_indent != "":
-                texture_override_ib_section.append("if vb0 == " + str(3000 + M_GlobalKeyCounter.generated_mod_number))
-
-            texture_override_ib_section.append(self.vlr_filter_index_indent + "handling = skip")
-
-
-            # If ib buf is emprt, continue to avoid add ib resource replace.
-            ib_buf = draw_ib_model.componentname_ibbuf_dict.get("Component " + part_name,None)
-            if ib_buf is None or len(ib_buf) == 0:
-                texture_override_ib_section.new_line()
-                continue
-
-            # 如果不使用GPU-Skinning即为Object类型，此时需要在ib上面替换对应槽位
-            # 必须在ib上面替换，否则阴影不正确
-            if not d3d11GameType.GPU_PreSkinning:
-                for category_name in d3d11GameType.OrderedCategoryNameList:
-                    category_hash = draw_ib_model.import_config.category_hash_dict[category_name]
-                    category_slot = d3d11GameType.CategoryExtractSlotDict[category_name]
-
-                    for original_category_name, draw_category_name in d3d11GameType.CategoryDrawCategoryDict.items():
-                        if original_category_name == draw_category_name:
-                            category_original_slot = d3d11GameType.CategoryExtractSlotDict[original_category_name]
-                            texture_override_ib_section.append(self.vlr_filter_index_indent + category_original_slot + " = Resource" + draw_ib + original_category_name)
-
-
-
-            # Add ib replace
-            texture_override_ib_section.append(self.vlr_filter_index_indent + "ib = " + ib_resource_name)
-
-            # Add slot style texture slot replace.
-            if not Properties_GenerateMod.forbid_auto_texture_ini():
-                slot_texturereplace_dict = draw_ib_model.import_config.PartName_SlotTextureReplaceDict_Dict.get(part_name,None)
-                # It may not have auto texture
-                if slot_texturereplace_dict is not None:
-                    for slot,texture_replace_obj in slot_texturereplace_dict.items():
-                        if texture_replace_obj.style == "Slot":
-                            texture_override_ib_section.append(self.vlr_filter_index_indent + slot + " = " + texture_replace_obj.resource_name)
-
-
-            
-
-            # Component DrawIndexed输出
-            component_name = "Component " + part_name 
-            
-            component_model = draw_ib_model.component_name_component_model_dict[component_name]
-            drawindexed_str_list = M_IniHelperV2.get_drawindexed_str_list(component_model.final_ordered_draw_obj_model_list)
-            for drawindexed_str in drawindexed_str_list:
-                texture_override_ib_section.append(drawindexed_str)
- 
-            
-            if self.vlr_filter_index_indent != "":
-                texture_override_ib_section.append("endif")
-                texture_override_ib_section.new_line()
-
-
-        config_ini_builder.append_section(texture_override_ib_section)
-
-    def add_unity_cs_resource_vb_sections(self,config_ini_builder:M_IniBuilder,draw_ib_model:DrawIBModel):
-        '''
-        Add Resource VB Section (UnityCS)
-        '''
-        resource_vb_section = M_IniSection(M_SectionType.ResourceBuffer)
-        for category_name in draw_ib_model.d3d11GameType.OrderedCategoryNameList:
-            resource_vb_section.append("[Resource" + draw_ib_model.draw_ib + category_name + "]")
-
-            if draw_ib_model.d3d11GameType.GPU_PreSkinning:
-                if category_name == "Position" or category_name == "Blend":
-                    resource_vb_section.append("type = ByteAddressBuffer")
-                else:
-                    resource_vb_section.append("type = Buffer")
-            else:
-                resource_vb_section.append("type = Buffer")
-
-            resource_vb_section.append("stride = " + str(draw_ib_model.d3d11GameType.CategoryStrideDict[category_name]))
-            
-            resource_vb_section.append("filename = Buffer/" + draw_ib_model.draw_ib + "-" + category_name + ".buf")
-            # resource_vb_section.append(";VertexCount: " + str(draw_ib_model.draw_number))
-            resource_vb_section.new_line()
-        
-        '''
-        Add Resource IB Section
-
-        We default use R32_UINT because R16_UINT have a very small number limit.
-        '''
-        for count_i in range(len(draw_ib_model.import_config.part_name_list)):
-            partname = draw_ib_model.import_config.part_name_list[count_i]
-            style_partname = "Component" + partname
-            ib_resource_name = "Resource_" + draw_ib_model.draw_ib + "_" + style_partname
-
-            
-            resource_vb_section.append("[" + ib_resource_name + "]")
-            resource_vb_section.append("type = Buffer")
-            resource_vb_section.append("format = DXGI_FORMAT_R32_UINT")
-            resource_vb_section.append("filename = Buffer/" + draw_ib_model.draw_ib + "-" + style_partname + ".buf")
-            resource_vb_section.new_line()
-        
-        config_ini_builder.append_section(resource_vb_section)
-    
-    def add_unity_cs_resource_vertexlimit(self,commandlist_ini_builder:M_IniBuilder,draw_ib_model:DrawIBModel):
-        '''
-        此部分由于顶点数变化后会刷新，应该写在CommandList.ini中
-        '''
-        resource_vertex_limit_section = M_IniSection(M_SectionType.ResourceBuffer)
-        resource_vertex_limit_section.append("[Resource_" + draw_ib_model.draw_ib + "_VertexLimit]")
-        resource_vertex_limit_section.append("type = Buffer")
-        resource_vertex_limit_section.append("format = R32G32B32A32_UINT")
-        resource_vertex_limit_section.append("data = " + str(draw_ib_model.draw_number) + " 0 0 0")
-        resource_vertex_limit_section.new_line()
-
-        commandlist_ini_builder.append_section(resource_vertex_limit_section)
-
-
-
-    def add_unity_cs_vertex_shader_check(self,ini_builder:M_IniBuilder):
-        print("add_unity_cs_vertex_shader_check::")
-        vscheck_section = M_IniSection(M_SectionType.VertexShaderCheck)
-
-        vs_hash_set = set()
-        for draw_ib, draw_ib_model in self.drawib_drawibmodel_dict.items():
-            for vs_hash in draw_ib_model.import_config.vshash_list:
-                vs_hash_set.add(vs_hash)
-        
-        for vs_hash in vs_hash_set:
-            print("VSHash: " + vs_hash)
-            vscheck_section.append("[ShaderOverride_" + vs_hash + "]")
-            vscheck_section.append("allow_duplicate_hash = overrule")
-            vscheck_section.append("hash = " + vs_hash)
-            vscheck_section.append("if $costume_mods")
-            vscheck_section.append("  checktextureoverride = ib")
-            vscheck_section.append("endif")
-            vscheck_section.new_line()
-        
-        ini_builder.append_section(vscheck_section)
-
-
-    def generate_unity_cs_config_ini(self):
-        config_ini_builder = M_IniBuilder()
-
-        M_IniHelperV2.generate_hash_style_texture_ini(ini_builder=config_ini_builder,drawib_drawibmodel_dict=self.drawib_drawibmodel_dict)
-
-
-
-
-        for draw_ib, draw_ib_model in self.drawib_drawibmodel_dict.items():
-
-            # 按键开关与按键切换声明部分
-
-
-            if GlobalConfig.logic_name != LogicName.SRMI:
-                self.add_unity_vs_texture_override_vlr_section(config_ini_builder=config_ini_builder,commandlist_ini_builder=config_ini_builder,draw_ib_model=draw_ib_model) 
-            self.add_unity_cs_texture_override_vb_sections(config_ini_builder=config_ini_builder,commandlist_ini_builder=config_ini_builder,draw_ib_model=draw_ib_model) 
-            self.add_unity_cs_texture_override_ib_sections(config_ini_builder=config_ini_builder,commandlist_ini_builder=config_ini_builder,draw_ib_model=draw_ib_model) 
-
-            # CommandList.ini
-            self.add_unity_cs_resource_vertexlimit(commandlist_ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)
-            # Resource.ini
-            self.add_unity_cs_resource_vb_sections(config_ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)
-            self.add_resource_texture_sections(ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)
-
-            M_IniHelperV2.move_slot_style_textures(draw_ib_model=draw_ib_model)
-
-            M_GlobalKeyCounter.generated_mod_number = M_GlobalKeyCounter.generated_mod_number + 1
-
-        M_IniHelperV3.add_branch_key_sections(ini_builder=config_ini_builder,key_name_mkey_dict=self.branch_model.keyname_mkey_dict)
-        
-        M_IniHelperGUI.add_branch_mod_gui_section(ini_builder=config_ini_builder,key_name_mkey_dict=self.branch_model.keyname_mkey_dict)
-
-        self.add_unity_cs_vertex_shader_check(ini_builder=config_ini_builder)
-
-        config_ini_builder.save_to_file(GlobalConfig.path_generate_mod_folder() + GlobalConfig.workspacename + ".ini")
-        
     def generate_unity_vs_config_ini(self):
         config_ini_builder = M_IniBuilder()
 
         M_IniHelperV2.generate_hash_style_texture_ini(ini_builder=config_ini_builder,drawib_drawibmodel_dict=self.drawib_drawibmodel_dict)
-
-
         
-        for draw_ib, draw_ib_model in self.drawib_drawibmodel_dict.items():
+        for draw_ib_model in self.drawib_drawibmodel_dict.values():
 
             # 按键开关与按键切换声明部分
 
@@ -587,7 +392,7 @@ class ModModelZZMI:
             self.add_unity_vs_texture_override_vlr_section(config_ini_builder=config_ini_builder,commandlist_ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)
             self.add_unity_vs_texture_override_vb_sections(config_ini_builder=config_ini_builder,commandlist_ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)
 
-            self.add_unity_vs_texture_override_ib_sections(config_ini_builder=config_ini_builder,commandlist_ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)
+            self.add_unity_vs_texture_override_ib_sections(config_ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)
 
             self.add_unity_vs_resource_vb_sections(ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)
             self.add_resource_texture_sections(ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)

@@ -11,14 +11,14 @@ from ..common.branch_model import M_GlobalKeyCounter
 from ..games.himi import ModModelHIMI
 from ..games.gimi import ModModelGIMI
 
-from ..games.ZZMI import ModModelZZMI
+from ..games.zzmi import ModModelZZMI
 
-from ..games.Unity import ModModelUnity
-from ..games.SRMI import ModModelSRMI
-from ..games.IdentityV import ModModelIdentityV
-from ..games.YYSLS import ModModelYYSLS
-from ..games.WWMI import ModModelWWMI
-from ..games.SnowBreak import ModModelSnowBreak
+from ..games.unity import ModModelUnity
+from ..games.srmi import ModModelSRMI
+from ..games.identityv import ModModelIdentityV
+from ..games.yysls import ModModelYYSLS
+from ..games.wwmi import ModModelWWMI
+from ..games.snowbreak import ModModelSnowBreak
 from ..config.properties_generate_mod import Properties_GenerateMod
 
 

@@ -10,3 +10,12 @@
 - 几乎所有流程都与旧版本SSMT不相同，请勿在生产环境中使用。
 
 
+# 插件开发
+
+开发插件请使用VSCode，严禁使用PyCharm开发
+
+请使用以下VSCode插件:
+- Blender Development (作者是 Jacques Lucke)
+- pylint 用于语法检查 (注意VSCode使用的是.pylintrc配置文件)
+
+

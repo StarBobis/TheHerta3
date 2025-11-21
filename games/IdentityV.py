@@ -96,9 +96,9 @@ class ModModelIdentityV:
         
         d3d11GameType = draw_ib_model.d3d11GameType
 
-        for count_i in range(len(draw_ib_model.import_config.part_name_list)):
+        for count_i, part_name in enumerate(draw_ib_model.import_config.part_name_list):
             match_first_index = draw_ib_model.import_config.match_first_index_list[count_i]
-            part_name = draw_ib_model.import_config.part_name_list[count_i]
+            # part_name = draw_ib_model.import_config.part_name_list[count_i]
 
             style_part_name = "Component" + part_name
 
@@ -109,7 +109,7 @@ class ModModelIdentityV:
             ib_resource_name = ""
             ib_resource_name = draw_ib_model.PartName_IBResourceName_Dict.get(part_name,None)
             
-            # XXX 第五必须用槽位恢复技术，绕过顶点限制
+            # 第五必须用槽位恢复技术，绕过顶点限制
             texture_override_ib_section.append("[Resource_IB_Bak_" + str(count_i) + "]")
             texture_override_ib_section.append("[TextureOverride_" + texture_override_name_suffix + "]")
             texture_override_ib_section.append("hash = " + draw_ib)
@@ -240,11 +240,8 @@ class ModModelIdentityV:
             # resource_vb_section.append(";VertexCount: " + str(draw_ib_model.draw_number))
             resource_vb_section.new_line()
         
-        '''
-        Add Resource IB Section
-
-        We default use R32_UINT because R16_UINT have a very small number limit.
-        '''
+        # Add Resource IB Section
+        # We default use R32_UINT because R16_UINT have a very small number limit.
 
         for partname, ib_filename in draw_ib_model.PartName_IBBufferFileName_Dict.items():
             ib_resource_name = draw_ib_model.PartName_IBResourceName_Dict.get(partname,None)
@@ -263,14 +260,15 @@ class ModModelIdentityV:
         只有槽位风格贴图会用到，因为Hash风格贴图有专门的方法去声明这个。
         '''
         if Properties_GenerateMod.forbid_auto_texture_ini():
-            return 
+            return
         
         resource_texture_section = M_IniSection(M_SectionType.ResourceTexture)
-        for resource_name, texture_filename in draw_ib_model.import_config.TextureResource_Name_FileName_Dict.items():
-            if "_Slot_" in texture_filename:
-                resource_texture_section.append("[" + resource_name + "]")
-                resource_texture_section.append("filename = Texture/" + texture_filename)
-                resource_texture_section.new_line()
+        for partname, texture_markup_info_list in draw_ib_model.import_config.partname_texturemarkinfolist_dict.items():
+            for texture_markup_info in texture_markup_info_list:
+                if texture_markup_info.mark_type == "Slot":
+                    resource_texture_section.append("[" + texture_markup_info.get_resource_name() + "]")
+                    resource_texture_section.append("filename = Texture/" + texture_markup_info.mark_filename)
+                    resource_texture_section.new_line()
 
         ini_builder.append_section(resource_texture_section)
 

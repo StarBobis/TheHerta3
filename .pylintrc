@@ -1,0 +1,5 @@
+[tool.pylint.messages_control]
+# 因为我们开发的是Blender插件，Blender插件永远是包内环境，只能使用相对导入
+# 此时VSCode的pylint插件检查就会报错，所以咱们得关掉它
+disable = relative-beyond-top-level
+

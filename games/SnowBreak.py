@@ -273,14 +273,14 @@ class ModModelSnowBreak:
             return 
         
         resource_texture_section = M_IniSection(M_SectionType.ResourceTexture)
-        for resource_name, texture_filename in draw_ib_model.import_config.TextureResource_Name_FileName_Dict.items():
-            if "_Slot_" in texture_filename:
-                resource_texture_section.append("[" + resource_name + "]")
-                resource_texture_section.append("filename = Texture/" + texture_filename)
-                resource_texture_section.new_line()
+        for partname, texture_markup_info_list in draw_ib_model.import_config.partname_texturemarkinfolist_dict.items():
+            for texture_markup_info in texture_markup_info_list:
+                if texture_markup_info.mark_type == "Slot":
+                    resource_texture_section.append("[" + texture_markup_info.get_resource_name() + "]")
+                    resource_texture_section.append("filename = Texture/" + texture_markup_info.mark_filename)
+                    resource_texture_section.new_line()
 
         ini_builder.append_section(resource_texture_section)
-
 
     def add_unity_cs_texture_override_vb_sections(self,config_ini_builder:M_IniBuilder,commandlist_ini_builder:M_IniBuilder,draw_ib_model:DrawIBModel):
         # 声明TextureOverrideVB部分，只有使用GPU-PreSkinning时是直接替换hash对应槽位

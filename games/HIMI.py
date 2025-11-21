@@ -1,7 +1,9 @@
-import bpy
+"""
+崩坏三
+"""
 import math
+import bpy
 
-from ..common.migoto_format import M_Key, M_DrawIndexed, M_Condition,D3D11GameType
 from ..config.main_config import GlobalConfig, LogicName
 from ..common.draw_ib_model import DrawIBModel
 
@@ -147,26 +149,25 @@ class ModModelHIMI:
                 '''
                 
                 if not Properties_GenerateMod.forbid_auto_texture_ini():
-                    slot_texture_replace_dict = draw_ib_model.import_config.PartName_SlotTextureReplaceDict_Dict.get(part_name,None)
+                    texture_markup_info_list = draw_ib_model.import_config.partname_texturemarkinfolist_dict.get(part_name,None)
                     # It may not have auto texture
-                    if slot_texture_replace_dict is not None:
-                        for slot,texture_replace in slot_texture_replace_dict.items():
-                            print(texture_replace.resource_name)
-                            if texture_replace.style == "Slot":
-                                if texture_replace.resource_name.endswith("DiffuseMap") and Properties_GenerateMod.zzz_use_slot_fix():
-                                    texture_override_ib_section.append("Resource\\ZZMI\\Diffuse = ref " + texture_replace.resource_name)
-                                elif texture_replace.resource_name.endswith("NormalMap") and Properties_GenerateMod.zzz_use_slot_fix():
-                                    texture_override_ib_section.append("Resource\\ZZMI\\NormalMap = ref " + texture_replace.resource_name)
-                                elif texture_replace.resource_name.endswith("LightMap") and Properties_GenerateMod.zzz_use_slot_fix():
-                                    texture_override_ib_section.append("Resource\\ZZMI\\LightMap = ref " + texture_replace.resource_name)
-                                elif texture_replace.resource_name.endswith("MaterialMap") and Properties_GenerateMod.zzz_use_slot_fix():
-                                    texture_override_ib_section.append("Resource\\ZZMI\\MaterialMap = ref " + texture_replace.resource_name)
-                                elif texture_replace.resource_name.endswith("StockingMap") and Properties_GenerateMod.zzz_use_slot_fix():
-                                    texture_override_ib_section.append("Resource\\ZZMI\\WengineFx = ref " + texture_replace.resource_name)
+                    if texture_markup_info_list is not None:
+                        for texture_markup_info in texture_markup_info_list:
+                            if texture_markup_info.mark_type == "Slot":
+                                if texture_markup_info.mark_name == "DiffuseMap" and Properties_GenerateMod.zzz_use_slot_fix():
+                                    texture_override_ib_section.append("Resource\\ZZMI\\Diffuse = ref " + texture_markup_info.get_resource_name())
+                                elif texture_markup_info.mark_name == "NormalMap" and Properties_GenerateMod.zzz_use_slot_fix():
+                                    texture_override_ib_section.append("Resource\\ZZMI\\NormalMap = ref " + texture_markup_info.get_resource_name())
+                                elif texture_markup_info.mark_name == "LightMap" and Properties_GenerateMod.zzz_use_slot_fix():
+                                    texture_override_ib_section.append("Resource\\ZZMI\\LightMap = ref " + texture_markup_info.get_resource_name())
+                                elif texture_markup_info.mark_name == "MaterialMap" and Properties_GenerateMod.zzz_use_slot_fix():
+                                    texture_override_ib_section.append("Resource\\ZZMI\\MaterialMap = ref " + texture_markup_info.get_resource_name())
+                                elif texture_markup_info.mark_name == "StockingMap" and Properties_GenerateMod.zzz_use_slot_fix():
+                                    texture_override_ib_section.append("Resource\\ZZMI\\WengineFx = ref " + texture_markup_info.get_resource_name())
                                 
                         texture_override_ib_section.append("run = CommandList\\ZZMI\\SetTextures")
 
-                        for slot,texture_replace in slot_texture_replace_dict.items():
+                        for texture_markup_info in texture_markup_info_list:
                             print(texture_replace.resource_name)
                             if texture_replace.style == "Slot":
                                 if texture_replace.resource_name.endswith("DiffuseMap") and Properties_GenerateMod.zzz_use_slot_fix():
@@ -180,13 +181,10 @@ class ModModelHIMI:
                                 elif texture_replace.resource_name.endswith("StockingMap") and Properties_GenerateMod.zzz_use_slot_fix():
                                     pass
                                 else:
-                                    texture_filter_index_indent = ""
-                        
-
-                                    texture_override_ib_section.append(texture_filter_index_indent + self.vlr_filter_index_indent + slot + " = " + texture_replace.resource_name)
+                                    texture_override_ib_section.append(self.vlr_filter_index_indent + slot + " = " + texture_replace.resource_name)
 
 
-                slot_texture_replace_dict = draw_ib_model.import_config.PartName_SlotTextureReplaceDict_Dict.get(part_name,None)
+                slot_texture_replace_dict = draw_ib_model.import_config.partname_texturemarkinfolist_dict.get(part_name,None)
                 if slot_texture_replace_dict is not None:
                     texture_override_ib_section.append("run = CommandListSkinTexture")
             else:
@@ -292,11 +290,12 @@ class ModModelHIMI:
             return 
         
         resource_texture_section = M_IniSection(M_SectionType.ResourceTexture)
-        for resource_name, texture_filename in draw_ib_model.import_config.TextureResource_Name_FileName_Dict.items():
-            if "_Slot_" in texture_filename:
-                resource_texture_section.append("[" + resource_name + "]")
-                resource_texture_section.append("filename = Texture/" + texture_filename)
-                resource_texture_section.new_line()
+        for partname, texture_markup_info_list in draw_ib_model.import_config.partname_texturemarkinfolist_dict.items():
+            for texture_markup_info in texture_markup_info_list:
+                if texture_markup_info.mark_type == "Slot":
+                    resource_texture_section.append("[" + texture_markup_info.get_resource_name() + "]")
+                    resource_texture_section.append("filename = Texture/" + texture_markup_info.mark_filename)
+                    resource_texture_section.new_line()
 
         ini_builder.append_section(resource_texture_section)
 

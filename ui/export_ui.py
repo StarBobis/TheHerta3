@@ -8,8 +8,8 @@ from ..utils.collection_utils import CollectionUtils
 from ..config.main_config import GlobalConfig, LogicName
 from ..common.branch_model import M_GlobalKeyCounter
 
-from ..games.HIMI import ModModelHIMI
-from ..games.GIMI import ModModelGIMI
+from ..games.himi import ModModelHIMI
+from ..games.gimi import ModModelGIMI
 
 from ..games.ZZMI import ModModelZZMI
 

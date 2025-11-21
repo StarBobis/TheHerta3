@@ -1,7 +1,9 @@
-import bpy
+"""
+GIMI
+"""
 import math
+import bpy
 
-from ..common.migoto_format import M_Key, M_DrawIndexed, M_Condition,D3D11GameType
 from ..config.main_config import GlobalConfig, LogicName
 from ..common.draw_ib_model import DrawIBModel
 
@@ -11,7 +13,11 @@ from ..config.properties_generate_mod import Properties_GenerateMod
 from ..common.m_ini_helper import M_IniHelperV2,M_IniHelperV3
 from ..common.m_ini_helper_gui import M_IniHelperGUI
 
+
 class ModModelGIMI:
+    '''
+    GIMI生成类
+    '''
     def __init__(self,workspace_collection:bpy.types.Collection):
         # (1) 统计全局分支模型
         self.branch_model = BranchModel(workspace_collection=workspace_collection)
@@ -33,20 +39,25 @@ class ModModelGIMI:
         for draw_ib in self.branch_model.draw_ib__component_count_list__dict.keys():
             draw_ib_model = DrawIBModel(draw_ib=draw_ib,branch_model=self.branch_model)
             self.drawib_drawibmodel_dict[draw_ib] = draw_ib_model
-            
-        
-    def add_unity_vs_texture_override_vb_sections(self,config_ini_builder:M_IniBuilder,commandlist_ini_builder:M_IniBuilder,draw_ib_model:DrawIBModel):
+
+    def add_unity_vs_texture_override_vb_sections(
+            self,
+            config_ini_builder:M_IniBuilder,
+            draw_ib_model:DrawIBModel):
+        '''
+        添加
+        '''
+
         # 声明TextureOverrideVB部分，只有使用GPU-PreSkinning时是直接替换hash对应槽位
-        d3d11GameType = draw_ib_model.d3d11GameType
+        d3d11_game_type = draw_ib_model.d3d11GameType
         draw_ib = draw_ib_model.draw_ib
 
         # 只有GPU-PreSkinning需要生成TextureOverrideVB部分，CPU类型不需要
 
         texture_override_vb_section = M_IniSection(M_SectionType.TextureOverrideVB)
         texture_override_vb_section.append("; " + draw_ib + " ")
-        for category_name in d3d11GameType.OrderedCategoryNameList:
+        for category_name in d3d11_game_type.OrderedCategoryNameList:
             category_hash = draw_ib_model.import_config.category_hash_dict[category_name]
-            category_slot = d3d11GameType.CategoryExtractSlotDict[category_name]
 
             texture_override_vb_name_suffix = "VB_" + draw_ib + "_" + draw_ib_model.draw_ib_alias + "_" + category_name
             texture_override_vb_section.append("[TextureOverride_" + texture_override_vb_name_suffix + "]")
@@ -62,21 +73,21 @@ class ModModelGIMI:
 
 
             # 遍历获取所有在当前分类hash下进行替换的分类，并添加对应的资源替换
-            for original_category_name, draw_category_name in d3d11GameType.CategoryDrawCategoryDict.items():
+            for original_category_name, draw_category_name in d3d11_game_type.CategoryDrawCategoryDict.items():
                 if category_name == draw_category_name:
-                    category_original_slot = d3d11GameType.CategoryExtractSlotDict[original_category_name]
+                    category_original_slot = d3d11_game_type.CategoryExtractSlotDict[original_category_name]
                     texture_override_vb_section.append(filterindex_indent_prefix + drawtype_indent_prefix + category_original_slot + " = Resource" + draw_ib + original_category_name)
 
             # draw一般都是在Blend槽位上进行的，所以我们这里要判断确定是Blend要替换的hash才能进行draw。
-            draw_category_name = d3d11GameType.CategoryDrawCategoryDict.get("Blend",None)
-            if draw_category_name is not None and category_name == d3d11GameType.CategoryDrawCategoryDict["Blend"]:
+            draw_category_name = d3d11_game_type.CategoryDrawCategoryDict.get("Blend",None)
+            if draw_category_name is not None and category_name == d3d11_game_type.CategoryDrawCategoryDict["Blend"]:
                 texture_override_vb_section.append(drawtype_indent_prefix + "handling = skip")
                 texture_override_vb_section.append(drawtype_indent_prefix + "draw = " + str(draw_ib_model.draw_number) + ", 0")
 
 
             
             # 分支架构，如果是Position则需提供激活变量
-            if category_name == d3d11GameType.CategoryDrawCategoryDict["Position"]:
+            if category_name == d3d11_game_type.CategoryDrawCategoryDict["Position"]:
                 if len(self.branch_model.keyname_mkey_dict.keys()) != 0:
                     texture_override_vb_section.append("$active" + str(M_GlobalKeyCounter.generated_mod_number) + " = 1")
 
@@ -92,7 +103,7 @@ class ModModelGIMI:
         texture_override_ib_section = M_IniSection(M_SectionType.TextureOverrideIB)
         draw_ib = draw_ib_model.draw_ib
         
-        d3d11GameType = draw_ib_model.d3d11GameType
+        d3d11_game_type = draw_ib_model.d3d11GameType
 
         texture_override_ib_section.append("[TextureOverride_IB_" + draw_ib + "]")
         texture_override_ib_section.append("hash = " + draw_ib)
@@ -374,12 +385,12 @@ class ModModelGIMI:
 
             # Add slot style texture slot replace.
             if not Properties_GenerateMod.forbid_auto_texture_ini():
-                slot_texturereplace_dict = draw_ib_model.import_config.PartName_SlotTextureReplaceDict_Dict.get(part_name,None)
+                texture_markup_info_list = draw_ib_model.import_config.partname_texturemarkinfolist_dict.get(part_name,None)
                 # It may not have auto texture
-                if slot_texturereplace_dict is not None:
-                    for slot,texture_replace_obj in slot_texturereplace_dict.items():
-                        if texture_replace_obj.style == "Slot":
-                            texture_override_ib_section.append(self.vlr_filter_index_indent + slot + " = " + texture_replace_obj.resource_name)
+                if texture_markup_info_list is not None:
+                    for texture_markup_info in texture_markup_info_list:
+                        if texture_markup_info.mark_type == "Slot":
+                            texture_override_ib_section.append(self.vlr_filter_index_indent + texture_markup_info.mark_slot + " = " + texture_markup_info.get_resource_name())
 
 
             
@@ -437,7 +448,7 @@ class ModModelGIMI:
 
         
             self.add_unity_vs_texture_override_vlr_section(config_ini_builder=config_ini_builder,commandlist_ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)
-            self.add_unity_vs_texture_override_vb_sections(config_ini_builder=config_ini_builder,commandlist_ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)
+            self.add_unity_vs_texture_override_vb_sections(config_ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)
 
             self.add_unity_vs_texture_override_ib_sections(config_ini_builder=config_ini_builder,commandlist_ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)
 

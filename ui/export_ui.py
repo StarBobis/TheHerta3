@@ -11,17 +11,17 @@ from ..utils.collection_utils import CollectionUtils
 from ..config.main_config import GlobalConfig, LogicName
 from ..common.branch_model import M_GlobalKeyCounter
 
-from ..games.himi import ModModelHIMI
-from ..games.gimi import ModModelGIMI
+from ..game.himi import ModModelHIMI
+from ..game.gimi import ModModelGIMI
 
-from ..games.zzmi import ModModelZZMI
+from ..game.zzmi import ModModelZZMI
 
-from ..games.unity import ModModelUnity
-from ..games.srmi import ModModelSRMI
-from ..games.identityv import ModModelIdentityV
-from ..games.yysls import ModModelYYSLS
-from ..games.wwmi import ModModelWWMI
-from ..games.snowbreak import ModModelSnowBreak
+from ..game.unity import ModModelUnity
+from ..game.srmi import ModModelSRMI
+from ..game.identityv import ModModelIdentityV
+from ..game.yysls import ModModelYYSLS
+from ..game.wwmi import ModModelWWMI
+from ..game.snowbreak import ModModelSnowBreak
 from ..config.properties_generate_mod import Properties_GenerateMod
 
 

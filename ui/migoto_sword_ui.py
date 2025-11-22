@@ -329,12 +329,12 @@ class SSMT_ImportTexture_VIEW3D_PT_ImageMaterialPanel(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = 'Sword'
-    bl_options = {'DEFAULT_CLOSED'}
-    
+    # bl_options = {'DEFAULT_CLOSED'}
+
     def draw(self, context):
         layout = self.layout
         scene = context.scene
-        
+
         # 一键导入逆向结果按钮
         layout.operator("ssmt.import_all_reverse")
 
@@ -342,7 +342,7 @@ class SSMT_ImportTexture_VIEW3D_PT_ImageMaterialPanel(Panel):
         row = layout.row()
 
         row.operator("wm.auto_detect_texture_folder", icon='FILE_REFRESH')
-        
+
         # 文件夹选择按钮
         row = layout.row()
         row.operator("wm.select_image_folder", icon='FILE_FOLDER')

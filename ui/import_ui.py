@@ -1,6 +1,12 @@
 
-import bpy
+'''
+导入模型配置面板
+'''
 import os
+import bpy
+
+# 用于解决 AttributeError: 'IMPORT_MESH_OT_migoto_raw_buffers_mmt' object has no attribute 'filepath'
+from bpy_extras.io_utils import ImportHelper 
 
 from ..utils.json_utils import JsonUtils
 from ..utils.config_utils import ConfigUtils
@@ -12,11 +18,11 @@ from ..config.main_config import GlobalConfig, LogicName
 
 from ..common.mesh_importer import MeshImporter,MigotoBinaryFile
 
-# 用于解决 AttributeError: 'IMPORT_MESH_OT_migoto_raw_buffers_mmt' object has no attribute 'filepath'
-from bpy_extras.io_utils import ImportHelper 
-
 
 class PanelModelImportConfig(bpy.types.Panel):
+    '''
+    导入模型文件面板
+    '''
     bl_label = "导入模型文件"
     bl_idname = "VIEW3D_PT_CATTER_WorkSpace_IO_panel"
     bl_space_type = 'VIEW_3D'

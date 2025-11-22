@@ -1,3 +1,6 @@
+'''
+生成Mod配置面板
+'''
 import bpy
 
 from ..utils.timer_utils import TimerUtils
@@ -23,20 +26,25 @@ from ..config.properties_generate_mod import Properties_GenerateMod
 
 
 class SSMTSelectGenerateModFolder(bpy.types.Operator):
+    '''
+    来一个按钮来选择生成Mod的位置,部分用户有这个需求但是这个设计是不优雅的
+    正常流程就是应该生成在Mods文件夹中,以便于游戏内F10刷新可以直接生效
+    后续观察如果使用人数过少就移除掉
+    '''
     bl_idname = "ssmt.select_generate_mod_folder"
     bl_label = "选择生成Mod的位置文件夹"
     bl_description = "选择生成Mod的位置文件夹"
-    
+
     directory: bpy.props.StringProperty(
         subtype='DIR_PATH'
     ) # type: ignore
-    
+
     def execute(self, context):
         # 将选择的文件夹路径保存到属性组中
         context.scene.properties_generate_mod.generate_mod_folder_path = self.directory
         self.report({'INFO'}, f"已选择文件夹: {self.directory}")
         return {'FINISHED'}
-    
+
     def invoke(self, context, event):
         # 打开文件浏览器，只允许选择文件夹
         context.window_manager.fileselect_add(self)
@@ -44,6 +52,9 @@ class SSMTSelectGenerateModFolder(bpy.types.Operator):
 
 
 class PanelGenerateModConfig(bpy.types.Panel):
+    '''
+    生成Mod面板
+    '''
     bl_label = "生成二创模型"
     bl_idname = "VIEW3D_PT_CATTER_GenerateMod_panel"
     bl_space_type = 'VIEW_3D'
@@ -57,7 +68,7 @@ class PanelGenerateModConfig(bpy.types.Panel):
         # 生成Mod按钮
         if GlobalConfig.logic_name == LogicName.WWMI:
             layout.label(text="仍在开发测试中，追求稳定请使用WWMITools",icon='INFO')
-        
+
 
         layout.operator("ssmt.generate_mod",icon='EXPORT')
 
@@ -66,22 +77,30 @@ class PanelGenerateModConfig(bpy.types.Panel):
 
         # 任何游戏都能贴图标记
         if GlobalConfig.logic_name == LogicName.WWMI:
-            layout.prop(context.scene.properties_generate_mod, "only_use_marked_texture",text="只使用标记过的贴图")
+            layout.prop(context.scene.properties_generate_mod,
+                "only_use_marked_texture",text="只使用标记过的贴图")
             layout.prop(context.scene.properties_wwmi, "ignore_muted_shape_keys")
             layout.prop(context.scene.properties_wwmi, "apply_all_modifiers")
 
-        layout.prop(context.scene.properties_generate_mod, "forbid_auto_texture_ini",text="禁止自动贴图流程")
+        layout.prop(context.scene.properties_generate_mod, 
+                    "forbid_auto_texture_ini",text="禁止自动贴图流程")
 
         if GlobalConfig.logic_name != LogicName.UnityCPU:
-            layout.prop(context.scene.properties_generate_mod, "recalculate_tangent",text="向量归一化法线存入TANGENT(全局)")
+            layout.prop(context.scene.properties_generate_mod,
+                        "recalculate_tangent",text="向量归一化法线存入TANGENT(全局)")
 
         if GlobalConfig.logic_name == LogicName.HIMI:
-            layout.prop(context.scene.properties_generate_mod, "recalculate_color",text="算术平均归一化法线存入COLOR(全局)")
+            layout.prop(context.scene.properties_generate_mod,
+                        "recalculate_color",text="算术平均归一化法线存入COLOR(全局)")
 
         # 绝区零特有的SlotFix技术
         if GlobalConfig.logic_name == LogicName.ZZMI:
             layout.prop(context.scene.properties_generate_mod, "zzz_use_slot_fix")
-        
+
+        # 原神特有的ORFix与NNFix技术
+        if GlobalConfig.logic_name == LogicName.GIMI:
+            layout.prop(context.scene.properties_generate_mod, "gimi_use_orfix")
+
         # 所有的游戏都要能支持生成分支架构面板Mod
         layout.prop(context.scene.properties_generate_mod, "generate_branch_mod_gui",text="生成分支架构Mod面板(测试中)")
 

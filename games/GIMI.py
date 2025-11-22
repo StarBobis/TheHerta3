@@ -102,17 +102,15 @@ class ModModelGIMI:
     def add_unity_vs_texture_override_ib_sections(self,config_ini_builder:M_IniBuilder,commandlist_ini_builder:M_IniBuilder,draw_ib_model:DrawIBModel):
         texture_override_ib_section = M_IniSection(M_SectionType.TextureOverrideIB)
         draw_ib = draw_ib_model.draw_ib
-        
-        d3d11_game_type = draw_ib_model.d3d11GameType
 
         texture_override_ib_section.append("[TextureOverride_IB_" + draw_ib + "]")
         texture_override_ib_section.append("hash = " + draw_ib)
         texture_override_ib_section.append("handling = skip")
         texture_override_ib_section.new_line()
 
-        for count_i in range(len(draw_ib_model.import_config.part_name_list)):
+        for count_i,part_name in enumerate(draw_ib_model.import_config.part_name_list):
             match_first_index = draw_ib_model.import_config.match_first_index_list[count_i]
-            part_name = draw_ib_model.import_config.part_name_list[count_i]
+            
             style_part_name = "Component" + part_name
             texture_override_name_suffix = "IB_" + draw_ib + "_" + draw_ib_model.draw_ib_alias + "_" + style_part_name
 
@@ -417,10 +415,10 @@ class ModModelGIMI:
         vscheck_section = M_IniSection(M_SectionType.VertexShaderCheck)
 
         vs_hash_set = set()
-        for draw_ib, draw_ib_model in self.drawib_drawibmodel_dict.items():
+        for draw_ib_model in self.drawib_drawibmodel_dict.values():
             for vs_hash in draw_ib_model.import_config.vshash_list:
                 vs_hash_set.add(vs_hash)
-        
+
         for vs_hash in vs_hash_set:
             print("VSHash: " + vs_hash)
             vscheck_section.append("[ShaderOverride_" + vs_hash + "]")
@@ -433,8 +431,6 @@ class ModModelGIMI:
         
         ini_builder.append_section(vscheck_section)
 
-
-
     def generate_unity_vs_config_ini(self):
         config_ini_builder = M_IniBuilder()
 
@@ -442,8 +438,7 @@ class ModModelGIMI:
 
 
         
-        for draw_ib, draw_ib_model in self.drawib_drawibmodel_dict.items():
-
+        for draw_ib_model in self.drawib_drawibmodel_dict.values():
             # 按键开关与按键切换声明部分
 
         

@@ -1,18 +1,20 @@
+'''
+基础信息面板
+'''
 import bpy
-import blf
-import os
-import sys
 
-from ..config.main_config import GlobalConfig, LogicName
-from ..utils.translate_utils import TR
+from ..config.main_config import GlobalConfig
 from ..config.plugin_config import PluginConfig
 
-
-
+from ..utils.translate_utils import TR
 
 
 class PanelBasicInformation(bpy.types.Panel):
-    bl_label = TR.translate("基础信息面板") 
+    '''
+    基础信息面板
+    此面板实时刷新并读取全局配置文件中的路径
+    '''
+    bl_label = TR.translate("基础信息面板")
     bl_idname = "VIEW3D_PT_CATTER_Buttons_panel"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
@@ -43,5 +45,3 @@ class PanelBasicInformation(bpy.types.Panel):
             layout.label(text="GameType: " + gametypename)
             layout.label(text="RecalculateTANGENT: " + str(recalculate_tangent))
             layout.label(text="RecalculateCOLOR: " + str(recalculate_color))
-
-        

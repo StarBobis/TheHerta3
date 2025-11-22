@@ -16,6 +16,3 @@
 
 请使用以下VSCode插件:
 - Blender Development (作者是 Jacques Lucke)
-- pylint 用于语法检查 (注意VSCode使用的是.pylintrc配置文件)
-
-

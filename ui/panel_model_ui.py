@@ -600,7 +600,7 @@ class PanelModelProcess(bpy.types.Panel):
     bl_idname = "VIEW3D_PT_Herta_ModelProcess_Panel"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = 'TheHerta'
+    bl_category = 'TheHerta3'
     bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
@@ -643,7 +643,7 @@ class PanelModelSplit(bpy.types.Panel):
     bl_idname = "VIEW3D_PT_Herta_ModelSplit_Panel"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = 'TheHerta'
+    bl_category = 'TheHerta3'
     bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):

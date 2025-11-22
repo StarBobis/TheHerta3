@@ -28,7 +28,7 @@ bl_info = {
     "name": "TheHerta3",
     "description": "SSMT3.0 Series's Blender Plugin.",
     "blender": (5, 1, 0),
-    "version": (3, 0, 6),
+    "version": (3, 0, 7),
     "location": "View3D",
     "category": "Generic"
 }
@@ -44,7 +44,7 @@ class UpdaterPanel(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_context = "objectmode"
-    bl_category = "TheHerta"
+    bl_category = "TheHerta3"
     bl_order = 99
     bl_options = {'DEFAULT_CLOSED'}
 

@@ -1,17 +1,24 @@
 """
 GIMI
 """
-import math
 import bpy
 
-from ..config.main_config import GlobalConfig, LogicName
-from ..common.draw_ib_model import DrawIBModel
+from ..config.main_config import GlobalConfig
+from ..config.properties_generate_mod import Properties_GenerateMod
 
+from ..common.draw_ib_model import DrawIBModel
 from ..common.branch_model import BranchModel,M_GlobalKeyCounter
 from ..common.m_ini_builder import M_IniBuilder,M_IniSection,M_SectionType
-from ..config.properties_generate_mod import Properties_GenerateMod
 from ..common.m_ini_helper import M_IniHelperV2,M_IniHelperV3
 from ..common.m_ini_helper_gui import M_IniHelperGUI
+
+class GIMITextureMarkName:
+    '''
+    GIMI的几个常用固定标记名称
+    '''
+    DiffuseMap = "DiffuseMap"
+    NormalMap = "NormalMap"
+    LightMap = "LightMap"
 
 
 class ModModelGIMI:
@@ -27,7 +34,6 @@ class ModModelGIMI:
         self.parse_draw_ib_draw_ib_model_dict()
 
         # (3) 这些属性用于ini生成
-        self.vlr_filter_index_indent = ""
         self.texture_hash_filter_index_dict = {}
 
     def parse_draw_ib_draw_ib_model_dict(self):
@@ -122,10 +128,6 @@ class ModModelGIMI:
             texture_override_ib_section.append("hash = " + draw_ib)
             texture_override_ib_section.append("match_first_index = " + match_first_index)
 
-            if self.vlr_filter_index_indent != "":
-                texture_override_ib_section.append("if vb0 == " + str(3000 + M_GlobalKeyCounter.generated_mod_number))
-
-            # texture_override_ib_section.append(self.vlr_filter_index_indent + "handling = skip")
 
             # If ib buf is emprt, continue to avoid add ib resource replace.
             ib_buf = draw_ib_model.componentname_ibbuf_dict.get("Component " + part_name,None)
@@ -137,22 +139,59 @@ class ModModelGIMI:
 
 
             # Add ib replace
-            texture_override_ib_section.append(self.vlr_filter_index_indent + "ib = " + ib_resource_name)
+            texture_override_ib_section.append("ib = " + ib_resource_name)
 
 
             print("Test: ZZZ")
             # Add slot style texture slot replace.
             if not Properties_GenerateMod.forbid_auto_texture_ini():
                 texture_markup_info_list = draw_ib_model.import_config.partname_texturemarkinfolist_dict.get(part_name,None)
+                
+                # 先判断是否具有NormalMap
+                normal_exists = False
+                
+                # 如果使用ORFix技术，则所有的槽位都要强制使用固定的槽位
+                if Properties_GenerateMod.gimi_use_orfix():
+                    if texture_markup_info_list is not None:
+                        
+                        for texture_markup_info in texture_markup_info_list:
+                            if texture_markup_info.mark_name == GIMITextureMarkName.NormalMap:
+                                normal_exists = True
+                        
+                        altered_texture_markup_info_list = []
+                        if normal_exists:
+                            for texture_markup_info in texture_markup_info_list:
+                                if texture_markup_info.mark_name == GIMITextureMarkName.NormalMap:
+                                    texture_markup_info.mark_slot = "ps-t0"
+                                elif texture_markup_info.mark_name == GIMITextureMarkName.DiffuseMap:
+                                    texture_markup_info.mark_slot = "ps-t1"
+                                elif texture_markup_info.mark_name == GIMITextureMarkName.LightMap:
+                                    texture_markup_info.mark_slot = "ps-t2"
+                                altered_texture_markup_info_list.append(texture_markup_info)
+                        else:
+                            for texture_markup_info in texture_markup_info_list:
+                                if texture_markup_info.mark_name == GIMITextureMarkName.DiffuseMap:
+                                    texture_markup_info.mark_slot = "ps-t0"
+                                elif texture_markup_info.mark_name == GIMITextureMarkName.LightMap:
+                                    texture_markup_info.mark_slot = "ps-t1"
+                                altered_texture_markup_info_list.append(texture_markup_info)
+                        
+                        texture_markup_info_list = altered_texture_markup_info_list
+                
+                # print(texture_markup_info_list)
                 # It may not have auto texture
                 if texture_markup_info_list is not None:
+                    slot_replace_exists = False
                     for texture_markup_info in texture_markup_info_list:
                         if texture_markup_info.mark_type == "Slot":
-                            texture_filter_index_indent = ""
+                            slot_replace_exists = True
+                            texture_override_ib_section.append(texture_markup_info.mark_slot + " = " + texture_markup_info.get_resource_name())
 
-                            texture_override_ib_section.append(texture_filter_index_indent + self.vlr_filter_index_indent + texture_markup_info.mark_slot + " = " + texture_markup_info.get_resource_name())
-
-                    texture_override_ib_section.append("; run = CommandList\\global\\ORFix\\ORFix")
+                    if Properties_GenerateMod.gimi_use_orfix() and slot_replace_exists:
+                        if normal_exists:
+                            texture_override_ib_section.append("run = CommandList\\global\\ORFix\\ORFix")
+                        else:
+                            texture_override_ib_section.append("run = CommandList\\global\\ORFix\\NNFix")
 
             # DrawIndexed部分
             component_name = "Component " + part_name
@@ -162,10 +201,6 @@ class ModModelGIMI:
             for drawindexed_str in drawindexed_str_list:
                 texture_override_ib_section.append(drawindexed_str)
 
-            # 补全endif
-            if self.vlr_filter_index_indent:
-                texture_override_ib_section.append("endif")
-                texture_override_ib_section.new_line()
             
         config_ini_builder.append_section(texture_override_ib_section)
 
@@ -192,12 +227,11 @@ class ModModelGIMI:
             vertexlimit_section_name_suffix =  draw_ib + "_" + draw_ib_model.draw_ib_alias + "_VertexLimitRaise"
             vertexlimit_section.append("[TextureOverride_" + vertexlimit_section_name_suffix + "]")
             vertexlimit_section.append("hash = " + draw_ib_model.import_config.vertex_limit_hash)
-            
-
-
             vertexlimit_section.append("override_byte_stride = " + str(d3d11GameType.CategoryStrideDict["Position"]))
             vertexlimit_section.append("override_vertex_count = " + str(draw_ib_model.draw_number))
-            vertexlimit_section.append("uav_byte_stride = 4")
+
+            # GIMI应该暂时不需要显式指定uav_byte_stride = 4
+            # vertexlimit_section.append("uav_byte_stride = 4")
             vertexlimit_section.new_line()
 
             commandlist_ini_builder.append_section(vertexlimit_section)
@@ -253,189 +287,10 @@ class ModModelGIMI:
         ini_builder.append_section(resource_texture_section)
 
 
-    def add_unity_cs_texture_override_vb_sections(self,config_ini_builder:M_IniBuilder,commandlist_ini_builder:M_IniBuilder,draw_ib_model:DrawIBModel):
-        # 声明TextureOverrideVB部分，只有使用GPU-PreSkinning时是直接替换hash对应槽位
-        d3d11GameType = draw_ib_model.d3d11GameType
-        draw_ib = draw_ib_model.draw_ib
-
-        if d3d11GameType.GPU_PreSkinning:
-            texture_override_vb_section = M_IniSection(M_SectionType.TextureOverrideVB)
-            texture_override_vb_section.append("; " + draw_ib + " ")
-            for category_name in d3d11GameType.OrderedCategoryNameList:
-                category_hash = draw_ib_model.import_config.category_hash_dict[category_name]
-                category_slot = d3d11GameType.CategoryExtractSlotDict[category_name]
-                texture_override_vb_namesuffix = "VB_" + draw_ib + "_" + draw_ib_model.draw_ib_alias + "_" + category_name
-
-                if GlobalConfig.logic_name == LogicName.SRMI:
-                    if category_name == "Position":
-                        texture_override_vb_section.append("[TextureOverride_" + texture_override_vb_namesuffix + "_VertexLimitRaise]")
-                        texture_override_vb_section.append("override_byte_stride = " + str(d3d11GameType.CategoryStrideDict["Position"]))
-                        texture_override_vb_section.append("override_vertex_count = " + str(draw_ib_model.draw_number))
-                        texture_override_vb_section.append("uav_byte_stride = 4")
-                    else:
-                        texture_override_vb_section.append("[TextureOverride_" + texture_override_vb_namesuffix + "]")
-                else:
-                    texture_override_vb_section.append("[TextureOverride_" + texture_override_vb_namesuffix + "]")
-                texture_override_vb_section.append("hash = " + category_hash)
-                
-
-
-                # 如果出现了VertexLimitRaise，Texcoord槽位需要检测filter_index才能替换
-                filterindex_indent_prefix = ""
-                if category_name == d3d11GameType.CategoryDrawCategoryDict["Texcoord"]:
-                    if self.vlr_filter_index_indent != "":
-                        texture_override_vb_section.append("if vb0 == " + str(3000 + M_GlobalKeyCounter.generated_mod_number))
-
-                # 遍历获取所有在当前分类hash下进行替换的分类，并添加对应的资源替换
-                for original_category_name, draw_category_name in d3d11GameType.CategoryDrawCategoryDict.items():
-                    if category_name == draw_category_name:
-                        if original_category_name == "Position":
-                            texture_override_vb_section.append("cs-cb0 = Resource_" + draw_ib + "_VertexLimit")
-
-                            position_category_slot = d3d11GameType.CategoryExtractSlotDict["Position"]
-                            blend_category_slot = d3d11GameType.CategoryExtractSlotDict["Blend"]
-                            # print(position_category_slot)
-
-                            texture_override_vb_section.append(position_category_slot + " = Resource" + draw_ib + "Position")
-                            texture_override_vb_section.append(blend_category_slot + " = Resource" + draw_ib + "Blend")
-
-                            texture_override_vb_section.append("handling = skip")
-
-                            dispatch_number = int(math.ceil(draw_ib_model.draw_number / 64)) + 1
-                            texture_override_vb_section.append("dispatch = " + str(dispatch_number) + ",1,1")
-                        elif original_category_name != "Blend":
-                            category_original_slot = d3d11GameType.CategoryExtractSlotDict[original_category_name]
-                            texture_override_vb_section.append(filterindex_indent_prefix  + category_original_slot + " = Resource" + draw_ib + original_category_name)
-
-                # 对应if vb0 == 3000的结束
-                if category_name == d3d11GameType.CategoryDrawCategoryDict["Texcoord"]:
-                    if self.vlr_filter_index_indent != "":
-                        texture_override_vb_section.append("endif")
-                
-                # 分支架构，如果是Position则需提供激活变量
-                if category_name == d3d11GameType.CategoryDrawCategoryDict["Position"]:
-                    if len(self.branch_model.keyname_mkey_dict.keys()) != 0:
-                        texture_override_vb_section.append("$active" + str(M_GlobalKeyCounter.generated_mod_number) + " = 1")
-
-                        if Properties_GenerateMod.generate_branch_mod_gui():
-                            texture_override_vb_section.append("$ActiveCharacter = 1")
-
-                texture_override_vb_section.new_line()
-            config_ini_builder.append_section(texture_override_vb_section)
-            
-            
-    def add_unity_cs_texture_override_ib_sections(self,config_ini_builder:M_IniBuilder,commandlist_ini_builder:M_IniBuilder,draw_ib_model:DrawIBModel):
-        texture_override_ib_section = M_IniSection(M_SectionType.TextureOverrideIB)
-        draw_ib = draw_ib_model.draw_ib
-        d3d11GameType = draw_ib_model.d3d11GameType
-
-        for count_i,part_name in enumerate(draw_ib_model.import_config.part_name_list):
-            match_first_index = draw_ib_model.import_config.match_first_index_list[count_i]
-            # part_name = draw_ib_model.import_config.part_name_list[count_i]
-
-            style_part_name = "Component" + part_name
-            ib_resource_name = "Resource_" + draw_ib + "_" + style_part_name
-            texture_override_ib_namesuffix = "IB_" + draw_ib + "_" + draw_ib_model.draw_ib_alias + "_" + style_part_name
-            
-            texture_override_ib_section.append("[TextureOverride_" + texture_override_ib_namesuffix + "]")
-            texture_override_ib_section.append("hash = " + draw_ib)
-            texture_override_ib_section.append("match_first_index = " + match_first_index)
-            texture_override_ib_section.append("checktextureoverride = vb1")
-            
-            # add slot check
-            if not Properties_GenerateMod.forbid_auto_texture_ini():
-                slot_texture_replace_dict = draw_ib_model.import_config.partname_texturemarkinfolist_dict.get(part_name,None)
-                # It may not have auto texture
-                if slot_texture_replace_dict is not None:
-                    for slot,texture_replace in slot_texture_replace_dict.items():
-
-                        if texture_replace.style == "Hash":
-                            texture_override_ib_section.append("checktextureoverride = " + slot)
-
-            if self.vlr_filter_index_indent != "":
-                texture_override_ib_section.append("if vb0 == " + str(3000 + M_GlobalKeyCounter.generated_mod_number))
-
-            texture_override_ib_section.append(self.vlr_filter_index_indent + "handling = skip")
-
-
-            # If ib buf is emprt, continue to avoid add ib resource replace.
-            ib_buf = draw_ib_model.componentname_ibbuf_dict.get("Component " + part_name,None)
-            if ib_buf is None or len(ib_buf) == 0:
-                texture_override_ib_section.new_line()
-                continue
-
-            # 如果不使用GPU-Skinning即为Object类型，此时需要在ib上面替换对应槽位
-            # 必须在ib上面替换，否则阴影不正确
-            if not d3d11GameType.GPU_PreSkinning:
-                for category_name in d3d11GameType.OrderedCategoryNameList:
-                    category_hash = draw_ib_model.import_config.category_hash_dict[category_name]
-                    category_slot = d3d11GameType.CategoryExtractSlotDict[category_name]
-
-                    for original_category_name, draw_category_name in d3d11GameType.CategoryDrawCategoryDict.items():
-                        if original_category_name == draw_category_name:
-                            category_original_slot = d3d11GameType.CategoryExtractSlotDict[original_category_name]
-                            texture_override_ib_section.append(self.vlr_filter_index_indent + category_original_slot + " = Resource" + draw_ib + original_category_name)
-
-
-
-            # Add ib replace
-            texture_override_ib_section.append(self.vlr_filter_index_indent + "ib = " + ib_resource_name)
-
-            # Add slot style texture slot replace.
-            if not Properties_GenerateMod.forbid_auto_texture_ini():
-                texture_markup_info_list = draw_ib_model.import_config.partname_texturemarkinfolist_dict.get(part_name,None)
-                # It may not have auto texture
-                if texture_markup_info_list is not None:
-                    for texture_markup_info in texture_markup_info_list:
-                        if texture_markup_info.mark_type == "Slot":
-                            texture_override_ib_section.append(self.vlr_filter_index_indent + texture_markup_info.mark_slot + " = " + texture_markup_info.get_resource_name())
-
-
-            
-
-            # Component DrawIndexed输出
-            component_name = "Component " + part_name 
-            
-            component_model = draw_ib_model.component_name_component_model_dict[component_name]
-            drawindexed_str_list = M_IniHelperV2.get_drawindexed_str_list(component_model.final_ordered_draw_obj_model_list)
-            for drawindexed_str in drawindexed_str_list:
-                texture_override_ib_section.append(drawindexed_str)
- 
-            
-            if self.vlr_filter_index_indent != "":
-                texture_override_ib_section.append("endif")
-                texture_override_ib_section.new_line()
-
-
-        config_ini_builder.append_section(texture_override_ib_section)
-
-
-    def add_unity_cs_vertex_shader_check(self,ini_builder:M_IniBuilder):
-        print("add_unity_cs_vertex_shader_check::")
-        vscheck_section = M_IniSection(M_SectionType.VertexShaderCheck)
-
-        vs_hash_set = set()
-        for draw_ib_model in self.drawib_drawibmodel_dict.values():
-            for vs_hash in draw_ib_model.import_config.vshash_list:
-                vs_hash_set.add(vs_hash)
-
-        for vs_hash in vs_hash_set:
-            print("VSHash: " + vs_hash)
-            vscheck_section.append("[ShaderOverride_" + vs_hash + "]")
-            vscheck_section.append("allow_duplicate_hash = overrule")
-            vscheck_section.append("hash = " + vs_hash)
-            vscheck_section.append("if $costume_mods")
-            vscheck_section.append("  checktextureoverride = ib")
-            vscheck_section.append("endif")
-            vscheck_section.new_line()
-        
-        ini_builder.append_section(vscheck_section)
-
     def generate_unity_vs_config_ini(self):
         config_ini_builder = M_IniBuilder()
 
         M_IniHelperV2.generate_hash_style_texture_ini(ini_builder=config_ini_builder,drawib_drawibmodel_dict=self.drawib_drawibmodel_dict)
-
 
         
         for draw_ib_model in self.drawib_drawibmodel_dict.values():

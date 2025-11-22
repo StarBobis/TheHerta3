@@ -85,7 +85,7 @@ class M_Key:
     
 
 class M_Condition:
-    def __init__(self,work_key_list:list[M_Key] = None):
+    def __init__(self,work_key_list:list[M_Key] = []):
         self.work_key_list = work_key_list
 
         # 计算出生效的ConditionStr

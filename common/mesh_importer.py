@@ -124,7 +124,7 @@ class FMTFile:
         for elemnt in self.elements:
             # Numpy类型由Format决定，此时即使是WWMI的特殊R8_UINT也能得到正确的numpy.uint8
             numpy_type = FormatUtils.get_nptype_from_format(elemnt.Format)
-
+            
             # 这里我们用ByteWidth / numpy_type.itemsize 得到总的维度数量，也就是列数
             # XXX 注意这里计算出正常Size的前提是numpy_type确定是对应真实的字节数，且ByteWidth正确，也就是数据类型必须完全正确。
             size = int( elemnt.ByteWidth / numpy.dtype(numpy_type).itemsize)

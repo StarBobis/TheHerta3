@@ -72,8 +72,20 @@ class DrawIBModelWWMI:
             component_model.final_ordered_draw_obj_model_list = component_obj_data_model_list
             self.component_model_list.append(component_model)
             self.component_name_component_model_dict[component_model.component_name] = component_model
-        
         LOG.newline()
+
+        # TODO 在这里遍历获取每个Component的obj列表，然后对这些obj进行统计，统计BLENDINDICES和BLENDWEIGHTS
+        # 生成BlendRemapForward.buf中的内容
+        # 每个Component 512个内容，每512个数字为一组，有几个Component就有几组 格式：R16_UINT
+        # 对应的位数就是局部顶点索引
+        # 对应的位上的内容就是原始的顶点组索引
+        
+        # 需要一个方法，能够获取指定obj的所有的d3d11Element内容。
+        # 也就是说之前的方法基本上都得重写，因为之前是基于当前选中的obj来进行格式转换的。
+        # 其次就是可能要考虑到先声明数据类型，后进行执行的问题，比如WWMI就是把所有的数据类型提前全部声明好
+        # 最后需要的时候只执行一次就把所有的内容都拿到了，本质上是数据类型设计的比较好。
+
+
 
         # (4) 根据之前解析集合架构的结果，读取obj对象内容到字典中
         self.mesh_vertex_count = 0 # 每个DrawIB都有总的顶点数，对应CategoryBuffer里的顶点数。
@@ -114,6 +126,10 @@ class DrawIBModelWWMI:
         self.write_out_index_buffer(ib=ib)
         self.write_out_category_buffer(category_buffer_dict=category_buffer_dict)
         self.write_out_shapekey_buffer(merged_obj=merged_obj, index_vertex_id_dict=index_vertex_id_dict)
+
+        # TODO 如果Merged架构下，顶点组数量超过了255，则必须使用Remap技术
+        # 则必须判断每个Component，但是这里已经获取不到每个Component的数据了。
+        # 所以必须往前几个步骤去想办法
         
         # 删除临时融合的obj对象
         bpy.data.objects.remove(merged_obj, do_unlink=True)

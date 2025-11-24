@@ -49,7 +49,6 @@ class ObjBufferModel:
         这是因为我们对indexid_vertexid_dict的组合还没有搞清楚导致的
         实际上全部都应该在BranchModel中进行调用。
 
-        TODO 且获取indexid_vertexid_dict很明显导致导出速度变慢，算法仍然有问题
         '''
         self.obj = ObjUtils.get_obj_by_name(name=self.obj_name)
 
@@ -70,17 +69,13 @@ class ObjBufferModel:
         if GlobalConfig.logic_name == LogicName.UnityCPU and "TANGENT" in self.d3d11_game_type.OrderedFullElementList:
             self.calc_index_vertex_buffer_girlsfrontline2()
         elif GlobalConfig.logic_name == LogicName.WWMI:
-            print("calc_index_vertex_buffer_wwmi::")
             self.calc_index_vertex_buffer_wwmi_v2()
         elif GlobalConfig.logic_name == LogicName.SnowBreak:
-            self.calc_index_vertex_buffer_wwmi()
+            self.calc_index_vertex_buffer_wwmi_v2()
         else:
             # 计算IndexBuffer和CategoryBufferDict
             self.calc_index_vertex_buffer_universal()
         
-        # TODO 鸣潮普通模型总耗时4.7秒，但是WWMITools 0.2秒就搞定了，说明我们的代码还是存在认知上的问题。
-        # 必须继续优化直到持平为止
-        # TODO 比如每个方法里都频繁的获取mesh的各种数据，每个地方都获取都有开销，为什么不能在一个地方统一获取，然后后面都使用呢
 
     def check_and_verify_attributes(self):
         '''
@@ -623,72 +618,6 @@ class ObjBufferModel:
         self.category_buffer_dict = category_buffer_dict
         self.index_vertex_id_dict = index_vertex_id_dict
 
-    def calc_index_vertex_buffer_wwmi(self):
-        '''
-        计算IndexBuffer和CategoryBufferDict并返回
-
-        这里是速度瓶颈，23万顶点情况下测试，前面的获取mesh数据只用了1.5秒
-        但是这里两个步骤加起来用了6秒，占了4/5运行时间。
-        不过暂时也够用了，先不管了。
-        '''
-        TimerUtils.Start("Calc IB VB") # TODO 这里消耗了所有的时间，必须严查
-        # (1) 统计模型的索引和唯一顶点
-
-        # 创建一个空列表用于存储最终的结果
-        # print("calc ivb wwmi")
-        index_vertex_id_dict = {}
-        ib = []
-        indexed_vertices = collections.OrderedDict()
-        # 一个字典确保每个符合条件的position只出现过一次
-        # 遍历每个多边形（polygon）
-        for poly in self.mesh.polygons:
-            # 创建一个临时列表用于存储当前多边形的索引
-            vertex_indices = []
-            
-            # 遍历当前多边形中的每一个环（loop），根据多边形的起始环和环总数
-            for blender_lvertex in self.mesh.loops[poly.loop_start:poly.loop_start + poly.loop_total]:
-                vertex_data_get = self.element_vertex_ndarray[blender_lvertex.index].copy()
-                vertex_data = vertex_data_get.tobytes()
-                index = indexed_vertices.setdefault(vertex_data, len(indexed_vertices))
-                vertex_indices.append(index)
-                index_vertex_id_dict[index] = blender_lvertex.vertex_index
-            
-            # 将当前多边形的顶点索引列表添加到最终结果列表中
-            ib.append(vertex_indices)
-
-        # print("长度：")
-        # print(len(position_normal_sharedtangent_dict))
-            
-        flattened_ib = [item for sublist in ib for item in sublist]
-        TimerUtils.End("Calc IB VB")
-
-        # (2) 转换为CategoryBufferDict
-        # TimerUtils.Start("Calc CategoryBuffer") # 几乎不消耗时间
-        category_stride_dict = self.d3d11_game_type.get_real_category_stride_dict()
-        category_buffer_dict:dict[str,list] = {}
-        for categoryname,category_stride in self.d3d11_game_type.CategoryStrideDict.items():
-            category_buffer_dict[categoryname] = []
-
-        data_matrix = numpy.array([numpy.frombuffer(byte_data,dtype=numpy.uint8) for byte_data in indexed_vertices])
-        stride_offset = 0
-        for categoryname,category_stride in category_stride_dict.items():
-            category_buffer_dict[categoryname] = data_matrix[:,stride_offset:stride_offset + category_stride].flatten()
-            stride_offset += category_stride
-
-        # TimerUtils.End("Calc CategoryBuffer")
-        print("导出时翻转面朝向")
-        flipped_indices = []
-        # print(flattened_ib[0],flattened_ib[1],flattened_ib[2])
-        for i in range(0, len(flattened_ib), 3):
-            triangle = flattened_ib[i:i+3]
-            flipped_triangle = triangle[::-1]
-            flipped_indices.extend(flipped_triangle)
-        # print(flipped_indices[0],flipped_indices[1],flipped_indices[2])
-
-        self.ib = flipped_indices
-
-        self.category_buffer_dict = category_buffer_dict
-        self.index_vertex_id_dict = index_vertex_id_dict
 
     def calc_index_vertex_buffer_universal(self):
         '''

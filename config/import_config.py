@@ -17,13 +17,13 @@ from .main_config import GlobalConfig
 
 from ..common.migoto_format import D3D11GameType
 
+@dataclass
 class TextureMarkUpInfo:
-    def  __init__(self):
-        self.mark_name:str = ""
-        self.mark_type:str = ""
-        self.mark_hash:str = ""
-        self.mark_slot:str = ""
-        self.mark_filename:str = ""
+    mark_name:str = field(default="",init=False)
+    mark_type:str = field(default="",init=False)
+    mark_hash:str = field(default="",init=False)
+    mark_slot:str = field(default="",init=False)
+    mark_filename:str = field(default="",init=False)
     
     def get_resource_name(self):
         return "Resource-" + self.mark_filename.split(".")[0]

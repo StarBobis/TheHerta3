@@ -36,8 +36,13 @@ class M_GlobalKeyCounter:
 分支按键使用此模型进行全局统计，不再以每个DrawIB为单位。
 '''
 class BranchModel:
+    '''
+    这里initialize_buffer一般其它游戏都是True
+    只有WWMI类型游戏是False因为它需要的是最终的MergedObj转换而不是每个Obj转换
 
-    def __init__(self,workspace_collection:bpy.types.Collection):
+    也就是说，调用BranchModel的时候，都是不转换Buffer的,只是获取其状态表示
+    '''
+    def __init__(self,workspace_collection:bpy.types.Collection,initialize_buffer:bool = True):
         # 初始化基础属性
         self.keyname_mkey_dict:dict[str,M_Key] = {} # 全局按键名称和按键属性字典
 
@@ -238,6 +243,7 @@ class BranchModel:
     def get_buffered_obj_data_model_list_by_draw_ib_and_game_type(self,draw_ib:str,d3d11_game_type:D3D11GameType):
         # print("BranchModel.get_buffered_obj_data_model_list_by_draw_ib_and_game_type()")
         '''
+        调用这个方法的时候才转换Buffer，不调用的话不转换
         (1) 读取obj的category_buffer
         (2) 读取obj的ib
         (3) 设置到最终的ordered_draw_obj_model_list

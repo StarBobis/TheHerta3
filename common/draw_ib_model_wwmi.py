@@ -37,7 +37,7 @@ class DrawIBModelWWMI:
     每个游戏的DrawIBModel都是不同的，但是一部分是可以复用的
     (例如WWMI就有自己的一套DrawIBModel) 
     '''
-
+    
     # 通过default_factory让每个类的实例的变量分割开来，不再共享类的静态变量
     def __init__(self,draw_ib:str,branch_model:BranchModel):
         # (1) 读取工作空间下的Config.json来设置当前DrawIB的别名
@@ -77,12 +77,11 @@ class DrawIBModelWWMI:
 
         # TODO 在这里遍历获取每个Component的obj列表，然后对这些obj进行统计，统计BLENDINDICES和BLENDWEIGHTS
         # 生成BlendRemapForward.buf中的内容
-        # 每个Component 512个内容，每512个数字为一组，有几个Component就有几组 格式：R16_UINT
+        # 每个Component 每512个数字为一组，有几个Component就有几组 格式：R16_UINT
         # 对应的位数就是局部顶点索引
         # 对应的位上的内容就是原始的顶点组索引
         
         # 需要一个方法，能够获取指定obj的所有的d3d11Element内容。
-        # 也就是说之前的方法基本上都得重写，因为之前是基于当前选中的obj来进行格式转换的。
         # 其次就是可能要考虑到先声明数据类型，后进行执行的问题，比如WWMI就是把所有的数据类型提前全部声明好
         # 最后需要的时候只执行一次就把所有的内容都拿到了，本质上是数据类型设计的比较好。
         

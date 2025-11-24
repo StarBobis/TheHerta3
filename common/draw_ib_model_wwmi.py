@@ -56,7 +56,7 @@ class DrawIBModelWWMI:
         self.ordered_obj_data_model_list:list[ObjDataModel] = branch_model.get_obj_data_model_list_by_draw_ib(draw_ib=draw_ib)
         
         # (3) 组装成特定格式？
-        self.component_model_list:list[ComponentModel] = []
+        self._component_model_list:list[ComponentModel] = []
         self.component_name_component_model_dict:dict[str,ComponentModel] = {}
 
         for part_name in self.import_config.part_name_list:
@@ -69,7 +69,7 @@ class DrawIBModelWWMI:
 
             component_model = ComponentModel(component_name="Component " + part_name,final_ordered_draw_obj_model_list=component_obj_data_model_list)
             
-            self.component_model_list.append(component_model)
+            self._component_model_list.append(component_model)
             self.component_name_component_model_dict[component_model.component_name] = component_model
         LOG.newline()
 
@@ -93,7 +93,7 @@ class DrawIBModelWWMI:
                 self.obj_name_drawindexed_dict[comp_obj.name] = draw_indexed_obj
         
         # (7) 填充到component_name为key的字典中，方便后续操作
-        for component_model in self.component_model_list:
+        for component_model in self._component_model_list:
             new_ordered_obj_model_list = []
             for obj_model in component_model.final_ordered_draw_obj_model_list:
                 obj_model.drawindexed_obj = self.obj_name_drawindexed_dict[obj_model.obj_name]
@@ -243,7 +243,7 @@ class DrawIBModelWWMI:
         # 这里是获取所有的obj，需要用咱们的方法来进行集合架构的遍历获取所有的obj
         # Nico: 添加缓存机制，一个obj只处理一次
         processed_obj_name_list:list[str] = []
-        for component_model in self.component_model_list:
+        for component_model in self._component_model_list:
             for obj_data_model in component_model.final_ordered_draw_obj_model_list:
                 obj_name = obj_data_model.obj_name
                 

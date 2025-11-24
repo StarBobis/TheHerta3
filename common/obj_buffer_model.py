@@ -45,11 +45,6 @@ class ObjBufferModel:
     def __post_init__(self) -> None:
         '''
         使用Numpy直接从指定名称的obj的mesh中转换数据到目标格式Buffer
-
-        TODO 目前这个函数分别在BranchModel和DrawIBModelWWMI中被调用，
-        这是因为我们对indexid_vertexid_dict的组合还没有搞清楚导致的
-        实际上全部都应该在BranchModel中进行调用。
-
         '''
         self.obj = ObjUtils.get_obj_by_name(name=self.obj_name)
 

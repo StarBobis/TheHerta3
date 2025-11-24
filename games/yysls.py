@@ -7,7 +7,7 @@ from ..common.draw_ib_model import DrawIBModel
 from ..common.branch_model import BranchModel,M_GlobalKeyCounter
 from ..common.m_ini_builder import M_IniBuilder,M_IniSection,M_SectionType
 from ..config.properties_generate_mod import Properties_GenerateMod
-from ..common.m_ini_helper import M_IniHelperV2,M_IniHelperV3
+from ..common.m_ini_helper import M_IniHelper,M_IniHelper
 from ..common.m_ini_helper_gui import M_IniHelperGUI
 
 class ModModelYYSLS:
@@ -162,7 +162,7 @@ class ModModelYYSLS:
 
             component_name = "Component " + part_name 
             component_model = draw_ib_model.component_name_component_model_dict[component_name]
-            drawindexed_str_list = M_IniHelperV2.get_drawindexed_str_list(component_model.final_ordered_draw_obj_model_list)
+            drawindexed_str_list = M_IniHelper.get_drawindexed_str_list(component_model.final_ordered_draw_obj_model_list)
             for drawindexed_str in drawindexed_str_list:
                 texture_override_ib_section.append(drawindexed_str)
             
@@ -339,7 +339,7 @@ class ModModelYYSLS:
         '''
         config_ini_builder = M_IniBuilder()
 
-        M_IniHelperV2.generate_hash_style_texture_ini(ini_builder=config_ini_builder,drawib_drawibmodel_dict=self.drawib_drawibmodel_dict)
+        M_IniHelper.generate_hash_style_texture_ini(ini_builder=config_ini_builder,drawib_drawibmodel_dict=self.drawib_drawibmodel_dict)
 
 
 
@@ -352,12 +352,12 @@ class ModModelYYSLS:
             self.add_unity_vs_resource_vb_sections(ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)
             self.add_resource_texture_sections(ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)
 
-            M_IniHelperV2.move_slot_style_textures(draw_ib_model=draw_ib_model)
+            M_IniHelper.move_slot_style_textures(draw_ib_model=draw_ib_model)
 
             M_GlobalKeyCounter.generated_mod_number = M_GlobalKeyCounter.generated_mod_number + 1
 
         
-        M_IniHelperV3.add_branch_key_sections(ini_builder=config_ini_builder,key_name_mkey_dict=self.branch_model.keyname_mkey_dict)
+        M_IniHelper.add_branch_key_sections(ini_builder=config_ini_builder,key_name_mkey_dict=self.branch_model.keyname_mkey_dict)
 
         M_IniHelperGUI.add_branch_mod_gui_section(ini_builder=config_ini_builder,key_name_mkey_dict=self.branch_model.keyname_mkey_dict)
 

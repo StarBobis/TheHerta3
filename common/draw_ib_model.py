@@ -44,7 +44,7 @@ class DrawIBModel:
         在这一步之前，需要对当前DrawIB的所有的obj_data_model填充ib和category_buf_dict属性
         '''
         self.draw_ib_ordered_obj_data_model_list:list[ObjDataModel] = branch_model.get_buffered_obj_data_model_list_by_draw_ib_and_game_type(draw_ib=draw_ib,d3d11_game_type=self.import_config.d3d11GameType)
-        self.component_model_list:list[ComponentModel] = []
+        self._component_model_list:list[ComponentModel] = []
         self.component_name_component_model_dict:dict[str,ComponentModel] = {}
         for part_name in self.import_config.part_name_list:
             print("part_name: " + part_name)
@@ -56,7 +56,7 @@ class DrawIBModel:
 
             component_model = ComponentModel(component_name="Component " +part_name, final_ordered_draw_obj_model_list=component_obj_data_model_list)
      
-            self.component_model_list.append(component_model)
+            self._component_model_list.append(component_model)
             self.component_name_component_model_dict[component_model.component_name] = component_model
         
         LOG.newline()
@@ -86,7 +86,7 @@ class DrawIBModel:
     def parse_categoryname_bytelist_dict_3(self):
         processed_obj_name_list = [] # 用于记录已经处理过的obj_name，避免重复处理
 
-        for component_model in self.component_model_list:
+        for component_model in self._component_model_list:
             for obj_model in component_model.final_ordered_draw_obj_model_list:
                 obj_name = obj_model.obj_name
                 # 如果obj_name已经被处理过了，则跳过
@@ -144,7 +144,7 @@ class DrawIBModel:
         draw_offset = 0
 
         new_component_model_list = []
-        for component_model in self.component_model_list:
+        for component_model in self._component_model_list:
             new_final_ordered_draw_obj_model_list:list[ObjDataModel] = [] 
 
             for obj_model in component_model.final_ordered_draw_obj_model_list:
@@ -198,7 +198,7 @@ class DrawIBModel:
         # 累加完毕后draw_offset的值就是总的index_count的值，正好作为WWMI的$object_id
         self.total_index_count = draw_offset
 
-        for component_model in self.component_model_list:
+        for component_model in self._component_model_list:
             # Only export if it's not empty.
             if len(ib_buf) != 0:
                 self.componentname_ibbuf_dict[component_model.component_name] = ib_buf
@@ -212,7 +212,7 @@ class DrawIBModel:
         obj_name_drawindexedobj_cache_dict:dict[str,M_DrawIndexed] = {}
 
         new_component_model_list = []
-        for component_model in self.component_model_list:
+        for component_model in self._component_model_list:
             ib_buf = []
             offset = 0
 
@@ -278,7 +278,7 @@ class DrawIBModel:
             else:
                 self.componentname_ibbuf_dict[component_model.component_name] = ib_buf
 
-        self.component_model_list = new_component_model_list
+        self._component_model_list = new_component_model_list
 
         self.total_index_count = total_offset
 

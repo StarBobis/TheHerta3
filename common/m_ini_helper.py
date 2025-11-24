@@ -10,10 +10,9 @@ from .draw_ib_model import DrawIBModel
 from ..base.m_key import M_Key
 from ..base.obj_data_model import ObjDataModel
 
-class M_IniHelperV2:
+class M_IniHelper:
     @classmethod
     def get_drawindexed_str_list(cls,ordered_draw_obj_model_list) -> list[str]:
-        # print("M_IniHelperV2.get_drawindexed_str_list()")
         # 在输出之前，我们需要根据condition对obj_model进行分组
         condition_str_obj_model_list_dict:dict[str,list[ObjDataModel]] = {}
         for obj_model in ordered_draw_obj_model_list:
@@ -173,118 +172,6 @@ class M_IniHelperV2:
                 if not os.path.exists(target_path):
                     print("Move Texture File: " + texture_markup_info.mark_filename)
                     shutil.copy2(source_path,target_path)
-
-    @classmethod
-    def add_switchkey_constants_section(cls,ini_builder,draw_ib_model:DrawIBModel):
-        '''
-        声明SwitchKey的Constants变量
-        '''
-        if len(draw_ib_model.key_name_mkey_dict.keys()) != 0:
-            constants_section = M_IniSection(M_SectionType.Constants)
-            constants_section.SectionName = "Constants"
-            constants_section.append("global $active" + str(M_GlobalKeyCounter.generated_mod_number))
-            for mkey in draw_ib_model.key_name_mkey_dict.values():
-                key_str = "global persist " + mkey.key_name + " = " + str(mkey.initialize_value)
-                constants_section.append(key_str) 
-
-            ini_builder.append_section(constants_section)
-
-    @classmethod
-    def add_switchkey_present_section(cls,ini_builder,draw_ib_model:DrawIBModel):
-        '''
-        声明$active激活变量
-        '''
-        if len(draw_ib_model.key_name_mkey_dict.keys()) != 0:
-            present_section = M_IniSection(M_SectionType.Present)
-            present_section.SectionName = "Present"
-            present_section.append("post $active" + str(M_GlobalKeyCounter.generated_mod_number) + " = 0")
-            ini_builder.append_section(present_section)
-    
-    @classmethod
-    def add_switchkey_sections(cls,ini_builder:M_IniBuilder,draw_ib_model:DrawIBModel):
-        '''
-        声明按键切换和按键开关的变量 Key Section
-        '''
-        key_number = 0
-        if len(draw_ib_model.key_name_mkey_dict.keys()) != 0:
-
-            for mkey in draw_ib_model.key_name_mkey_dict.values():
-                key_section = M_IniSection(M_SectionType.Key)
-                key_section.append("[KeySwap_" + str(M_GlobalKeyCounter.generated_mod_number) + "_" + str(key_number) + "]")
-                if draw_ib_model.d3d11GameType.GPU_PreSkinning:
-                    key_section.append("condition = $active" + str(M_GlobalKeyCounter.generated_mod_number) + " == 1")
-                key_section.append("key = " + mkey.key_value)
-                key_section.append("type = cycle")
-
-                key_value_number = len(mkey.value_list)
-                key_cycle_str = ""
-                for i in range(key_value_number):
-                    if i < key_value_number + 1:
-                        key_cycle_str = key_cycle_str + str(i) + ","
-                    else:
-                        key_cycle_str = key_cycle_str + str(i)
-                key_section.append(mkey.key_name + " = " + key_cycle_str)
-                key_section.new_line()
-                ini_builder.append_section(key_section)
-
-                key_number = key_number + 1
-
-class M_IniHelperV3:
-
-    @classmethod
-    def add_switchkey_constants_section(cls,ini_builder,key_name_mkey_dict):
-        '''
-        声明SwitchKey的Constants变量
-        '''
-        if len(key_name_mkey_dict.keys()) != 0:
-            constants_section = M_IniSection(M_SectionType.Constants)
-            constants_section.SectionName = "Constants"
-            constants_section.append("global $active" + str(M_GlobalKeyCounter.generated_mod_number))
-            for mkey in key_name_mkey_dict.values():
-                key_str = "global persist " + mkey.key_name + " = " + str(mkey.initialize_value)
-                constants_section.append(key_str) 
-
-            ini_builder.append_section(constants_section)
-
-    @classmethod
-    def add_switchkey_present_section(cls,ini_builder,key_name_mkey_dict):
-        '''
-        声明$active激活变量
-        '''
-        if len(key_name_mkey_dict.keys()) != 0:
-            present_section = M_IniSection(M_SectionType.Present)
-            present_section.SectionName = "Present"
-            present_section.append("post $active" + str(M_GlobalKeyCounter.generated_mod_number) + " = 0")
-            ini_builder.append_section(present_section)
-    
-    @classmethod
-    def add_switchkey_sections(cls,ini_builder:M_IniBuilder,key_name_mkey_dict):
-        '''
-        声明按键切换和按键开关的变量 Key Section
-        '''
-        key_number = 0
-        if len(key_name_mkey_dict.keys()) != 0:
-
-            for mkey in key_name_mkey_dict.values():
-                key_section = M_IniSection(M_SectionType.Key)
-                key_section.append("[KeySwap_" + str(M_GlobalKeyCounter.generated_mod_number) + "_" + str(key_number) + "]")
-                key_section.append("condition = $active" + str(M_GlobalKeyCounter.generated_mod_number) + " == 1")
-                key_section.append("key = " + mkey.key_value)
-                key_section.append("type = cycle")
-
-                key_value_number = len(mkey.value_list)
-                key_cycle_str = ""
-                for i in range(key_value_number):
-                    if i < key_value_number + 1:
-                        key_cycle_str = key_cycle_str + str(i) + ","
-                    else:
-                        key_cycle_str = key_cycle_str + str(i)
-                key_section.append(mkey.key_name + " = " + key_cycle_str)
-                key_section.new_line()
-                ini_builder.append_section(key_section)
-
-                key_number = key_number + 1
-
 
     @classmethod
     def add_branch_key_sections(cls,ini_builder:M_IniBuilder,key_name_mkey_dict:dict[str,M_Key]):

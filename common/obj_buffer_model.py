@@ -22,7 +22,9 @@ from ..config.main_config import GlobalConfig, LogicName
 from ..config.properties_import_model import Properties_ImportModel
 from ..config.properties_generate_mod import Properties_GenerateMod
 
-from .migoto_format import D3D11GameType,ObjDataModel
+from .migoto_format import D3D11GameType
+
+from ..base.obj_data_model import ObjDataModel
 
 @dataclass
 class ObjBufferModel:

@@ -9,19 +9,13 @@ from ..utils.collection_utils import *
 from ..config.main_config import *
 from ..utils.json_utils import *
 from ..utils.timer_utils import *
-from ..common.migoto_format import M_DrawIndexed,ObjDataModel
+from ..common.migoto_format import M_DrawIndexed
+from ..base.obj_data_model import ObjDataModel
+from ..base.component_model import ComponentModel
+
 from ..config.import_config import ImportConfig
 
 from .branch_model import BranchModel
-
-class ComponentModel:
-    '''
-    一个小数据结构，用来更方便的表示数据之间的关系，用于传递数据
-    '''
-    def __init__(self):
-        self.component_name = ""
-        self.final_ordered_draw_obj_model_list = []
-        pass
 
 
 class DrawIBModel:
@@ -59,9 +53,8 @@ class DrawIBModel:
                     component_obj_data_model_list.append(obj_data_model)
                     # print(part_name + " 已赋值")
 
-            component_model = ComponentModel()
-            component_model.component_name = "Component " +part_name
-            component_model.final_ordered_draw_obj_model_list = component_obj_data_model_list
+            component_model = ComponentModel(component_name="Component " +part_name, final_ordered_draw_obj_model_list=component_obj_data_model_list)
+     
             self.component_model_list.append(component_model)
             self.component_name_component_model_dict[component_model.component_name] = component_model
         

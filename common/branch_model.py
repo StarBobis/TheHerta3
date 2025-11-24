@@ -6,9 +6,10 @@ from ..utils.log_utils import LOG
 from ..utils.collection_utils import CollectionUtils, CollectionColor
 from ..utils.config_utils import ConfigUtils
 
-from ..common.migoto_format import M_Key, ObjDataModel, M_Condition, D3D11GameType
+from ..common.migoto_format import M_Key, M_Condition, D3D11GameType
 from ..utils.tips_utils import TipUtils
 
+from ..base.obj_data_model import ObjDataModel
 
 from .obj_buffer_model import ObjBufferModel
 
@@ -29,18 +30,18 @@ class M_GlobalKeyCounter:
         cls.global_key_index = 0
         cls.generated_mod_number = 0
 
-'''
-分支模型
 
-也就是我们的基于集合嵌套的按键开关与按键切换架构。
-分支按键使用此模型进行全局统计，不再以每个DrawIB为单位。
-'''
 class BranchModel:
     '''
+    分支模型
+
+    也就是我们的基于集合嵌套的按键开关与按键切换架构。
+    分支按键使用此模型进行全局统计,不再以每个DrawIB为单位,而是整体多IB的分支模型。
+
     这里initialize_buffer一般其它游戏都是True
     只有WWMI类型游戏是False因为它需要的是最终的MergedObj转换而不是每个Obj转换
 
-    也就是说，调用BranchModel的时候，都是不转换Buffer的,只是获取其状态表示
+    也就是说,调用BranchModel的时候,都是不转换Buffer的,只是获取其状态表示
     '''
     def __init__(self,workspace_collection:bpy.types.Collection,initialize_buffer:bool = True):
         # 初始化基础属性

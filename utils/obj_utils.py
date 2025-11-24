@@ -421,6 +421,23 @@ class OpenObject:
 class ObjUtils:
 
     @staticmethod
+    def select_obj(target_obj:bpy.types.Object):
+        # 假设 obj_copy 已经是你新建/复制的物体
+        view_layer = bpy.context.view_layer
+
+        # 1. 清空当前所有选中（可选，但通常需要）
+        bpy.ops.object.select_all(action='DESELECT')
+
+        # 2. 设活动对象
+        view_layer.objects.active = target_obj
+
+        # 3. 选中它
+        target_obj.select_set(True)
+
+        # 4. 强制刷新（某些模式下需要）
+        view_layer.update()
+
+    @staticmethod
     def get_obj_by_name(name: str) -> bpy.types.Object | None:
         """根据名称拿到 Object；找不到返回 None"""
         return bpy.data.objects.get(name)          # 等价于 bpy.data.objects[name]，但不会抛 KeyError
@@ -503,9 +520,9 @@ class ObjUtils:
 
     @classmethod
     def normalize_all(cls,obj):
-        '''
-        调用前需确保选中了这个obj，也就是当前的active对象是这个obj
-        '''
+        # 调用前需确保选中了这个obj，也就是当前的active对象是这个obj
+        cls.select_obj(obj)
+
         # print("Normalize All Weights For: " + obj.name)
         # 选择你要操作的对象，这里假设场景中只有一个导入的OBJ对象
         if obj and obj.type == 'MESH':

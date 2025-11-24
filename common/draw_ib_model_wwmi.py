@@ -16,7 +16,10 @@ from ..utils.shapekey_utils import ShapeKeyUtils
 from ..utils.log_utils import LOG
 
 from .extracted_object import ExtractedObject, ExtractedObjectHelper
-from ..common.migoto_format import M_DrawIndexed,ObjDataModel
+from ..common.migoto_format import M_DrawIndexed
+from ..base.obj_data_model import ObjDataModel
+from ..base.component_model import ComponentModel
+
 from ..config.import_config import ImportConfig
 from .obj_buffer_model import ObjBufferModel
 
@@ -24,11 +27,7 @@ from .branch_model import BranchModel
 
 from ..config.properties_wwmi import Properties_WWMI
 
-class ComponentModel:
 
-    def __init__(self):
-        self.component_name:str = ""
-        self.final_ordered_draw_obj_model_list:list[ObjDataModel]= []
 
 class DrawIBModelWWMI:
     '''
@@ -37,7 +36,7 @@ class DrawIBModelWWMI:
     每个游戏的DrawIBModel都是不同的，但是一部分是可以复用的
     (例如WWMI就有自己的一套DrawIBModel) 
     '''
-    
+
     # 通过default_factory让每个类的实例的变量分割开来，不再共享类的静态变量
     def __init__(self,draw_ib:str,branch_model:BranchModel):
         # (1) 读取工作空间下的Config.json来设置当前DrawIB的别名
@@ -68,9 +67,8 @@ class DrawIBModelWWMI:
                     component_obj_data_model_list.append(obj_data_model)
                     print("obj_data_model: " + obj_data_model.obj_name)
 
-            component_model = ComponentModel()
-            component_model.component_name = "Component " + part_name
-            component_model.final_ordered_draw_obj_model_list = component_obj_data_model_list
+            component_model = ComponentModel(component_name="Component " + part_name,final_ordered_draw_obj_model_list=component_obj_data_model_list)
+            
             self.component_model_list.append(component_model)
             self.component_name_component_model_dict[component_model.component_name] = component_model
         LOG.newline()

@@ -100,29 +100,6 @@ class M_Condition:
         self.condition_str = condition_str
 
 
-class ObjDataModel:
-    def __init__(self,obj_name:str):
-        self.obj_name = obj_name
-        
-        # 因为现在的obj都需要遵守命名规则
-        print(self.obj_name)
-        obj_name_split = self.obj_name.split("-")
-        self.draw_ib = obj_name_split[0]
-
-        # TODO 这里以后要改进去掉，统一规范
-        # 鸣潮生成的临时obj不会遵循命名规范，这里的值也不需要设置
-        # 这里是旧代码的遗留问题，暂时只添加个兼容处理即可。
-        if "-" in self.obj_name:
-            self.component_count = int(obj_name_split[1])
-            self.obj_alias_name = obj_name_split[2]
-
-        # 其它属性
-        self.ib = []
-        self.category_buffer_dict = {}
-        self.index_vertex_id_dict = {} # 仅用于WWMI的索引顶点ID字典，key是顶点索引，value是顶点ID，默认可以为None
-        self.condition:M_Condition = M_Condition()
-        self.drawindexed_obj:M_DrawIndexed = M_DrawIndexed()
-
 
 # Designed to read from json file for game type config
 @dataclass

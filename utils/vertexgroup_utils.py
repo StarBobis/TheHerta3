@@ -467,10 +467,115 @@ class VertexGroupUtils:
 
 
     @classmethod
-    def get_blendweights_blendindices_v4(cls, mesh, normalize_weights: bool = False,blend_size = 4):
-        """
+    def get_blendweights_blendindices_v4_fast(cls, mesh, normalize_weights: bool = False, blend_size=4):
+        '''
+        Collects flat triplets (vertex_idx, group_id, weight) once, then uses numpy to
+        compute per-vertex top-K (K = aligned_max_groups) and maps to per-loop arrays.
+        Returns same shape: (blendweights_dict, blendindices_dict) with SemanticIndex 0.
+
         目前只有鸣潮在使用，尚未在其它游戏中进行测试
         TODO 需要测试其它游戏是否兼容。
+        '''
+        import numpy as np
+
+        mesh_loops = mesh.loops
+        mesh_verts = mesh.vertices
+        n_loops = len(mesh_loops)
+        n_verts = len(mesh_verts)
+
+        # get loop->vertex indices (will be used later)
+        loop_vertex_indices = np.empty(n_loops, dtype=int)
+        mesh_loops.foreach_get("vertex_index", loop_vertex_indices)
+
+        # 1) collect flat lists of (v_idx, group_id, weight)
+        v_idx_list = []
+        g_id_list = []
+        w_list = []
+        for v in mesh_verts:
+            # v.groups is typically small; we collect all triplets into flat lists
+            for g in v.groups:
+                if g.weight > 0:
+                    v_idx_list.append(v.index)
+                    g_id_list.append(g.group)
+                    w_list.append(g.weight)
+
+        if len(v_idx_list) == 0:
+            # no weights at all: return zeros compatible with old interface
+            aligned_max_groups = max(4, blend_size)
+            blendweights = np.zeros((n_loops, aligned_max_groups), dtype=np.float32)
+            blendindices = np.zeros((n_loops, aligned_max_groups), dtype=np.uint32)
+            return {0: blendweights}, {0: blendindices}
+
+        v_idx_arr = np.asarray(v_idx_list, dtype=np.int32)
+        g_arr = np.asarray(g_id_list, dtype=np.int32)
+        w_arr = np.asarray(w_list, dtype=np.float32)
+
+        # 2) figure out aligned_max_groups (multiple of 4, at least blend_size)
+        # real_max_groups = max groups any vertex has
+        # we can compute counts via bincount
+        counts = np.bincount(v_idx_arr, minlength=n_verts)
+        real_max_groups = int(counts.max()) if counts.size > 0 else 0
+        aligned_max_groups = 4 * math.ceil(real_max_groups / 4) if real_max_groups else 4
+        if aligned_max_groups < blend_size:
+            aligned_max_groups = blend_size
+        M = aligned_max_groups
+
+        # 3) we want for each vertex the top-M groups sorted by weight
+        # Strategy:
+        # - stable sort global entries by (vertex_index asc, weight desc)
+        # - compute per-vertex offsets and build index positions for top-M
+        order = np.lexsort(( -w_arr, v_idx_arr ))  # sorted by vertex asc, weight desc
+        v_sorted = v_idx_arr[order]
+        g_sorted = g_arr[order]
+        w_sorted = w_arr[order]
+
+        # offsets: start index in sorted arrays for each vertex
+        # counts already known; offsets = cumsum(counts) shifted
+        offsets = np.zeros(n_verts, dtype=np.int64)
+        if n_verts > 0:
+            offsets[1:] = np.cumsum(counts)[:-1]
+
+        # build positions matrix: shape (n_verts, M)
+        # pos = offsets[:,None] + np.arange(M)
+        arange_M = np.arange(M, dtype=np.int64)
+        pos = offsets[:, None] + arange_M[None, :]   # may point beyond end
+        # mask valid positions
+        valid_mask = pos < (offsets[:, None] + counts[:, None])
+
+        # clip positions to last index to avoid OOB (we'll zero invalid later)
+        pos_clipped = np.minimum(pos, order.size - 1)
+        # pick group ids and weights for these positions
+        picked_g = g_sorted[pos_clipped]    # shape (n_verts, M)
+        picked_w = w_sorted[pos_clipped]    # shape (n_verts, M)
+
+        # zero out invalid slots
+        picked_g[~valid_mask] = 0
+        picked_w[~valid_mask] = 0.0
+
+        # 4) optionally ensure per-vertex normalization (per original code behavior)
+        if normalize_weights:
+            # sum across M and avoid divide by zero
+            sums = picked_w.sum(axis=1, keepdims=True)
+            sums[sums == 0] = 1.0
+            picked_w = picked_w / sums
+
+        # 5) map per-vertex data to per-loop arrays using loop_vertex_indices
+        # valid_mask_loop: guard against malformed loops
+        valid_loop_mask = (0 <= loop_vertex_indices) & (loop_vertex_indices < n_verts)
+        blendindices = np.zeros((n_loops, M), dtype=np.uint32)
+        blendweights = np.zeros((n_loops, M), dtype=np.float32)
+        if np.any(valid_loop_mask):
+            valid_vidx = loop_vertex_indices[valid_loop_mask]
+            blendindices[valid_loop_mask] = picked_g[valid_vidx]
+            blendweights[valid_loop_mask] = picked_w[valid_vidx]
+
+        # return in old interface: semantic index 0 only (v4 implementation style)
+        return {0: blendweights}, {0: blendindices}
+
+    @classmethod
+    def get_blendweights_blendindices_v4(cls, mesh, normalize_weights: bool = False,blend_size = 4):
+        """
+        注意这个先别删留着备用防止新的出问题，新的fast是这个的好几倍速度，所以这个弃用了。
         """
         # -------------------- 基础数据 --------------------
         mesh_loops = mesh.loops

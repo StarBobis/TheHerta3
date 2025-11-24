@@ -427,6 +427,9 @@ class ObjUtils:
     
     @staticmethod
     def get_mesh_evaluate_from_obj(obj:bpy.types.Object) -> bpy.types.Mesh:
+        '''
+        Nico: 通过evaluated_get获取到的是一个新的mesh，用于导出，不影响原始Mesh
+        '''
         return obj.evaluated_get(bpy.context.evaluated_depsgraph_get()).to_mesh()
 
     @classmethod

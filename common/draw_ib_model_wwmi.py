@@ -120,7 +120,9 @@ class DrawIBModelWWMI:
 
         merged_obj.name
         
+        TimerUtils.Start("构建ObjBufferModel")
         obj_buffer_model = ObjBufferModel(d3d11_game_type=self.d3d11GameType,obj_name=merged_obj.name)
+        TimerUtils.End("构建ObjBufferModel")
 
         # 写出到文件
         self.write_out_index_buffer(ib=obj_buffer_model.ib)

@@ -8,9 +8,7 @@ from dataclasses import dataclass, field
 from ..utils.config_utils import ConfigUtils
 from ..utils.collection_utils import *
 from ..config.main_config import *
-from ..utils.json_utils import *
-from ..utils.timer_utils import TimerUtils
-from ..utils.format_utils import Fatal
+# removed unused imports: json utils, timer utilities and Fatal formatter
 from ..utils.obj_utils import *
 from ..utils.shapekey_utils import ShapeKeyUtils
 from ..utils.log_utils import LOG
@@ -41,6 +39,12 @@ class DrawIBModelWWMI:
     Mod导出可以调用这个模型来进行业务逻辑部分
     每个游戏的DrawIBModel都是不同的，但是一部分是可以复用的
     (例如WWMI就有自己的一套DrawIBModel) 
+
+    TODO 仍然有问题未解决
+
+    1.使用ReMap技术时，Blend.buf中的顶点索引要替换为局部索引。
+    2.使用ReMap技术时，生成的BlendRemapVertexVG.buf大小应该是和Blend.buf大小相同的。
+
     '''
     draw_ib: str
     branch_model: BranchModel
@@ -62,6 +66,7 @@ class DrawIBModelWWMI:
     obj_name_drawindexed_dict:dict[str,M_DrawIndexed] = field(init=False,default_factory=dict)
 
     blend_remap:bool = field(init=False,default=False)
+    # NOTE: local remap rows are computed during export but not persisted on the instance
     
 
     def __post_init__(self):
@@ -128,14 +133,15 @@ class DrawIBModelWWMI:
         # (8) 选中当前融合的obj对象，计算得到ib和category_buffer，以及每个IndexId对应的VertexId
         merged_obj = self.merged_object.object
 
-        merged_obj.name
+        # merged_obj.name  # no-op leftover; removed
         
         # 构建ObjBufferModel
         obj_buffer_model = ObjBufferModel(d3d11_game_type=self.d3d11GameType,obj_name=merged_obj.name)
 
         # 写出到文件
         self.write_out_index_buffer(ib=obj_buffer_model.ib)
-        self.write_out_category_buffer(category_buffer_dict=obj_buffer_model.category_buffer_dict)
+        # 传入 index_vertex_id_dict 以便在需要 remap 时能够知道每个唯一顶点对应的原始顶点 id
+        self.write_out_category_buffer(category_buffer_dict=obj_buffer_model.category_buffer_dict, index_vertex_id_dict=obj_buffer_model.index_vertex_id_dict)
         self.write_out_shapekey_buffer(merged_obj=merged_obj, index_vertex_id_dict=obj_buffer_model.index_vertex_id_dict)
 
         # 删除临时融合的obj对象
@@ -167,6 +173,39 @@ class DrawIBModelWWMI:
         except Exception:
             pass
         return int(default)
+
+    def _normalize_rows(self, indices_arr, weights_arr, slots):
+        """
+        Normalize indices and weights rows to a fixed number of `slots`.
+        Returns (vg_rows, weights) as numpy arrays with shapes (N, slots).
+        This was previously an inner function inside `export_blendremap_for_components_v2_wwmi`.
+        """
+        arr = numpy.asarray(indices_arr)
+        if arr.ndim == 1:
+            arr = arr.reshape(-1, 1)
+        M = arr.shape[1]
+        if M >= slots:
+            vg_rows = arr[:, :slots]
+        else:
+            pad = numpy.zeros((arr.shape[0], slots - M), dtype=numpy.uint32)
+            vg_rows = numpy.concatenate((arr, pad), axis=1)
+
+        if weights_arr is None:
+            weights = numpy.zeros((vg_rows.shape[0], slots), dtype=numpy.uint8)
+        else:
+            w = numpy.asarray(weights_arr)
+            if w.ndim == 1:
+                w = w.reshape(-1, 1)
+            if w.dtype != numpy.uint8:
+                w = (w * 255.0).round().astype(numpy.uint8)
+            if w.shape[1] >= slots:
+                weights = w[:, :slots]
+            else:
+                wp = numpy.zeros((vg_rows.shape[0], slots), dtype=numpy.uint8)
+                wp[:, :w.shape[1]] = w
+                weights = wp
+
+        return vg_rows.astype(numpy.uint32), weights.astype(numpy.uint8)
 
     def collect_component_mesh_data(self, obj, vg_slots=None):
         """
@@ -215,41 +254,18 @@ class DrawIBModelWWMI:
 
         if vg_slots is None:
             vg_slots = self._detect_vg_slots_from_gametype(d3d11_game_type or D3D11GameType(), default=DEFAULT_VG_SLOTS)
+        # record slots used for remap so writers can align buffers
+        self.blend_remap_vg_slots = int(vg_slots)
 
         concatenated_vg_ids = []
         concatenated_vg_weights = []
         concatenated_index_data = []
         index_layout = []
+        component_rows_counts = []
 
         vertex_offset = 0
 
-        def _normalize_rows(indices_arr, weights_arr, slots):
-            arr = numpy.asarray(indices_arr)
-            if arr.ndim == 1:
-                arr = arr.reshape(-1, 1)
-            M = arr.shape[1]
-            if M >= slots:
-                vg_rows = arr[:, :slots]
-            else:
-                pad = numpy.zeros((arr.shape[0], slots - M), dtype=numpy.uint32)
-                vg_rows = numpy.concatenate((arr, pad), axis=1)
-
-            if weights_arr is None:
-                weights = numpy.zeros((vg_rows.shape[0], slots), dtype=numpy.uint8)
-            else:
-                w = numpy.asarray(weights_arr)
-                if w.ndim == 1:
-                    w = w.reshape(-1, 1)
-                if w.dtype != numpy.uint8:
-                    w = (w * 255.0).round().astype(numpy.uint8)
-                if w.shape[1] >= slots:
-                    weights = w[:, :slots]
-                else:
-                    wp = numpy.zeros((vg_rows.shape[0], slots), dtype=numpy.uint8)
-                    wp[:, :w.shape[1]] = w
-                    weights = wp
-
-            return vg_rows.astype(numpy.uint32), weights.astype(numpy.uint8)
+        # Use the class helper for normalizing rows
 
         for comp_obj in components_objs:
             # 尝试使用 ObjBufferModel 的 loop/element 行，如果失败则回退到基于网格的收集
@@ -307,6 +323,7 @@ class DrawIBModelWWMI:
                 else:
                     index_layout.append(0)
                 vertex_offset += vertex_count
+                component_rows_counts.append(vertex_count)
                 continue
 
             unique_blendindices = all_blendindices[unique_first_indices]
@@ -314,7 +331,7 @@ class DrawIBModelWWMI:
             print(f'[v2_wwmi-debug] component={comp_obj.name} unique_blendindices_rows={len(unique_blendindices)}')
 
             # 归一化每行（填充/截断到固定的 vg_slots）并生成权重矩阵
-            vg_rows, vw = _normalize_rows(unique_blendindices, unique_blendweights, vg_slots)
+            vg_rows, vw = self._normalize_rows(unique_blendindices, unique_blendweights, vg_slots)
             print(f'[v2_wwmi-debug] component={comp_obj.name} vg_rows={vg_rows.shape[0]} slots={vg_rows.shape[1]}')
             concatenated_vg_ids.extend(vg_rows.tolist())
             concatenated_vg_weights.extend(vw.tolist())
@@ -328,6 +345,7 @@ class DrawIBModelWWMI:
                 index_layout.append(0)
 
             vertex_offset += vg_rows.shape[0]
+            component_rows_counts.append(int(vg_rows.shape[0]))
 
         # 确认是否导出了顶点行
         if len(concatenated_vg_ids) == 0:
@@ -364,9 +382,17 @@ class DrawIBModelWWMI:
         remapped_vgs_counts = []
 
         idx_offset = 0
+        comp_idx = 0
+        vg_row_offset = 0
+        local_rows = []
         for index_count in index_layout:
+            # 组件对应的唯一行数（如果存在）
+            comp_rows = int(component_rows_counts[comp_idx]) if comp_idx < len(component_rows_counts) else 0
             if index_count <= 0:
                 remapped_vgs_counts.append(0)
+                # advance component counters even when skipping
+                vg_row_offset += comp_rows
+                comp_idx += 1
                 continue
 
             vertex_ids = index_data_np[idx_offset: idx_offset + index_count]
@@ -375,6 +401,8 @@ class DrawIBModelWWMI:
             if vertex_ids.size == 0:
                 remapped_vgs_counts.append(0)
                 idx_offset += index_count
+                vg_row_offset += comp_rows
+                comp_idx += 1
                 continue
 
             obj_vg_ids = vg_ids_np[vertex_ids].flatten()
@@ -383,6 +411,8 @@ class DrawIBModelWWMI:
             if obj_vg_ids.size == 0 or numpy.max(obj_vg_ids) < REMAPP_SKIP_THRESHOLD:
                 remapped_vgs_counts.append(0)
                 idx_offset += index_count
+                vg_row_offset += comp_rows
+                comp_idx += 1
                 continue
 
             obj_vg_weights = vg_weights_np[vertex_ids].flatten()
@@ -391,6 +421,8 @@ class DrawIBModelWWMI:
             if non_zero_idx.size == 0:
                 remapped_vgs_counts.append(0)
                 idx_offset += index_count
+                vg_row_offset += comp_rows
+                comp_idx += 1
                 continue
 
             obj_vg_ids = obj_vg_ids[non_zero_idx]
@@ -399,6 +431,8 @@ class DrawIBModelWWMI:
             if obj_vg_ids.size == 0 or numpy.max(obj_vg_ids) < REMAPP_SKIP_THRESHOLD:
                 remapped_vgs_counts.append(0)
                 idx_offset += index_count
+                vg_row_offset += comp_rows
+                comp_idx += 1
                 continue
 
             # 如果出现的 VG id 超过 BLOCK_SIZE（例如 >= 512），为了避免越界和不合理的稀疏表，跳过该 component 的 remap
@@ -406,6 +440,8 @@ class DrawIBModelWWMI:
                 print(f'WARNING: component has VG id >= {BLOCK_SIZE}, skipping remap for that component.')
                 remapped_vgs_counts.append(0)
                 idx_offset += index_count
+                vg_row_offset += comp_rows
+                comp_idx += 1
                 continue
 
             remapped_vgs_counts.append(int(obj_vg_ids.size))
@@ -421,7 +457,27 @@ class DrawIBModelWWMI:
             blend_remap_forward = numpy.concatenate((blend_remap_forward, forward), axis=0)
             blend_remap_reverse = numpy.concatenate((blend_remap_reverse, reverse), axis=0)
 
+            # 构建当前 component 对应的局部索引行（针对整个 component 的所有唯一行）
+            try:
+                if comp_rows > 0:
+                    block_rows = vg_ids_np[vg_row_offset: vg_row_offset + comp_rows]
+                    # 如果当前 component 实施了 remap（即 obj_vg_ids 满足 remap 条件），则映射 global id -> local index
+                    if obj_vg_ids.size != 0 and numpy.max(obj_vg_ids) >= REMAPP_SKIP_THRESHOLD and numpy.max(obj_vg_ids) < BLOCK_SIZE:
+                        obj_vg_list = obj_vg_ids.tolist()
+                        mapping = {g: i for i, g in enumerate(obj_vg_list)}
+                        for row in block_rows:
+                            mapped = [int(mapping.get(int(x), 0)) for x in row.tolist()]
+                            local_rows.append(mapped)
+                    else:
+                        for row in block_rows:
+                            local_rows.append([int(x) for x in row.tolist()])
+            except Exception:
+                pass
+
             idx_offset += index_count
+            # advance component counters
+            vg_row_offset += comp_rows
+            comp_idx += 1
 
         # 如果存在 remap 数据则写出 remap 文件（Forward/Reverse/Layout）
         if blend_remap_forward.size > 0:
@@ -430,6 +486,7 @@ class DrawIBModelWWMI:
             self.blend_remap = True
 
             # 只有在存在 remap block 时才写出 VertexVG 文件
+            # 保存每顶点的全局VG id表（BlendRemapVertexVG）
             with open(os.path.join(out_dir, self.draw_ib + '-BlendRemapVertexVG.buf'), 'wb') as f:
                 vg_out.tofile(f)
 
@@ -459,36 +516,29 @@ class DrawIBModelWWMI:
         with open(buf_output_folder + self.draw_ib + "-Component1.buf", 'wb') as ibf:
             ibf.write(packed_data) 
 
-    def write_out_category_buffer(self,category_buffer_dict):
-        __categoryname_bytelist_dict = {} 
+    def write_out_category_buffer(self, category_buffer_dict, index_vertex_id_dict=None):
+        __categoryname_bytelist_dict = {}
         for category_name in self.d3d11GameType.OrderedCategoryNameList:
             if category_name not in __categoryname_bytelist_dict:
-                __categoryname_bytelist_dict[category_name] =  category_buffer_dict[category_name]
+                __categoryname_bytelist_dict[category_name] = category_buffer_dict[category_name]
             else:
                 existing_array = __categoryname_bytelist_dict[category_name]
                 buffer_array = category_buffer_dict[category_name]
 
-                # 确保两个数组都是NumPy数组
                 existing_array = numpy.asarray(existing_array)
                 buffer_array = numpy.asarray(buffer_array)
 
-                # 使用 concatenate 连接两个数组，确保传递的是一个序列（如列表或元组）
                 concatenated_array = numpy.concatenate((existing_array, buffer_array))
-
-                # 更新字典中的值
                 __categoryname_bytelist_dict[category_name] = concatenated_array
 
-        # 顺便计算一下步长得到总顶点数
         position_stride = self.d3d11GameType.CategoryStrideDict["Position"]
         position_bytelength = len(__categoryname_bytelist_dict["Position"])
-        self.mesh_vertex_count = int(position_bytelength/position_stride)
+        self.mesh_vertex_count = int(position_bytelength / position_stride)
 
         buf_output_folder = GlobalConfig.path_generatemod_buffer_folder()
-            
+
         for category_name, category_buf in __categoryname_bytelist_dict.items():
             buf_path = buf_output_folder + self.draw_ib + "-" + category_name + ".buf"
-             # 将 list 转换为 numpy 数组
-            # category_array = numpy.array(category_buf, dtype=numpy.uint8)
             with open(buf_path, 'wb') as ibf:
                 category_buf.tofile(ibf)
 
@@ -658,8 +708,6 @@ class DrawIBModelWWMI:
                 component.vertex_count += temp_object.vertex_count
                 component.index_count += temp_object.index_count
 
-        # 上面的内容为每个component里的每个obj都移除了不必要的顶点组，以及统计好了vertex_count和index_count
-        # TODO 感觉可以再遍历一次来获取ReMap技术所需的信息
 
 
 
@@ -729,5 +777,5 @@ class DrawIBModelWWMI:
         
         LOG.newline()
         return drawib_merged_object
-    
+
 

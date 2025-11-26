@@ -17,6 +17,7 @@ from ..config.properties_generate_mod import Properties_GenerateMod
 from ..base.d3d11_gametype import D3D11GameType
 from ..base.obj_data_model import ObjDataModel
 from .obj_element_model import ObjElementModel
+from ..utils.shapekey_utils import ShapeKeyUtils
 
 @dataclass
 class ObjBufferModelWWMI:
@@ -41,6 +42,12 @@ class ObjBufferModelWWMI:
     category_buffer_dict:dict = field(init=False,repr=False)
     index_vertex_id_dict:dict = field(init=False,repr=False) # 仅用于WWMI的索引顶点ID字典，key是顶点索引，value是顶点ID，默认可以为None
     
+    shapekey_offsets:list = field(init=False,repr=False,default_factory=list)
+    shapekey_vertex_ids:list = field(init=False,repr=False,default_factory=list)
+    shapekey_vertex_offsets:list = field(init=False,repr=False,default_factory=list)
+
+    export_shapekey:bool =  field(init=False,repr=False,default=False)
+
     def __post_init__(self) -> None:
         self.obj = self.obj_element_model.obj
         self.mesh = self.obj_element_model.mesh
@@ -49,16 +56,21 @@ class ObjBufferModelWWMI:
         self.dtype = self.obj_element_model.dtype
         self.element_vertex_ndarray = self.obj_element_model.element_vertex_ndarray
 
-        # 因为只有存在TANGENT时，顶点数才会增加，所以如果是GF2并且存在TANGENT才使用共享TANGENT防止增加顶点数
-        if GlobalConfig.logic_name == LogicName.UnityCPU and "TANGENT" in self.obj_element_model.d3d11_game_type.OrderedFullElementList:
-            self.calc_index_vertex_buffer_girlsfrontline2()
-        elif GlobalConfig.logic_name == LogicName.WWMI:
-            self.calc_index_vertex_buffer_wwmi_v2()
-        elif GlobalConfig.logic_name == LogicName.SnowBreak:
-            self.calc_index_vertex_buffer_wwmi_v2()
+        # 计算IB和分类缓冲区以及索引映射表
+        self.calc_index_vertex_buffer_wwmi_v2()
+        
+        # 获取ShapeKey数据
+        if self.obj.data.shape_keys is None or len(getattr(self.obj.data.shape_keys, 'key_blocks', [])) == 0:
+            print(f'No shapekeys found to process!')
+            self.export_shapekey = False
         else:
-            # 计算IndexBuffer和CategoryBufferDict
-            self.calc_index_vertex_buffer_universal()
+            shapekey_offsets,shapekey_vertex_ids,shapekey_vertex_offsets_np = ShapeKeyUtils.extract_shapekey_data(merged_obj=self.obj,index_vertex_id_dict=self.index_vertex_id_dict)
+            
+            self.shapekey_offsets = shapekey_offsets
+            self.shapekey_vertex_ids = shapekey_vertex_ids
+            self.shapekey_vertex_offsets = shapekey_vertex_offsets_np
+
+            self.export_shapekey = True
 
 
     def calc_index_vertex_buffer_wwmi_v2(self):

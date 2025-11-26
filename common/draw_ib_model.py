@@ -310,7 +310,7 @@ class DrawIBModel:
                 print("Export Skip, Can't get ib buf for partname: " + partname)
             else:
                 buf_filename = self.PartName_IBBufferFileName_Dict[partname]
-                ObjWriter.write_ib_buf_r32_uint(ib_buf,buf_filename)
+                ObjWriter.write_buf_ib_r32_uint(ib_buf,buf_filename)
                 
         # print("Export Category Buffers::")
         # Export category buffer files.

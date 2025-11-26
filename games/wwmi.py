@@ -45,7 +45,7 @@ class ModModelWWMI:
 
         # 哦，总算搞明白了，WWMI的代码中的注释也有问题，它说的Number of shapekeyed vertices in custom model原来不是字面意思，而是指的是shapekey_vertex_id的数量。
         # 因为这玩意是用来改变Shapekey的UAV的大小的
-        constants_section.append("global $shapekey_vertex_count = " + str(len(draw_ib_model.shapekey_vertex_ids)))
+        constants_section.append("global $shapekey_vertex_count = " + str(len(draw_ib_model.obj_buffer_model_wwmi.shapekey_vertex_ids)))
 
         # WWMI中每个mod的mod_id都是-1000，暂时不知道是为了什么，难道是保留设计？不管了，为保证兼容性，暂时先留着
         constants_section.append("global $mod_id = -1000")

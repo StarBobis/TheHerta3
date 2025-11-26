@@ -49,11 +49,6 @@ class DrawIBModelWWMI:
     在此之前必须解决我们生成的Blend.buf和WWMI-Tools生成的Blend.buf大小不一致的问题
     否则就无法进行测试对比
     这侧面反应了我们的架构设计是不合理的，因为不能随意做到修改局部以及整体的每一处细节数据
-    所有的Buffer化，都应该是最后发生的，而不是发生在获取ObjBufferModel的时候
-    不然我们拿到的内容就是已经转为Buffe的内容了
-    所以说ObjBufferModel实际上应该再拆分一层专门的数据层出来，负责转换为可供随时拆分读取的数据
-
-    其次就是MergedObj的问题,如果不能解决这些问题,就不能实现Mod制作方式的大一统。
 
     '''
     draw_ib: str
@@ -70,6 +65,7 @@ class DrawIBModelWWMI:
     
     component_name_component_model_dict: dict[str, ComponentModel] = field(init=False,default_factory=dict)
 
+    # 每个DrawIB都有总的顶点数，对应CategoryBuffer里的顶点数。
     mesh_vertex_count:int = field(init=False,default=0)
 
     merged_object:MergedObject = field(init=False)
@@ -78,6 +74,7 @@ class DrawIBModelWWMI:
     blend_remap:bool = field(init=False,default=False)
     # NOTE: local remap rows are computed during export but not persisted on the instance
     
+    obj_buffer_model_wwmi:ObjBufferModelWWMI = field(init=False,default=False)
 
     def __post_init__(self):
         # (1) 读取工作空间下的Config.json来设置当前DrawIB的别名
@@ -112,10 +109,6 @@ class DrawIBModelWWMI:
             self.component_name_component_model_dict[component_model.component_name] = component_model
         LOG.newline()
 
-
-        # (4) 根据之前解析集合架构的结果，读取obj对象内容到字典中
-        self.mesh_vertex_count = 0 # 每个DrawIB都有总的顶点数，对应CategoryBuffer里的顶点数。
-
         # (5) 对所有obj进行融合，得到一个最终的用于导出的临时obj
         self.merged_object = self.build_merged_object(
             extracted_object=self.extracted_object
@@ -149,23 +142,20 @@ class DrawIBModelWWMI:
         TimerUtils.End("ObjElementModel")
 
         TimerUtils.Start("ObjBufferModelWWMI")
-        obj_buffer_model = ObjBufferModelWWMI(obj_element_model=obj_element_model)
+        self.obj_buffer_model_wwmi = ObjBufferModelWWMI(obj_element_model=obj_element_model)
         TimerUtils.End("ObjBufferModelWWMI")
 
-        # TODO 这里的写出Buffer文件和获取ShapeKey应该分开
-        # 在ObjBufferModel中就应该把所有需要写出的东西都获取完毕了
-        # 然后这里的三个写出Buffer方法改为一个写出Buffer方法就行了
-        # 甚至这个写出Buffer的方法，理论上也应该在ObjBufferModel中实现
-        # 因为到了BufferModel这一步理论上就应该直接落地文件了
-        # 但是由于每个游戏的Buffer写出方式可能不一样
-        # 所以最好是专门开一个类，专门负责Buffer写出到文件
-
         # 写出Index.buf
-        ObjWriter.write_ib_buf_r32_uint(obj_buffer_model.ib,self.draw_ib + "-Component1.buf")
-        
+        ObjWriter.write_buf_ib_r32_uint(self.obj_buffer_model_wwmi.ib,self.draw_ib + "-Component1.buf")
+
         # 传入 index_vertex_id_dict 以便在需要 remap 时能够知道每个唯一顶点对应的原始顶点 id
-        self.write_out_category_buffer(category_buffer_dict=obj_buffer_model.category_buffer_dict, index_vertex_id_dict=obj_buffer_model.index_vertex_id_dict)
-        self.write_out_shapekey_buffer(merged_obj=merged_obj, index_vertex_id_dict=obj_buffer_model.index_vertex_id_dict)
+        self.write_out_category_buffer(category_buffer_dict=self.obj_buffer_model_wwmi.category_buffer_dict)
+        
+        # 写出ShapeKey相关Buffer文件
+        if self.obj_buffer_model_wwmi.export_shapekey:
+            ObjWriter.write_buf_shapekey_offsets(self.obj_buffer_model_wwmi.shapekey_offsets,self.draw_ib + "-" + "ShapeKeyOffset.buf")
+            ObjWriter.write_buf_shapekey_vertex_ids(self.obj_buffer_model_wwmi.shapekey_vertex_ids,self.draw_ib + "-" + "ShapeKeyVertexId.buf")
+            ObjWriter.write_buf_shapekey_vertex_offsets(self.obj_buffer_model_wwmi.shapekey_vertex_offsets,self.draw_ib + "-" + "ShapeKeyVertexOffset.buf")
 
         # 删除临时融合的obj对象
         bpy.data.objects.remove(merged_obj, do_unlink=True)
@@ -275,7 +265,7 @@ class DrawIBModelWWMI:
 
 
 
-    def write_out_category_buffer(self, category_buffer_dict, index_vertex_id_dict=None):
+    def write_out_category_buffer(self, category_buffer_dict):
         __categoryname_bytelist_dict = {}
         for category_name in self.d3d11GameType.OrderedCategoryNameList:
             if category_name not in __categoryname_bytelist_dict:
@@ -301,47 +291,8 @@ class DrawIBModelWWMI:
             with open(buf_path, 'wb') as ibf:
                 category_buf.tofile(ibf)
 
-    def write_out_shapekey_buffer(self,merged_obj,index_vertex_id_dict):
-        buf_output_folder = GlobalConfig.path_generatemod_buffer_folder()
 
-        self.shapekey_offsets = []
-        self.shapekey_vertex_ids = []
-        self.shapekey_vertex_offsets = []
-
-        # (11) 拼接ShapeKey数据
-        if merged_obj.data.shape_keys is None or len(getattr(merged_obj.data.shape_keys, 'key_blocks', [])) == 0:
-            print(f'No shapekeys found to process!')
-        else:
-            shapekey_offsets,shapekey_vertex_ids,shapekey_vertex_offsets_np = ShapeKeyUtils.extract_shapekey_data(merged_obj=merged_obj,index_vertex_id_dict=index_vertex_id_dict)
-            # extract_shapekey_data_v2
-            # shapekey_offsets,shapekey_vertex_ids,shapekey_vertex_offsets_np = ShapeKeyUtils.extract_shapekey_data_v2(mesh=mesh,index_vertex_id_dict=index_vertex_id_dict)
-
-            self.shapekey_offsets = shapekey_offsets
-            self.shapekey_vertex_ids = shapekey_vertex_ids
-            self.shapekey_vertex_offsets = shapekey_vertex_offsets_np
-
-            # 鸣潮的ShapeKey三个Buffer的导出
-            if len(self.shapekey_offsets) != 0:
-                with open(buf_output_folder + self.draw_ib + "-" + "ShapeKeyOffset.buf", 'wb') as file:
-                    for number in self.shapekey_offsets:
-                        # 假设数字是32位整数，使用'i'格式符
-                        # 根据实际需要调整数字格式和相应的格式符
-                        data = struct.pack('i', number)
-                        file.write(data)
             
-            if len(self.shapekey_vertex_ids) != 0:
-                with open(buf_output_folder + self.draw_ib + "-" + "ShapeKeyVertexId.buf", 'wb') as file:
-                    for number in self.shapekey_vertex_ids:
-                        # 假设数字是32位整数，使用'i'格式符
-                        # 根据实际需要调整数字格式和相应的格式符
-                        data = struct.pack('i', number)
-                        file.write(data)
-            
-            if len(self.shapekey_vertex_offsets) != 0:
-                # 将列表转换为numpy数组，并改变其数据类型为float16
-                float_array = numpy.array(self.shapekey_vertex_offsets, dtype=numpy.float32).astype(numpy.float16)
-                with open(buf_output_folder + self.draw_ib + "-" + "ShapeKeyVertexOffset.buf", 'wb') as file:
-                    float_array.tofile(file)
 
 
     def build_merged_object(self,extracted_object:ExtractedObject):

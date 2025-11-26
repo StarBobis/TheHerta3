@@ -1,5 +1,6 @@
 import os
 import struct
+import numpy
 
 from ..config.main_config import GlobalConfig
 
@@ -19,9 +20,33 @@ class ObjWriter:
     '''
 
     @staticmethod
-    def write_ib_buf_r32_uint(index_list:list[int],buf_file_name:str):
+    def write_buf_ib_r32_uint(index_list:list[int],buf_file_name:str):
         ib_path = os.path.join(GlobalConfig.path_generatemod_buffer_folder(), buf_file_name)
         packed_data = struct.pack(f'<{len(index_list)}I', *index_list)
         with open(ib_path, 'wb') as ibf:
             ibf.write(packed_data) 
 
+    @staticmethod
+    def write_buf_shapekey_offsets(shapekey_offsets,filename:str):
+        with open(GlobalConfig.path_generatemod_buffer_folder() + filename, 'wb') as file:
+            for number in shapekey_offsets:
+                # 假设数字是32位整数，使用'i'格式符
+                # 根据实际需要调整数字格式和相应的格式符
+                data = struct.pack('i', number)
+                file.write(data)
+
+    @staticmethod
+    def write_buf_shapekey_vertex_ids(shapekey_vertex_ids,filename:str):
+        with open(GlobalConfig.path_generatemod_buffer_folder() + filename, 'wb') as file:
+            for number in shapekey_vertex_ids:
+                # 假设数字是32位整数，使用'i'格式符
+                # 根据实际需要调整数字格式和相应的格式符
+                data = struct.pack('i', number)
+                file.write(data)
+                
+    @staticmethod
+    def write_buf_shapekey_vertex_offsets(shapekey_vertex_offsets,filename:str):
+        # 将列表转换为numpy数组，并改变其数据类型为float16
+        float_array = numpy.array(shapekey_vertex_offsets, dtype=numpy.float32).astype(numpy.float16)
+        with open(GlobalConfig.path_generatemod_buffer_folder() + filename, 'wb') as file:
+            float_array.tofile(file)

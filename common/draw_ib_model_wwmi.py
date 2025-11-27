@@ -125,101 +125,47 @@ class DrawIBModelWWMI:
             component_model.final_ordered_draw_obj_model_list = new_ordered_obj_model_list
             self.component_name_component_model_dict[component_model.component_name] = component_model
         
-        # (8) 单独拿出来,方便使用
-        merged_obj = self.merged_object.object
+        # 创建obj_element_model
+        obj_element_model = ObjElementModel(d3d11_game_type=self.d3d11GameType, obj_name=self.merged_object.object.name)
 
-        TimerUtils.Start("Obj To Buffer")
-        obj_element_model = ObjElementModel(d3d11_game_type=self.d3d11GameType, obj_name=merged_obj.name)
-
+        # 如果使用了remap技术则替换Remap
         if getattr(self, 'blend_remap_maps', None):
-            self.apply_blendindex_remap(obj_element_model)
+            self.replace_remapped_blendindices(obj_element_model)
+            self.blend_remap = True
         else:
             print("No blend_remap_maps found, skipping BLENDINDICES remap.")
 
-        # Now that any external changes (e.g. remap) have been applied to
-        # `elementname_data_dict`, pack into the structured ndarray.
-        try:
-            obj_element_model.fill_into_element_vertex_ndarray()
-        except Exception as e:
-            print(f"Failed to pack element arrays into structured ndarray: {e}")
+        # 上面替换完了remap这里才填充为最终的ndarray
+        obj_element_model.fill_into_element_vertex_ndarray()
 
+        # 然后才能创建ObjBufferModelWWMI
         self.obj_buffer_model_wwmi = ObjBufferModelWWMI(obj_element_model=obj_element_model)
-        TimerUtils.End("Obj To Buffer")
 
-        # Write BlendRemapVertexVG aligned to ObjBufferModelWWMI's unique vertex ordering.
-        # Build per-unique-vertex VG id array using index_vertex_id_dict (maps unique_index -> original_vertex_id).
-        try:
-            index_vertex_id_dict = self.obj_buffer_model_wwmi.index_vertex_id_dict
-            if index_vertex_id_dict is not None:
-                blendindices_element = self.d3d11GameType.ElementNameD3D11ElementDict["BLENDINDICES"]
-                num_vgs = 4
-                if blendindices_element.Format == "R8_UINT":
-                    num_vgs = blendindices_element.ByteWidth
+        # 写出原始未经任何改动的BLENDINDICES到BlendRemapVertexVG.buf, 格式为uint16_t
+        index_vertex_id_dict = self.obj_buffer_model_wwmi.index_vertex_id_dict
+        if index_vertex_id_dict is not None:
+            # 获取真实的VG通道数量
+            num_vgs = self.d3d11GameType.get_blendindices_count_wwmi()
 
-                unique_count = len(index_vertex_id_dict)
-                vg_array = numpy.zeros((unique_count, num_vgs), dtype=numpy.uint16)
+            # 初始化数组
+            vg_array = numpy.zeros((len(index_vertex_id_dict), num_vgs), dtype=numpy.uint16)
 
-                # Prepare mapping vertex -> first loop index so we can sample per-loop pre-remap BLENDINDICES
-                mesh = self.obj_buffer_model_wwmi.mesh
-                try:
-                    n_loops = len(mesh.loops)
-                    loop_vertex_indices = numpy.empty(n_loops, dtype=int)
-                    mesh.loops.foreach_get("vertex_index", loop_vertex_indices)
-                except Exception:
-                    loop_vertex_indices = None
-
-                vertex_to_first_loop = {}
-                if loop_vertex_indices is not None:
-                    for li, vid in enumerate(loop_vertex_indices.tolist()):
-                        if int(vid) not in vertex_to_first_loop:
-                            vertex_to_first_loop[int(vid)] = li
-
-                # For each unique index (0..unique_count-1), get original vertex id and read its pre-remap BLENDINDICES
-                # Compute original per-loop BLENDINDICES source on demand (no long-lived copy)
-                if hasattr(obj_element_model, 'elementname_data_dict') and 'BLENDINDICES' in obj_element_model.elementname_data_dict and obj_element_model.elementname_data_dict['BLENDINDICES'] is not None:
-                    _pre_blend = obj_element_model.elementname_data_dict['BLENDINDICES']
-                else:
-                    _pre_blend = None
-
-                for uniq_idx in range(unique_count):
-                    orig_vid = index_vertex_id_dict.get(uniq_idx, None)
-                    if orig_vid is None:
-                        continue
-
-                    written = False
-                    # Prefer pre-remap BLENDINDICES sampled at a representative loop for this vertex
-                    if _pre_blend is not None and vertex_to_first_loop:
-                        loop_idx = vertex_to_first_loop.get(int(orig_vid), None)
-                        if loop_idx is not None and loop_idx < len(_pre_blend):
-                            # _pre_blend may be 1D or 2D
-                            if getattr(_pre_blend, 'ndim', 1) == 1:
-                                vg_array[uniq_idx, 0] = int(_pre_blend[loop_idx])
-                                written = True
-                            else:
-                                vals = _pre_blend[loop_idx]
-                                for i in range(min(num_vgs, len(vals))):
-                                    vg_array[uniq_idx, i] = int(vals[i])
-                                written = True
-
-                    if written:
-                        continue
-
-                    # Fallback: sample vertex groups from merged object
-                    try:
-                        v = self.merged_object.object.data.vertices[int(orig_vid)]
-                        groups = [(g.group, g.weight) for g in v.groups]
-                        if groups:
-                            groups.sort(key=lambda x: x[1], reverse=True)
-                            for i, (gidx, w) in enumerate(groups[:num_vgs]):
-                                vg_array[uniq_idx, i] = int(gidx)
-                    except Exception:
-                        # leave zeros
-                        pass
-
-                # Flatten and write as uint16
-                ObjWriter.write_buf_blendindices_uint16(vg_array, self.draw_ib + "-BlendRemapVertexVG.buf")
-        except Exception as e:
-            print(f"Failed to write BlendRemapVertexVG aligned file: {e}")
+            # Reconstruct per-unique-row original (pre-remap) BLENDINDICES by
+            # sampling `obj_element_model.original_elementname_data_dict['BLENDINDICES']`
+            # at the same loop indices used by ObjBufferModelWWMI when it built
+            # `unique_element_vertex_ndarray`.
+            # Strict path: require `unique_first_loop_indices` and original parsed BLENDINDICES.
+            # If either is missing, skip writing the aligned BlendRemapVertexVG file and log a warning.
+            original_blendindices = obj_element_model.original_elementname_data_dict['BLENDINDICES']
+            sampled_blendindices = original_blendindices[self.obj_buffer_model_wwmi.unique_first_loop_indices]
+            # Always treat sampled_blendindices as 2D (channels in axis=1).
+            # If it's 1D (single channel), reshape to (N,1) so the same loop works.
+            if getattr(sampled_blendindices, 'ndim', 1) == 1:
+                sampled_blendindices = sampled_blendindices.reshape(-1, 1)
+            for i in range(min(num_vgs, sampled_blendindices.shape[1])):
+                vg_array[:, i] = sampled_blendindices[:, i].astype(numpy.uint16)
+            # 写出到文件
+            ObjWriter.write_buf_blendindices_uint16(vg_array, self.draw_ib + "-BlendRemapVertexVG.buf")
 
         # 写出Index.buf
         ObjWriter.write_buf_ib_r32_uint(self.obj_buffer_model_wwmi.ib,self.draw_ib + "-Component1.buf")
@@ -234,16 +180,14 @@ class DrawIBModelWWMI:
             ObjWriter.write_buf_shapekey_vertex_offsets(self.obj_buffer_model_wwmi.shapekey_vertex_offsets,self.draw_ib + "-" + "ShapeKeyVertexOffset.buf")
 
         # 删除临时融合的obj对象
-        bpy.data.objects.remove(merged_obj, do_unlink=True)
+        bpy.data.objects.remove(self.merged_object.object, do_unlink=True)
 
 
     def export_blendremap_forward_and_reverse(self, components_objs):
         output_dir = GlobalConfig.path_generatemod_buffer_folder()
         
-        num_vgs = 4
-        blendindices_element = self.d3d11GameType.ElementNameD3D11ElementDict["BLENDINDICES"]
-        if blendindices_element.Format == "R8_UINT":
-            num_vgs = blendindices_element.ByteWidth
+        # Determine number of VG channels from game type
+        num_vgs = self.d3d11GameType.get_blendindices_count_wwmi()
 
         blend_remap_forward = numpy.empty(0, dtype=numpy.uint16)
         blend_remap_reverse = numpy.empty(0, dtype=numpy.uint16)
@@ -317,7 +261,7 @@ class DrawIBModelWWMI:
 
  
 
-    def apply_blendindex_remap(self, obj_element_model: ObjElementModel):
+    def replace_remapped_blendindices(self, obj_element_model: ObjElementModel):
         """
         使用已经生成的 self.blend_remap_maps 将 obj_element_model.element_vertex_ndarray['BLENDINDICES']
         中的全局顶点组索引替换为对应 component 的局部（compact）索引。
@@ -401,11 +345,6 @@ class DrawIBModelWWMI:
                     orig = int(arr[li, j])
                     new = reverse_map.get(orig, orig)
                     arr[li, j] = new
-        # Do NOT mutate the original parsed arrays. Place remapped array into
-        # `final_elementname_data_dict` so callers may later call
-        # `fill_into_element_vertex_ndarray()` to pack using remapped values.
-        if not hasattr(obj_element_model, 'final_elementname_data_dict') or obj_element_model.final_elementname_data_dict is None:
-            obj_element_model.final_elementname_data_dict = {}
 
         obj_element_model.final_elementname_data_dict['BLENDINDICES'] = arr
 

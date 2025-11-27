@@ -151,6 +151,30 @@ class ObjBufferModelWWMI:
         # Pick original unique rows from row_bytes using insertion-ordered indices
         unique_rows = row_bytes[unique_first_indices_insertion]
 
+        # Expose the loop indices (first-occurrence loop indices) used to select
+        # the unique rows. Callers can sample per-loop original arrays using
+        # these indices to reconstruct per-unique-row original element values.
+        self.unique_first_loop_indices = unique_first_indices_insertion
+
+        # Reconstruct a structured ndarray of the unique element rows.
+        # This lets callers access element fields by name for the unique
+        # vertex set (useful for debugging or further processing).
+        # Ensure the byte width matches the dtype itemsize.
+        if unique_rows.shape[1] != self.dtype.itemsize:
+            raise Fatal(f"Unique row byte-size ({unique_rows.shape[1]}) does not match structured dtype itemsize ({self.dtype.itemsize})")
+
+        n_unique = unique_rows.shape[0]
+        unique_rows_contig = numpy.ascontiguousarray(unique_rows)
+        try:
+            # Zero-copy view where possible
+            unique_element_vertex_ndarray = unique_rows_contig.view(self.dtype).reshape(n_unique)
+        except Exception:
+            # Fallback to a safe copy-based reconstruction
+            unique_element_vertex_ndarray = numpy.frombuffer(unique_rows_contig.tobytes(), dtype=self.dtype).reshape(n_unique)
+
+        # Expose for downstream use: structure-aligned unique vertex records
+        self.unique_element_vertex_ndarray = unique_element_vertex_ndarray
+
         # 构建 index -> original vertex id（使用每个 unique 行的第一个 loop 对应的 vertex）
         original_vertex_ids = loop_vertex_indices[unique_first_indices_insertion]
         index_vertex_id_dict = dict(enumerate(original_vertex_ids.astype(int).tolist()))

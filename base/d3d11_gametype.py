@@ -96,4 +96,28 @@ class D3D11GameType:
             new_dict[categoryname] = category_stride
         return new_dict
 
+    def get_blendindices_count_wwmi(self) -> int:
+        """
+        Nico:注意这个方法是给WWMI准备的,其它逻辑不兼容此方法,也不需要用到此方法
+        Return the number of blend indices (VG channels) used by the game type.
+
+        Historically code used a pattern like::
+            num_vgs = 4
+            if blendindices_element.Format == "R8_UINT":
+                num_vgs = blendindices_element.ByteWidth
+
+        This helper centralizes that logic. If the BLENDINDICES element is not
+        present, or the format is not R8_UINT, default to 4.
+        """
+        elem = self.ElementNameD3D11ElementDict.get("BLENDINDICES", None)
+        if elem is None:
+            return 4
+        try:
+            if getattr(elem, 'Format', None) == "R8_UINT":
+                bw = int(getattr(elem, 'ByteWidth', 0))
+                return bw if bw > 0 else 4
+        except Exception:
+            pass
+        return 4
+
   

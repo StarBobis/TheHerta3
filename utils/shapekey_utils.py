@@ -235,8 +235,6 @@ class ShapeKeyUtils:
         '''
         传入一个Obj，提取出其形态键数据为特定格式
         '''
-        TimerUtils.Start("process shapekey data")
-
         shapekey_cache = cls.get_shapekey_cache(merged_obj,index_vertex_id_dict)
 
         shapekey_offsets = []
@@ -259,17 +257,12 @@ class ShapeKeyUtils:
                 shapekey_vertex_offsets.extend(vertex_offsets + [0, 0, 0])
                 shapekey_verts_count += 1
 
-        TimerUtils.End("process shapekey data") 
         return shapekey_offsets,shapekey_vertex_ids,shapekey_vertex_offsets
     
 
 
     @classmethod
     def get_shapekey_cache(cls, merged_obj, index_vertex_id_dict):
-        '''
-        Numpy优化版本，快很多
-        '''
-        TimerUtils.Start("shapekey_cache")
         obj = merged_obj
         mesh = obj.data
         mesh_shapekeys = mesh.shape_keys
@@ -342,79 +335,8 @@ class ShapeKeyUtils:
                     for index_id in vertex_to_indices[v_idx]:
                         shapekey_cache[shapekey_idx][index_id] = offset_list
 
-        TimerUtils.End("shapekey_cache")
         return shapekey_cache
     
 
-    @classmethod
-    def extract_shapekey_data_v2(cls, merged_obj, index_vertex_id_dict):
-        '''
-        旧代码分成俩不好理解，所以整合成了一个，方便理解。
-        传入一个 Obj，直接输出形态键三数组（功能与旧代码完全一致）
-        耗时大概0.6秒
-        '''
-        TimerUtils.Start("process shapekey data")
-        mesh = merged_obj.data
-        shapekeys = mesh.shape_keys
-        if not shapekeys:
-            TimerUtils.End("process shapekey data")
-            return [0] * 128, [], []
-
-        # ----- 1. vertex_id -> [draw_index,...] 反向表
-        v2d = {}
-        for draw_idx, v_idx in index_vertex_id_dict.items():
-            v2d.setdefault(v_idx, []).append(draw_idx)
-
-        # ----- 2. 读 Basis
-        basis = numpy.empty((len(mesh.vertices), 3), dtype=numpy.float32)
-        shapekeys.key_blocks['Basis'].data.foreach_get('co', basis.ravel())
-
-        # ----- 3. 正则
-        pat = re.compile(r'.*(?:deform|custom)[_ -]*(\d+).*', re.I)
-
-        # ----- 4. 先按 0-127 顺序收集每键“顶点集”，后者覆盖前者
-        # key=shape_idx  value={draw_index: [dx,dy,dz], ...}
-        cache = {}
-        for sk in shapekeys.key_blocks:
-            if sk.name == 'Basis':
-                continue
-            m = pat.findall(sk.name)
-            if not m:
-                continue
-            idx = int(m[0])
-            if idx >= 128:
-                continue
-
-            skco = numpy.empty((len(mesh.vertices), 3), dtype=numpy.float32)
-            sk.data.foreach_get('co', skco.ravel())
-            delta = skco - basis
-            mask = numpy.linalg.norm(delta, axis=1) >= 1e-9
-            valid_v = numpy.where(mask)[0]
-
-            # 后者整键覆盖
-            cache[idx] = {}
-            for v_idx in valid_v:
-                off = delta[v_idx].tolist()
-                for draw_idx in v2d.get(v_idx, []):
-                    cache[idx][draw_idx] = off
-
-        # ----- 5. 按 0-127 顺序拼三数组（前缀和版）
-        shapekey_offsets = []
-        shapekey_vertex_ids = []
-        shapekey_vertex_offsets = []
-        verts_so_far = 0
-
-        for group_id in range(128):
-            if group_id in cache and cache[group_id]:
-                shapekey_offsets.append(verts_so_far)
-                for draw_idx, off in cache[group_id].items():
-                    shapekey_vertex_ids.append(draw_idx)
-                    shapekey_vertex_offsets.extend(off + [0., 0., 0.])
-                    verts_so_far += 1
-            else:
-                shapekey_offsets.append(verts_so_far)
-
-        TimerUtils.End("process shapekey data")
-        return shapekey_offsets, shapekey_vertex_ids, shapekey_vertex_offsets
 
 

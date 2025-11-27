@@ -5,22 +5,16 @@ from ..utils.obj_utils import ObjUtils
 from ..utils.log_utils import LOG
 from ..utils.collection_utils import CollectionUtils, CollectionColor
 from ..utils.config_utils import ConfigUtils
-
+from ..utils.tips_utils import TipUtils
 
 from ..base.m_key import M_Key
 from ..base.m_condition import M_Condition
 from ..base.d3d11_gametype import D3D11GameType
-
-
-from ..utils.tips_utils import TipUtils
-
 from ..base.obj_data_model import ObjDataModel
+from ..base.m_global_key_counter import M_GlobalKeyCounter
 
 from .obj_element_model import ObjElementModel
 from .obj_buffer_model_unity import ObjBufferModelUnity
-
-from ..base.m_global_key_counter import M_GlobalKeyCounter
-
 
 
 class BranchModel:
@@ -29,13 +23,8 @@ class BranchModel:
 
     也就是我们的基于集合嵌套的按键开关与按键切换架构。
     分支按键使用此模型进行全局统计,不再以每个DrawIB为单位,而是整体多IB的分支模型。
-
-    这里initialize_buffer一般其它游戏都是True
-    只有WWMI类型游戏是False因为它需要的是最终的MergedObj转换而不是每个Obj转换
-
-    也就是说,调用BranchModel的时候,都是不转换Buffer的,只是获取其状态表示
     '''
-    def __init__(self,workspace_collection:bpy.types.Collection,initialize_buffer:bool = True):
+    def __init__(self,workspace_collection:bpy.types.Collection):
         # 初始化基础属性
         self.keyname_mkey_dict:dict[str,M_Key] = {} # 全局按键名称和按键属性字典
 
@@ -198,7 +187,7 @@ class BranchModel:
         # 处理obj
         for obj in current_collection.objects:
             '''
-            每个obj都必须添加条件，可是怎么样能知道当前条件是怎样的呢
+            每个obj都必须添加条件,可是怎么样能知道当前条件是怎样的呢
             '''
             if obj.type == 'MESH' and obj.hide_get() == False:
                 
@@ -217,7 +206,7 @@ class BranchModel:
         '''
         只返回指定draw_ib的obj列表
         这个方法存在的目的是为了兼容鸣潮的MergedObj
-        这里只是根据IB获取一下对应的obj列表，不需要额外计算其它东西，因为WWMI的逻辑是融合后计算。
+        这里只是根据IB获取一下对应的obj列表,不需要额外计算其它东西,因为WWMI的逻辑是融合后计算。
         '''
     
         final_ordered_draw_obj_model_list:list[ObjDataModel] = [] 
@@ -273,6 +262,8 @@ class BranchModel:
 
                 # print("DrawIB BranchModel")
                 obj_element_model = ObjElementModel(d3d11_game_type=d3d11_game_type,obj_name=obj_name)
+                obj_element_model.fill_into_element_vertex_ndarray()
+                
                 obj_buffer_model = ObjBufferModelUnity(obj_element_model=obj_element_model)
                 # print(len(category_buffer_dict["Blend"]))
                 # print(len(index_vertex_id_dict))

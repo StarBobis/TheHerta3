@@ -39,18 +39,6 @@ class DrawIBModelWWMI:
     Mod导出可以调用这个模型来进行业务逻辑部分
     每个游戏的DrawIBModel都是不同的，但是一部分是可以复用的
     (例如WWMI就有自己的一套DrawIBModel) 
-
-    TODO 仍然有问题未解决
-
-    1.使用ReMap技术时，Blend.buf中的顶点索引要替换为局部索引。
-    2.使用ReMap技术时，生成的BlendRemapVertexVG.buf大小应该是和Blend.buf大小相同的。
-    4.生成的Mod光照不一致
-
-    在当前架构下，要替换最终生成的Blend.buf中的BLENDINDICES的内容十分困难
-    在此之前必须解决我们生成的Blend.buf和WWMI-Tools生成的Blend.buf大小不一致的问题
-    否则就无法进行测试对比
-    这侧面反应了我们的架构设计是不合理的，因为不能随意做到修改局部以及整体的每一处细节数据
-
     '''
     draw_ib: str
     branch_model: BranchModel
@@ -88,15 +76,14 @@ class DrawIBModelWWMI:
         # (2) 读取工作空间中配置文件的配置项
         self.import_config = ImportConfig(draw_ib=self.draw_ib)
         self.d3d11GameType:D3D11GameType = self.import_config.d3d11GameType
+        
         # 读取WWMI专属配置
         self.extracted_object:ExtractedObject = ExtractedObjectHelper.read_metadata(GlobalConfig.path_extract_gametype_folder(draw_ib=self.draw_ib,gametype_name=self.d3d11GameType.GameTypeName)  + "Metadata.json")
 
-        '''
-        这里是要得到每个Component对应的obj_data_model列表
-        '''
+        # 这里是要得到每个Component对应的obj_data_model列表
         self.ordered_obj_data_model_list:list[ObjDataModel] = self.branch_model.get_obj_data_model_list_by_draw_ib(draw_ib=self.draw_ib)
         
-        # (3) 组装成特定格式？
+        # (3) 组装成特定格式
         self._component_model_list:list[ComponentModel] = []
         self.component_name_component_model_dict:dict[str,ComponentModel] = {}
 
@@ -138,109 +125,26 @@ class DrawIBModelWWMI:
             component_model.final_ordered_draw_obj_model_list = new_ordered_obj_model_list
             self.component_name_component_model_dict[component_model.component_name] = component_model
         
-        # (8) 选中当前融合的obj对象，计算得到ib和category_buffer，以及每个IndexId对应的VertexId
+        # (8) 单独拿出来,方便使用
         merged_obj = self.merged_object.object
 
-        # 构建ObjBufferModel
-        # If we have generated per-component remap maps, precompute a
-        # per-loop remapped BLENDINDICES array for the merged object and
-        # pass it into ObjElementModel so remapping happens before the
-        # structured dtype is allocated (avoids uint8 truncation).
-        blendindices_override = None
-        try:
-            if hasattr(self, 'blend_remap_maps') and self.blend_remap_maps:
-                # prepare evaluated mesh for merged object
-                mesh_for_remap = ObjUtils.get_mesh_evaluate_from_obj(obj=merged_obj)
+        TimerUtils.Start("Obj To Buffer")
+        obj_element_model = ObjElementModel(d3d11_game_type=self.d3d11GameType, obj_name=merged_obj.name)
 
-                normalize_weights = "Blend" in self.d3d11GameType.OrderedCategoryNameList
-                # determine expected blend size from game element configuration
-                try:
-                    blendindices_element = self.d3d11GameType.ElementNameD3D11ElementDict["BLENDINDICES"]
-                    np_type = FormatUtils.get_nptype_from_format(blendindices_element.Format)
-                    blend_size = int(blendindices_element.ByteWidth / numpy.dtype(np_type).itemsize)
-                except Exception:
-                    blend_size = 4
-
-                # reuse VertexGroupUtils to get raw per-loop blendindices
-                _, blendindices_dict_for_mesh = VertexGroupUtils.get_blendweights_blendindices_v4_fast(mesh=mesh_for_remap, normalize_weights=normalize_weights, blend_size=blend_size)
-
-                # build raw_blendindices as ObjElementModel does (sorted keys concatenation)
-                try:
-                    keys = sorted(blendindices_dict_for_mesh.keys())
-                    parts = [blendindices_dict_for_mesh[k] for k in keys]
-                    if len(parts) == 1:
-                        raw_blendindices = parts[0].astype(numpy.uint32)
-                    else:
-                        raw_blendindices = numpy.concatenate(parts, axis=1).astype(numpy.uint32)
-                except Exception:
-                    raw_blendindices = None
-
-                if raw_blendindices is not None:
-                    n_loops = raw_blendindices.shape[0]
-                    total_cols = raw_blendindices.shape[1]
-
-                    # build loop -> polygon mapping
-                    loop_to_poly = numpy.empty(n_loops, dtype=numpy.int32)
-                    for poly in mesh_for_remap.polygons:
-                        start = poly.loop_start
-                        end = start + poly.loop_total
-                        loop_to_poly[start:end] = poly.index
-
-                    # build polygon -> component object name mapping using index offsets
-                    poly_count = len(mesh_for_remap.polygons)
-                    polygon_to_objname = [None] * poly_count
-                    for comp in self.merged_object.components:
-                        for temp_obj in comp.objects:
-                            if not hasattr(temp_obj, 'index_offset') or not hasattr(temp_obj, 'index_count'):
-                                continue
-                            poly_start = int(temp_obj.index_offset // 3)
-                            poly_end = poly_start + int(temp_obj.index_count // 3)
-                            for p in range(poly_start, poly_end):
-                                if 0 <= p < poly_count:
-                                    polygon_to_objname[p] = temp_obj.name
-
-                    # apply per-loop remap using component reverse maps
-                    remapped = numpy.copy(raw_blendindices)
-                    for li in range(n_loops):
-                        poly_idx = int(loop_to_poly[li])
-                        comp_obj_name = polygon_to_objname[poly_idx] if (0 <= poly_idx < len(polygon_to_objname)) else None
-                        if not comp_obj_name:
-                            continue
-                        remap_entry = self.blend_remap_maps.get(comp_obj_name, None)
-                        if not remap_entry:
-                            continue
-                        reverse_map = remap_entry.get('reverse', {})
-                        # vectorize mapping where possible
-                        for j in range(total_cols):
-                            orig = int(remapped[li, j])
-                            remapped[li, j] = reverse_map.get(orig, orig)
-
-                    blendindices_override = remapped
-        except Exception as _e:
-            print(f"Warning: could not precompute blendindices_override: {_e}")
-
-        TimerUtils.Start("ObjElementModel")
-        obj_element_model = ObjElementModel(d3d11_game_type=self.d3d11GameType,obj_name=merged_obj.name, blendindices_override=blendindices_override)
-        TimerUtils.End("ObjElementModel")
-
-        # 原始 BLENDINDICES 不再长期存储为单独变量；在需要时直接从
-        # `obj_element_model.elementname_data_dict['BLENDINDICES']` 或者
-        # `obj_element_model.element_vertex_ndarray['BLENDINDICES']` 读取。
-
-        # If we didn't pass a precomputed `blendindices_override` into
-        # ObjElementModel, and we do have remap maps, apply remap now. If
-        # an override was provided, remapping already happened earlier.
-        if (hasattr(self, 'blend_remap_maps') and self.blend_remap_maps) and getattr(obj_element_model, 'blendindices_override', None) is None:
-            try:
-                self.apply_blendindex_remap(obj_element_model)
-            except Exception as e:
-                print(f"apply_blendindex_remap failed: {e}")
+        if getattr(self, 'blend_remap_maps', None):
+            self.apply_blendindex_remap(obj_element_model)
         else:
-            print("No blend_remap_maps found or remap already applied, skipping BLENDINDICES remap.")
+            print("No blend_remap_maps found, skipping BLENDINDICES remap.")
 
-        TimerUtils.Start("ObjBufferModelWWMI")
+        # Now that any external changes (e.g. remap) have been applied to
+        # `elementname_data_dict`, pack into the structured ndarray.
+        try:
+            obj_element_model.fill_into_element_vertex_ndarray()
+        except Exception as e:
+            print(f"Failed to pack element arrays into structured ndarray: {e}")
+
         self.obj_buffer_model_wwmi = ObjBufferModelWWMI(obj_element_model=obj_element_model)
-        TimerUtils.End("ObjBufferModelWWMI")
+        TimerUtils.End("Obj To Buffer")
 
         # Write BlendRemapVertexVG aligned to ObjBufferModelWWMI's unique vertex ordering.
         # Build per-unique-vertex VG id array using index_vertex_id_dict (maps unique_index -> original_vertex_id).
@@ -334,9 +238,6 @@ class DrawIBModelWWMI:
 
 
     def export_blendremap_forward_and_reverse(self, components_objs):
-        '''
-        
-        '''
         output_dir = GlobalConfig.path_generatemod_buffer_folder()
         
         num_vgs = 4
@@ -348,8 +249,6 @@ class DrawIBModelWWMI:
         blend_remap_reverse = numpy.empty(0, dtype=numpy.uint16)
         remapped_vgs_counts = []
 
-        # Collect per-vertex VG ids for the whole drawib (flattened as uint16)
-        all_vg_ids = []
         # Per-component remap maps: { component_name: { 'forward': [orig_vg_ids], 'reverse': {orig->local} } }
         remap_maps: dict[str, dict] = {}
         # Per-component boolean indicating whether remap was used for that component
@@ -375,9 +274,6 @@ class DrawIBModelWWMI:
                         vert_vg_ids[vi, i] = int(gidx)
                         if w > 0:
                             used_vg_set.add(int(gidx))
-
-            # Append this component's per-vertex VG ids to global list (flatten row-major)
-            all_vg_ids.append(vert_vg_ids.ravel())
 
             # Determine whether remapping is needed for this component
             if len(used_vg_set) == 0 or (max(used_vg_set) if len(used_vg_set) else 0) < 256:
@@ -406,12 +302,6 @@ class DrawIBModelWWMI:
             remap_maps[comp_obj.name] = { 'forward': forward_list, 'reverse': reverse_map }
             remap_used[comp_obj.name] = True
 
-        # If there are per-component VG arrays, concatenate into single array
-        if len(all_vg_ids) > 0:
-            vg_concat = numpy.concatenate(all_vg_ids).astype(numpy.uint16)
-        else:
-            vg_concat = numpy.empty(0, dtype=numpy.uint16)
-
         if blend_remap_forward.size != 0:
             with open(os.path.join(output_dir, f"{self.draw_ib}-BlendRemapForward.buf"), 'wb') as f:
                 blend_remap_forward.tofile(f)
@@ -420,23 +310,11 @@ class DrawIBModelWWMI:
             with open(os.path.join(output_dir, f"{self.draw_ib}-BlendRemapReverse.buf"), 'wb') as f:
                 blend_remap_reverse.tofile(f)
 
-        # BlendRemapVertexVG: per-vertex VG ids flattened (uint16)
-        with open(os.path.join(output_dir, f"{self.draw_ib}-BlendRemapVertexVG.buf"), 'wb') as f:
-            vg_concat.tofile(f)
-
-        # Optionally write a layout buffer (counts per component) matching WWMI-Tools naming
-        if len(remapped_vgs_counts) > 0:
-            layout_arr = numpy.array(remapped_vgs_counts, dtype=numpy.uint32)
-            with open(os.path.join(output_dir, f"{self.draw_ib}-BlendRemapLayout.buf"), 'wb') as f:
-                layout_arr.tofile(f)
-
         # Expose the remap maps on the instance for later use (original vg id -> local compact id)
         self.blend_remap_maps = remap_maps
         # also expose which components actually used remapping
         self.blend_remap_used = remap_used
 
-        # Return the buffers and the remap maps for convenience (caller may ignore)
-        return blend_remap_forward, blend_remap_reverse, vg_concat, remap_maps
  
 
     def apply_blendindex_remap(self, obj_element_model: ObjElementModel):
@@ -454,19 +332,35 @@ class DrawIBModelWWMI:
         if not hasattr(self, 'blend_remap_maps') or not self.blend_remap_maps:
             return
 
-        if 'BLENDINDICES' not in obj_element_model.element_vertex_ndarray.dtype.names:
-            return
+        # We prefer to operate on the parsed per-element arrays stored in
+        # `original_elementname_data_dict` and write remapped results into
+        # `final_elementname_data_dict`. This avoids mutating the original
+        # parsed arrays and defers packing until callers call
+        # `fill_into_element_vertex_ndarray()`.
 
         mesh = obj_element_model.mesh
         loops_len = obj_element_model.mesh_loops_length
 
-        # 1) loop -> polygon mapping
+        # Build loop -> polygon mapping
         loop_to_poly = _np.empty(loops_len, dtype=_np.int32)
         for poly in mesh.polygons:
             start = poly.loop_start
             end = start + poly.loop_total
-            # assign polygon index to all loops in this polygon
             loop_to_poly[start:end] = poly.index
+
+        arr = None
+        # Source array: original parsed dict if present
+        if 'BLENDINDICES' in getattr(obj_element_model, 'original_elementname_data_dict', {}):
+            # copy to avoid mutating the original
+            src = obj_element_model.original_elementname_data_dict['BLENDINDICES']
+            arr = src.copy()
+        elif hasattr(obj_element_model, 'element_vertex_ndarray') and 'BLENDINDICES' in obj_element_model.element_vertex_ndarray.dtype.names:
+            # If the caller has already packed, take a copy of the packed ndarray
+            arr = obj_element_model.element_vertex_ndarray['BLENDINDICES'].copy()
+
+        if arr is None:
+            # Nothing to remap
+            return
 
         # 2) polygon -> component object name mapping
         poly_count = len(mesh.polygons)
@@ -474,7 +368,6 @@ class DrawIBModelWWMI:
 
         for comp in self.merged_object.components:
             for temp_obj in comp.objects:
-                # temp_obj should have index_offset and index_count in triangle indices
                 if not hasattr(temp_obj, 'index_offset') or not hasattr(temp_obj, 'index_count'):
                     continue
                 poly_start = int(temp_obj.index_offset // 3)
@@ -483,11 +376,8 @@ class DrawIBModelWWMI:
                     if 0 <= p < poly_count:
                         polygon_to_objname[p] = temp_obj.name
 
-        # 3) apply remap per loop
-        arr = obj_element_model.element_vertex_ndarray['BLENDINDICES']
-
         # Determine width (number of indices per entry)
-        if arr.ndim == 1:
+        if getattr(arr, 'ndim', 1) == 1:
             width = 1
         else:
             width = arr.shape[1]
@@ -511,9 +401,15 @@ class DrawIBModelWWMI:
                     orig = int(arr[li, j])
                     new = reverse_map.get(orig, orig)
                     arr[li, j] = new
+        # Do NOT mutate the original parsed arrays. Place remapped array into
+        # `final_elementname_data_dict` so callers may later call
+        # `fill_into_element_vertex_ndarray()` to pack using remapped values.
+        if not hasattr(obj_element_model, 'final_elementname_data_dict') or obj_element_model.final_elementname_data_dict is None:
+            obj_element_model.final_elementname_data_dict = {}
 
-        # updated in-place
-        print("Applied BLENDINDICES remap to ObjElementModel")
+        obj_element_model.final_elementname_data_dict['BLENDINDICES'] = arr
+
+        print("Applied BLENDINDICES remap and wrote results into final_elementname_data_dict")
  
 
 

@@ -149,7 +149,8 @@ class ModModelWWMI:
 
             for component_name, use_remap in draw_ib_model.blend_remap_used.items():
                 if use_remap:
-                    component_count = int(component_name.split(" ")[1]) - 1
+                    print(component_name)
+                    component_count = int(component_name.split("-")[1]) - 1
                     blend_remap_section.append("[ResourceRemappedBlendBufferComponent" + str(component_count) + "]")
                     blend_remap_section.append("[ResourceRemappedSkeletonComponent" + str(component_count) + "]")
                     blend_remap_section.append("[ResourceExtraRemappedSkeletonComponent" + str(component_count) + "]")
@@ -169,7 +170,7 @@ class ModModelWWMI:
             blend_remap_id = 0
             for component_name, use_remap in draw_ib_model.blend_remap_used.items():
                 if use_remap:
-                    component_count = int(component_name.split(" ")[1]) - 1
+                    component_count = int(component_name.split("-")[1]) - 1
                     component_count_str = str(component_count)
                     blend_remap_section.append("    $\\WWMIv1\\blend_remap_id = " + str(blend_remap_id))
                     blend_remap_section.append("    ResourceRemappedBlendBufferRW = copy ResourceBlendBufferNoStride")
@@ -591,6 +592,7 @@ class ModModelWWMI:
             self.add_present_section(ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)
             self.add_commandlist_register_mod_section(ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)
             self.add_commandlist_update_merged_skeleton(ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)
+            self.add_blend_remap_sections(ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)
             
             self.add_resource_mod_info_section_default(ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)
             self.add_commandlist_trigger_shared_cleanup_section(ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)

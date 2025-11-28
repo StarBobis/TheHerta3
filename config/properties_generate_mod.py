@@ -31,8 +31,8 @@ class Properties_GenerateMod(bpy.types.PropertyGroup):
     
     gimi_use_orfix: bpy.props.BoolProperty(
         name="槽位风格贴图使用ORFix",
-        description="在使用槽位风格贴图标记时，如果偷懒不想在版本更新时维护由于贴图槽位变化导致的贴图损坏问题，可以勾选此选项将问题交给ORFix维护者来解决，仅GIMI可用",
-        default=False
+        description="勾选后，在使用槽位风格贴图标记时，如果偷懒不想手动维护由于贴图槽位变化导致的贴图损坏问题，可以勾选此选项将问题交给ORFix维护者来解决，仅GIMI可用\n注意，如果你不懂ORFix和NNFix的原理，请不要取消勾选，取消勾选会严格按照贴图标记来执行贴图部分ini生成，默认你会在ini中自行写判断语句修复来替代实现ORFix和NNFix的功能",
+        default=True
     ) # type: ignore
 
     @classmethod

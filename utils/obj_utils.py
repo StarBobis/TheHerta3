@@ -448,6 +448,16 @@ class ObjUtils:
 
         # 1. 清空当前所有选中（可选，但通常需要）
         # bpy.ops.object.select_all(action='DESELECT')
+        # Nico: 注意，这里不能用 bpy.ops.object.select_all(action='DESELECT')，
+        # 因为这个操作有 poll() 检查，
+        # bpy.ops.object.select_all 
+        # 通常要求当前的上下文是 3D 视图（3D Viewport）。
+        # 如果你的脚本是在其他面板（比如属性面板）的按钮回调中运行，或者在后台运行，
+        # 当前的 Context 可能不满足这个要求，导致 poll() 检查失败。
+        # 修复方法：
+        # 不要使用 bpy.ops.object.select_all(action='DESELECT') 这种依赖 Context 的操作符，
+        # 而是直接使用 Blender 的数据 API 来修改对象的选中状态。
+        # 这种方式更底层，不受 Context 限制，更加稳定。
         for obj in bpy.context.selected_objects:
             obj.select_set(False)
 

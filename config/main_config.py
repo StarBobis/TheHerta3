@@ -57,7 +57,7 @@ class GlobalConfig:
             else:
                 print("Can't find: " + main_json_path)
             
-            game_config_json_path = os.path.join(cls.dbmtlocation,"Games\\" + cls.gamename + "\\Config.json")
+            game_config_json_path = os.path.join(GlobalConfig.path_ssmt3_global_configs_folder(),"Games\\" + cls.gamename + "\\Config.json")
             if os.path.exists(game_config_json_path):
                 game_config_json_file = open(game_config_json_path)
                 game_config_json = json.load(game_config_json_file)

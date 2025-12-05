@@ -715,7 +715,7 @@ class ModModelWWMI:
 
         # Add namespace 
         for draw_ib, draw_ib_model in self.drawib_drawibmodel_dict.items():
-
+            
             self.add_constants_section(ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)
             self.add_present_section(ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)
             self.add_commandlist_register_mod_section(ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)
@@ -739,15 +739,15 @@ class ModModelWWMI:
 
             M_GlobalKeyCounter.generated_mod_number = M_GlobalKeyCounter.generated_mod_number + 1
 
-        M_IniHelper.add_branch_key_sections(ini_builder=config_ini_builder,key_name_mkey_dict=self.branch_model.keyname_mkey_dict)
+            M_IniHelper.add_branch_key_sections(ini_builder=config_ini_builder,key_name_mkey_dict=self.branch_model.keyname_mkey_dict)
 
-        M_IniHelperGUI.add_branch_mod_gui_section(ini_builder=config_ini_builder,key_name_mkey_dict=self.branch_model.keyname_mkey_dict)
+            M_IniHelperGUI.add_branch_mod_gui_section(ini_builder=config_ini_builder,key_name_mkey_dict=self.branch_model.keyname_mkey_dict)
 
-        M_IniHelper.generate_hash_style_texture_ini(ini_builder=config_ini_builder,drawib_drawibmodel_dict=self.drawib_drawibmodel_dict)
+            M_IniHelper.generate_hash_style_texture_ini(ini_builder=config_ini_builder,drawib_drawibmodel_dict=self.drawib_drawibmodel_dict)
 
-        # 保存ini文件，但是按照代码中顺序排列
-        config_ini_builder.save_to_file_not_reorder(GlobalConfig.path_generate_mod_folder() + GlobalConfig.workspacename + ".ini")
+            # 保存ini文件，但是按照代码中顺序排列
+            config_ini_builder.save_to_file_not_reorder(GlobalConfig.path_generate_mod_folder() + GlobalConfig.workspacename + "_" + draw_ib + ".ini")
 
-
+            config_ini_builder.clear()
 
         

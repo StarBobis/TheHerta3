@@ -164,7 +164,11 @@ class ModModelWWMI:
                 blend_remap_section.append("  ResourceExtraRemappedSkeletonRW = copy ResourceExtraMergedSkeletonRW")
                 blend_remap_section.new_line()
                 blend_remap_section.append("  $\\WWMIv1\\custom_vertex_count = $mesh_vertex_count")
-                blend_remap_section.append("  $\\WWMIv1\\weights_per_vertex_count = 8") # TODO 这里后续要改成动态获取
+
+                # Nico: 注意，这里的数量是BLENDINDICES的数量，不是固定写死的，是要动态从数据类型中获取
+                weights_per_vertex_count = draw_ib_model.d3d11GameType.get_blendindices_count_wwmi()
+                blend_remap_section.append("  $\\WWMIv1\\weights_per_vertex_count = " + str(weights_per_vertex_count)) 
+
                 blend_remap_section.append("  cs-t34 = ref ResourceBlendRemapReverseBuffer")
                 blend_remap_section.append("  cs-t35 = ref ResourceBlendRemapVertexVGBuffer")
 
@@ -579,7 +583,6 @@ class ModModelWWMI:
     def add_resource_merged_skeleton(self,ini_builder:M_IniBuilder,draw_ib_model:DrawIBModelWWMI):
         resource_skeleton_section = M_IniSection(M_SectionType.ResourceSkeletonOverride)
 
-        # TODO 这些array后面的值可能是动态计算得到的
         resource_skeleton_section.append("[ResourceMergedSkeleton]")
         resource_skeleton_section.new_line()
 
@@ -587,10 +590,14 @@ class ModModelWWMI:
         resource_skeleton_section.append("type = RWBuffer")
         resource_skeleton_section.append("format = R32G32B32A32_FLOAT")
 
-        if draw_ib_model.d3d11GameType.get_blendindices_count_wwmi() == 4:
-            resource_skeleton_section.append("array = 768")
-        elif draw_ib_model.d3d11GameType.get_blendindices_count_wwmi() == 8:
+        # Nico: 这里的array等于多少是固定的
+        # 如果用了Remap就是1536，否则就是768
+        if draw_ib_model.blend_remap:
             resource_skeleton_section.append("array = 1536")
+        else:
+            resource_skeleton_section.append("array = 768")
+
+   
         resource_skeleton_section.new_line()
 
         resource_skeleton_section.append("[ResourceExtraMergedSkeleton]")
@@ -600,11 +607,12 @@ class ModModelWWMI:
         resource_skeleton_section.append("type = RWBuffer")
         resource_skeleton_section.append("format = R32G32B32A32_FLOAT")
 
-        if draw_ib_model.d3d11GameType.get_blendindices_count_wwmi() == 4:
-            resource_skeleton_section.append("array = 768")
-        elif draw_ib_model.d3d11GameType.get_blendindices_count_wwmi() == 8:
+        # Nico: 这里的array等于多少是固定的
+        # 如果用了Remap就是1536，否则就是768
+        if draw_ib_model.blend_remap:
             resource_skeleton_section.append("array = 1536")
-
+        else:
+            resource_skeleton_section.append("array = 768")
         ini_builder.append_section(resource_skeleton_section)
 
     def add_resource_buffer(self,ini_builder:M_IniBuilder,draw_ib_model:DrawIBModelWWMI):

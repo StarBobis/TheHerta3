@@ -300,6 +300,20 @@ class SwordImportAllReversed(bpy.types.Operator):
                 datatype_collection.objects.link(obj_result)
                 # 这里先链接SourceCollection，确保它在上面
 
+                # 刷新视图以得到流畅的导入逐渐增多的视觉效果
+                bpy.context.view_layer.update()
+                # 强制Blender刷新界面
+                bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
+
+                # 在这里调用对obj应用全部Transformation
+                bpy.ops.object.select_all(action='DESELECT')
+                obj_result.select_set(True)
+                bpy.context.view_layer.objects.active = obj_result
+                bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+                obj_result.select_set(False)
+                
+
+
         # 随后把图片路径指定为当前路径
         reload_textures_from_folder(reverse_output_folder_path)
 

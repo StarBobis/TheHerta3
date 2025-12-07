@@ -68,7 +68,7 @@ class PanelGenerateModConfig(bpy.types.Panel):
         # 生成Mod按钮
         if GlobalConfig.logic_name == LogicName.WWMI:
             layout.label(text="鸣潮请优先考虑使用WWMI-Tools,SSMT仅提供概念与流程验证支持",icon='INFO')
-
+        
         layout.operator("ssmt.generate_mod",icon='EXPORT')
 
         # 根据当前游戏类型判断哪些应该显示哪些不显示。

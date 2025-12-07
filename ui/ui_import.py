@@ -97,6 +97,15 @@ class Import3DMigotoRaw(bpy.types.Operator, ImportHelper):
             mbf = MigotoBinaryFile(fmt_path=fmt_file_path)
             obj_result = MeshImporter.create_mesh_obj_from_mbf(mbf=mbf)
             collection.objects.link(obj_result)
+
+
+
+            # 刷新视图以得到流畅的导入逐渐增多的视觉效果
+            bpy.context.view_layer.update()
+
+            # 强制Blender刷新界面
+            bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
+
         
         # Select all objects under collection (因为用户习惯了导入后就是全部选中的状态). 
         CollectionUtils.select_collection_objects(collection)
@@ -109,6 +118,8 @@ def ImprotFromWorkSpaceSSMTV3(self, context):
     print(import_drawib_aliasname_folder_path_dict)
 
     workspace_collection = CollectionUtils.create_new_collection(collection_name=GlobalConfig.workspacename,color_tag=CollectionColor.Red)
+    # 这里先链接SourceCollection，确保它在上面
+    bpy.context.scene.collection.children.link(workspace_collection)
 
     # 读取时保存每个DrawIB对应的GameType名称到工作空间文件夹下面的Import.json，在导出时使用
     draw_ib_gametypename_dict = {}
@@ -146,11 +157,16 @@ def ImprotFromWorkSpaceSSMTV3(self, context):
             mbf = MigotoBinaryFile(fmt_path=fmt_file_path,mesh_name=draw_ib + "-" + str(part_count) + "-" + alias_name)
             obj_result = MeshImporter.create_mesh_obj_from_mbf(mbf=mbf)
 
+            # 刷新视图以得到流畅的导入逐渐增多的视觉效果
+            bpy.context.view_layer.update()
+
+            # 强制Blender刷新界面
+            bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
+            
             default_show_collection.objects.link(obj_result)
             part_count = part_count + 1
 
-    # 这里先链接SourceCollection，确保它在上面
-    bpy.context.scene.collection.children.link(workspace_collection)
+    
 
     # Select all objects under collection (因为用户习惯了导入后就是全部选中的状态). 
     CollectionUtils.select_collection_objects(workspace_collection)

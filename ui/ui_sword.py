@@ -306,11 +306,13 @@ class SwordImportAllReversed(bpy.types.Operator):
                 bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
 
                 # 在这里调用对obj应用全部Transformation
-                bpy.ops.object.select_all(action='DESELECT')
-                obj_result.select_set(True)
-                bpy.context.view_layer.objects.active = obj_result
-                bpy.ops.object.transform_apply(location=True, rotation=True, scale=False)
-                obj_result.select_set(False)
+
+                if mbf.fmt_file.apply_rotation_transformation:
+                    bpy.ops.object.select_all(action='DESELECT')
+                    obj_result.select_set(True)
+                    bpy.context.view_layer.objects.active = obj_result
+                    bpy.ops.object.transform_apply(location=True, rotation=True, scale=False)
+                    obj_result.select_set(False)
                 
 
 

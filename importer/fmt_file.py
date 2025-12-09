@@ -15,6 +15,7 @@ class FMTFile:
         self.rotate_angle_y:float = 0
         self.rotate_angle_z:float = 0
         self.flip_face_orientation:bool = False
+        self.apply_rotation_transformation:bool = False
 
         self.elements:list[D3D11Element] = []
 
@@ -51,6 +52,8 @@ class FMTFile:
             
             elif key == "flip_face_orientation":
                 self.flip_face_orientation = value.lower() == "true"
+            elif key == "apply_rotation_transformation":
+                self.apply_rotation_transformation = value.lower() == "true"
 
             elif key.startswith("element"):
                 # 处理element块

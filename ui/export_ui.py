@@ -65,6 +65,11 @@ class PanelGenerateModConfig(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
 
+        # TODO 如果当前没有选中任何工作空间集合，就提示用户先选中一个，在面板上显示一个提示
+        if not context.scene.active_workspace_collection:
+            layout.label(text="请先在下拉列表中选择一个工作空间集合用于生成Mod", icon='ERROR')
+        layout.prop_search(context.scene, "active_workspace_collection", bpy.data, "collections", text="")
+
         # 生成Mod按钮
         if GlobalConfig.logic_name == LogicName.WWMI:
             layout.label(text="鸣潮请优先考虑使用WWMI-Tools,SSMT仅提供概念与流程验证支持",icon='INFO')
@@ -131,7 +136,10 @@ class SSMTGenerateMod(bpy.types.Operator):
         M_GlobalKeyCounter.initialize()
 
         # 先校验当前选中的工作空间是不是一个有效的工作空间集合
-        workspace_collection = bpy.context.collection
+        if not context.scene.active_workspace_collection:
+            self.report({'ERROR'},"请先在下拉列表中选择一个工作空间集合用于生成Mod")
+            return {'FINISHED'}
+        workspace_collection = context.scene.active_workspace_collection
         result = CollectionUtils.is_valid_ssmt_workspace_collection_v2(workspace_collection)
         if result != "":
             self.report({'ERROR'},result)

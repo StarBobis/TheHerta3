@@ -29,7 +29,7 @@ bl_info = {
     "name": "TheHerta3",
     "description": "SSMT3.0 Series's Blender Plugin.",
     "blender": (4, 5, 0),
-    "version": (3, 2, 1),
+    "version": (3, 2, 2),
     "location": "View3D",
     "category": "Generic"
 }
@@ -198,6 +198,17 @@ def register():
     bpy.types.Scene.properties_wwmi = bpy.props.PointerProperty(type=Properties_WWMI)
     bpy.types.Scene.properties_import_model = bpy.props.PointerProperty(type=Properties_ImportModel)
     bpy.types.Scene.properties_generate_mod = bpy.props.PointerProperty(type=Properties_GenerateMod)
+
+    # 注册一个用于选择工作空间集合的属性，带poll函数过滤红色集合
+    def poll_red_collection(self, object):
+        return object.color_tag == 'COLOR_01'
+
+    bpy.types.Scene.active_workspace_collection = bpy.props.PointerProperty(
+        type=bpy.types.Collection,
+        name="Generate Mod Workspace Collection",
+        description="生成Mod之前必须在这里选择一个当前工作空间为名称的集合",
+        poll=poll_red_collection
+    )
     bpy.types.Scene.properties_extract_model = bpy.props.PointerProperty(type=Properties_ExtractModel)
 
     bpy.types.VIEW3D_MT_object_context_menu.append(menu_func_migoto_right_click)

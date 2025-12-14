@@ -119,6 +119,10 @@ def ImprotFromWorkSpaceSSMTV3(self, context):
     # 这里先链接SourceCollection，确保它在上面
     bpy.context.scene.collection.children.link(workspace_collection)
 
+    # TODO 如果此时刚才那个下拉列表没有任何集合，就让那个下拉列表选中这个集合
+    if not context.scene.active_workspace_collection:
+        context.scene.active_workspace_collection = workspace_collection
+
     # 读取时保存每个DrawIB对应的GameType名称到工作空间文件夹下面的Import.json，在导出时使用
     draw_ib_gametypename_dict = {}
     for draw_ib_aliasname,import_folder_path in import_drawib_aliasname_folder_path_dict.items():
@@ -187,4 +191,7 @@ class SSMTImportAllFromCurrentWorkSpaceV3(bpy.types.Operator):
             TimerUtils.Start("ImportFromWorkSpace")
             ImprotFromWorkSpaceSSMTV3(self,context)
             TimerUtils.End("ImportFromWorkSpace")
+        
+
+
         return {'FINISHED'}

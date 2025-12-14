@@ -52,14 +52,98 @@ class ObjBufferModelUnity:
         # 因为只有存在TANGENT时，顶点数才会增加，所以如果是GF2并且存在TANGENT才使用共享TANGENT防止增加顶点数
         if GlobalConfig.logic_name == LogicName.UnityCPU and "TANGENT" in self.obj_element_model.d3d11_game_type.OrderedFullElementList:
             self.calc_index_vertex_buffer_girlsfrontline2()
-        elif GlobalConfig.logic_name == LogicName.WWMI:
-            self.calc_index_vertex_buffer_wwmi_v2()
-        elif GlobalConfig.logic_name == LogicName.SnowBreak:
-            self.calc_index_vertex_buffer_wwmi_v2()
         else:
             # 计算IndexBuffer和CategoryBufferDict
-            self.calc_index_vertex_buffer_universal()
+            # self.calc_index_vertex_buffer_universal()
+            self.calc_index_vertex_buffer_unified()
 
+    def calc_index_vertex_buffer_unified(self):
+        '''
+        计算IndexBuffer和CategoryBufferDict并返回
+        如果模型具有形态键，那么形态键盘的值为0到1的任何值应用后，都不会造成由于顶点合并导致的顶点数改变。
+        '''
+        # TimerUtils.Start("Calc IB VB")
+        
+        has_shape_keys = False
+        if self.mesh.shape_keys and len(self.mesh.shape_keys.key_blocks) > 0:
+             has_shape_keys = True
+
+        if has_shape_keys:
+            # 如果有形态键，必须区分不同顶点索引的顶点，即使它们的数据相同
+            # 这样可以防止合并那些在Basis中重合但在ShapeKey中分离的顶点
+            unique_map = collections.OrderedDict()
+            ib = []
+            for poly in self.mesh.polygons:
+                poly_indices = []
+                for loop_index in range(poly.loop_start, poly.loop_start + poly.loop_total):
+                    loop = self.mesh.loops[loop_index]
+                    data = self.element_vertex_ndarray[loop.index].tobytes()
+                    # Key includes vertex_index to prevent merging different vertices
+                    key = (data, loop.vertex_index)
+                    idx = unique_map.setdefault(key, len(unique_map))
+                    poly_indices.append(idx)
+                ib.append(poly_indices)
+            
+            # Extract just the data bytes for the vertex buffer
+            vertex_data_list = [k[0] for k in unique_map.keys()]
+            
+        else:
+            # Standard merging based on data only
+            indexed_vertices = collections.OrderedDict()
+            ib = [[indexed_vertices.setdefault(self.element_vertex_ndarray[blender_lvertex.index].tobytes(), len(indexed_vertices))
+                    for blender_lvertex in self.mesh.loops[poly.loop_start:poly.loop_start + poly.loop_total]
+                        ]for poly in self.mesh.polygons] 
+            vertex_data_list = indexed_vertices # keys are the data bytes
+
+        flattened_ib = [item for sublist in ib for item in sublist]
+        # TimerUtils.End("Calc IB VB")
+
+        # 重计算TANGENT步骤
+        indexed_vertices = self.average_normal_tangent(obj=self.obj, indexed_vertices=vertex_data_list, d3d11GameType=self.d3d11_game_type,dtype=self.dtype)
+        
+        # 重计算COLOR步骤
+        indexed_vertices = self.average_normal_color(obj=self.obj, indexed_vertices=indexed_vertices, d3d11GameType=self.d3d11_game_type,dtype=self.dtype)
+
+        # (2) 转换为CategoryBufferDict
+        # TimerUtils.Start("Calc CategoryBuffer")
+        category_stride_dict = self.d3d11_game_type.get_real_category_stride_dict()
+        category_buffer_dict:dict[str,list] = {}
+        for categoryname,category_stride in self.d3d11_game_type.CategoryStrideDict.items():
+            category_buffer_dict[categoryname] = []
+
+        data_matrix = numpy.array([numpy.frombuffer(byte_data,dtype=numpy.uint8) for byte_data in indexed_vertices])
+        stride_offset = 0
+        for categoryname,category_stride in category_stride_dict.items():
+            category_buffer_dict[categoryname] = data_matrix[:,stride_offset:stride_offset + category_stride].flatten()
+            stride_offset += category_stride
+
+        self.ib = flattened_ib
+
+        flip_face_direction = False
+
+        if Properties_ImportModel.use_mirror_workflow():
+            flip_face_direction = True
+            if GlobalConfig.logic_name == LogicName.YYSLS:
+                flip_face_direction = False
+        else:
+            if GlobalConfig.logic_name == LogicName.YYSLS:
+                flip_face_direction = True
+
+        if flip_face_direction:
+            print("导出时翻转面朝向")
+
+            flipped_indices = []
+            # print(flattened_ib[0],flattened_ib[1],flattened_ib[2])
+            for i in range(0, len(flattened_ib), 3):
+                triangle = flattened_ib[i:i+3]
+                flipped_triangle = triangle[::-1]
+                flipped_indices.extend(flipped_triangle)
+            # print(flipped_indices[0],flipped_indices[1],flipped_indices[2])
+            self.ib = flipped_indices
+
+        self.category_buffer_dict = category_buffer_dict
+        self.index_vertex_id_dict = None
+        
     def calc_index_vertex_buffer_girlsfrontline2(self):
         '''
         1. Blender 的“顶点数”= mesh.vertices 长度，只要位置不同就算一个。

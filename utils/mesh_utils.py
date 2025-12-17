@@ -50,7 +50,7 @@ class MeshUtils:
 
         # Blender 4.1+ 推荐路径：直接从顶点设置，自动插值得到丝滑效果
         if bpy.app.version >= (4, 1, 0):
-            mesh.use_auto_smooth = True  # 确保启用 auto smooth
+            # mesh.use_auto_smooth = True  # 确保启用 auto smooth
             mesh.normals_split_custom_set_from_vertices(normals)
             return
 

@@ -32,6 +32,7 @@ class ModModelZZMI:
     '''
     def __init__(self,workspace_collection:bpy.types.Collection):
         # (1) 统计全局分支模型
+        print(workspace_collection.name)
         self.branch_model = BranchModel(workspace_collection=workspace_collection)
 
         # (2) 抽象每个DrawIB为DrawIBModel

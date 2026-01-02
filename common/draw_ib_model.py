@@ -35,6 +35,7 @@ class DrawIBModel:
         self.draw_ib:str = draw_ib
         self.draw_ib_alias:str = draw_ib_alias_name_dict.get(draw_ib,draw_ib)
 
+        print(self.draw_ib + " Alias Name: " + self.draw_ib_alias)
         # (2) 读取工作空间中配置文件的配置项
         self.import_config:ImportConfig = ImportConfig(draw_ib=self.draw_ib)
         self.d3d11GameType:D3D11GameType = self.import_config.d3d11GameType

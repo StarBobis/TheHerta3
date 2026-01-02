@@ -152,21 +152,24 @@ def ImprotFromWorkSpaceSSMTV3(self, context):
             self.report({'ERROR'},"当前output文件夹"+draw_ib_aliasname+"中的内容暂不支持一键导入分支模型")
             continue
 
-
+        
         part_count = 1
         for prefix in import_prefix_list:
-            fmt_file_path = os.path.join(import_folder_path, prefix + ".fmt")
-            mbf = MigotoBinaryFile(fmt_path=fmt_file_path,mesh_name=draw_ib + "-" + str(part_count) + "-" + alias_name)
-            obj_result = MeshImporter.create_mesh_obj_from_mbf(mbf=mbf)
+            try:
+                fmt_file_path = os.path.join(import_folder_path, prefix + ".fmt")
+                mbf = MigotoBinaryFile(fmt_path=fmt_file_path,mesh_name=draw_ib + "-" + str(part_count) + "-" + alias_name)
+                obj_result = MeshImporter.create_mesh_obj_from_mbf(mbf=mbf)
 
-            # 刷新视图以得到流畅的导入逐渐增多的视觉效果
-            bpy.context.view_layer.update()
+                # 刷新视图以得到流畅的导入逐渐增多的视觉效果
+                bpy.context.view_layer.update()
 
-            # 强制Blender刷新界面
-            bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
-            
-            default_show_collection.objects.link(obj_result)
-            part_count = part_count + 1
+                # 强制Blender刷新界面
+                bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
+                
+                default_show_collection.objects.link(obj_result)
+                part_count = part_count + 1
+            except Exception as e:
+                self.report({'ERROR'}, "当前DrawIB" + draw_ib +"导入发生错误:" + str(e) )
 
     
 

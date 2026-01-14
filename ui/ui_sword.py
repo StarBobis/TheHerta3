@@ -349,6 +349,9 @@ class Sword_ImportTexture_VIEW3D_PT_ImageMaterialPanel(Panel):
 
         # 一键导入逆向结果按钮
         layout.operator("ssmt.import_all_reverse")
+        
+        # 导入 ib vb fmt格式文件
+        layout.operator("import_mesh.migoto_raw_buffers_mmt",icon='IMPORT')
 
         # 自动检测按钮
         row = layout.row()

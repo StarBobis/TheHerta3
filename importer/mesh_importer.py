@@ -83,6 +83,7 @@ class MeshImporter:
 
                 # 这里鸣潮的翻转X和Y是为了和游戏里解包出来的原模型朝向完全一致
                 if GlobalConfig.logic_name == LogicName.WWMI:
+                    # TODO 这里应该在SSMT提取端就完成
                     # 鸣潮的坐标系需要额外处理一下,这样让模型旋转了180度的效果
                     positions = [(-x[0], -x[1], x[2]) for x in data]
 
@@ -128,6 +129,7 @@ class MeshImporter:
                     normals = [(x[0] * 2 - 1, x[1] * 2 - 1, x[2] * 2 - 1) for x in data]
 
                 # 这里鸣潮的翻转X和Y是为了和游戏里解包出来的原模型朝向完全一致
+                # TODO 这里应该在SSMT提取端就完成
                 elif GlobalConfig.logic_name == LogicName.WWMI:
                     normals = [(-x[0], -x[1], x[2]) for x in data]
                 else:
@@ -235,6 +237,10 @@ class MeshImporter:
             obj.rotation_euler[0] = math.radians(mbf.fmt_file.rotate_angle_x)
             obj.rotation_euler[1] = math.radians(mbf.fmt_file.rotate_angle_y)
             obj.rotation_euler[2] = math.radians(mbf.fmt_file.rotate_angle_z)
+        else:
+            obj.rotation_euler[0] = 0
+            obj.rotation_euler[1] = 0
+            obj.rotation_euler[2] = 0
 
     @classmethod
     def initialize_mesh(cls,mesh, mbf:MigotoBinaryFile):

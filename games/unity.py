@@ -440,7 +440,7 @@ class ModModelUnity:
         resource_vertex_limit_section.append("[Resource_" + draw_ib_model.draw_ib + "_VertexLimit]")
         resource_vertex_limit_section.append("type = Buffer")
         resource_vertex_limit_section.append("format = R32G32B32A32_UINT")
-        resource_vertex_limit_section.append("data = " + str(draw_ib_model.draw_number) + " 0 0 0")
+        resource_vertex_limit_section.append("data = " + str(draw_ib_model.draw_number) + " 0 "+str(draw_ib_model.draw_number)+" 0")
         resource_vertex_limit_section.new_line()
 
         commandlist_ini_builder.append_section(resource_vertex_limit_section)

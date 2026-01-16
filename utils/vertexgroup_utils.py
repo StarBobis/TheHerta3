@@ -37,73 +37,169 @@ class VertexGroupUtils:
             for x in obj.vertex_groups:
                 obj.vertex_groups.remove(x)
 
+    # @classmethod
+    # def merge_vertex_groups_with_same_number(cls):
+    #     # Author: SilentNightSound#7430
+    #     # Combines vertex groups with the same prefix into one, a fast alternative to the Vertex Weight Mix that works for multiple groups
+    #     # You will likely want to use blender_fill_vg_gaps.txt after this to fill in any gaps caused by merging groups together
+    #     # Nico: we only need mode 3 here.
+
+    #     selected_obj = [obj for obj in bpy.context.selected_objects]
+    #     vgroup_names = []
+
+    #     ##### USAGE INSTRUCTIONS
+    #     # MODE 1: Runs the merge on a specific list of vertex groups in the selected object(s). Can add more names or fewer to the list - change the names to what you need
+    #     # MODE 2: Runs the merge on a range of vertex groups in the selected object(s). Replace smallest_group_number with the lower bound, and largest_group_number with the upper bound
+    #     # MODE 3 (DEFAULT): Runs the merge on ALL vertex groups in the selected object(s)
+
+    #     # Select the mode you want to run:
+    #     mode = 3
+
+    #     # Required data for MODE 1:
+    #     vertex_groups = ["replace_with_first_vertex_group_name", "second_vertex_group_name", "third_name_etc"]
+
+    #     # Required data for MODE 2:
+    #     smallest_group_number = 000
+    #     largest_group_number = 999
+
+    #     ######
+
+    #     if mode == 1:
+    #         vgroup_names = [vertex_groups]
+    #     elif mode == 2:
+    #         vgroup_names = [[f"{i}" for i in range(smallest_group_number, largest_group_number + 1)]]
+    #     elif mode == 3:
+    #         vgroup_names = [[x.name.split(".")[0] for x in y.vertex_groups] for y in selected_obj]
+    #     else:
+    #         raise Fatal("Mode not recognized, exiting")
+
+    #     if not vgroup_names:
+    #         raise Fatal(
+    #             "No vertex groups found, please double check an object is selected and required data has been entered")
+
+    #     for cur_obj, cur_vgroup in zip(selected_obj, itertools.cycle(vgroup_names)):
+    #         for vname in cur_vgroup:
+    #             relevant = [x.name for x in cur_obj.vertex_groups if x.name.split(".")[0] == f"{vname}"]
+
+    #             if relevant:
+
+    #                 vgroup = cur_obj.vertex_groups.new(name=f"x{vname}")
+
+    #                 for vert_id, vert in enumerate(cur_obj.data.vertices):
+    #                     available_groups = [v_group_elem.group for v_group_elem in vert.groups]
+
+    #                     combined = 0
+    #                     for v in relevant:
+    #                         if cur_obj.vertex_groups[v].index in available_groups:
+    #                             combined += cur_obj.vertex_groups[v].weight(vert_id)
+
+    #                     if combined > 0:
+    #                         vgroup.add([vert_id], combined, 'ADD')
+
+    #                 for vg in [x for x in cur_obj.vertex_groups if x.name.split(".")[0] == f"{vname}"]:
+    #                     cur_obj.vertex_groups.remove(vg)
+
+    #                 for vg in cur_obj.vertex_groups:
+    #                     if vg.name[0].lower() == "x":
+    #                         vg.name = vg.name[1:]
+
+    #         bpy.context.view_layer.objects.active = cur_obj
+    #         bpy.ops.object.vertex_group_sort()
+
     @classmethod
-    def merge_vertex_groups_with_same_number(cls):
-        # Author: SilentNightSound#7430
-        # Combines vertex groups with the same prefix into one, a fast alternative to the Vertex Weight Mix that works for multiple groups
-        # You will likely want to use blender_fill_vg_gaps.txt after this to fill in any gaps caused by merging groups together
-        # Nico: we only need mode 3 here.
+    def merge_vertex_groups_with_same_number_v2(cls):
+        '''
+        merge_vertex_groups_with_same_number 的 Mode 3 优化版本
+        大幅提升执行速度 (Differential Update Strategy)
 
-        selected_obj = [obj for obj in bpy.context.selected_objects]
-        vgroup_names = []
+        
+        '''
+        selected_objs = [obj for obj in bpy.context.selected_objects if obj.type == 'MESH']
+        if not selected_objs:
+             raise Fatal("No mesh objects selected")
 
-        ##### USAGE INSTRUCTIONS
-        # MODE 1: Runs the merge on a specific list of vertex groups in the selected object(s). Can add more names or fewer to the list - change the names to what you need
-        # MODE 2: Runs the merge on a range of vertex groups in the selected object(s). Replace smallest_group_number with the lower bound, and largest_group_number with the upper bound
-        # MODE 3 (DEFAULT): Runs the merge on ALL vertex groups in the selected object(s)
+        for obj in selected_objs:
+            # 1. Group by prefix
+            groups_by_prefix = {}
+            for vg in obj.vertex_groups:
+                prefix = vg.name.split(".")[0]
+                if prefix not in groups_by_prefix:
+                    groups_by_prefix[prefix] = []
+                groups_by_prefix[prefix].append(vg)
+            
+            # 2. Identify merge targets and sources
+            # merge_actions stores: (target_vg_name, [source_vg_indices])
+            # We store indices/names because pointers might be risky if we renamed things, usually ok though.
+            merge_actions = [] 
+            all_source_vgs = []
+            
+            for prefix, vgs in groups_by_prefix.items():
+                if len(vgs) < 2:
+                    # Rename single groups just in case
+                    if vgs[0].name != prefix:
+                        vgs[0].name = prefix
+                    continue
+                
+                # Pick target: prefer exact match or first
+                target = next((g for g in vgs if g.name == prefix), vgs[0])
+                if target.name != prefix:
+                    target.name = prefix
+                
+                sources = [g for g in vgs if g != target]
+                merge_actions.append( (target.name, sources) )
+                all_source_vgs.extend(sources)
+            
+            if not merge_actions:
+                continue
 
-        # Select the mode you want to run:
-        mode = 3
+            # 3. Create mapping for fast lookup
+            # index -> target_name
+            # obj.vertex_groups can be non-contiguous in memory but indices are 0..N-1 usually? 
+            # VertexGroup.index is the index in the list.
+            max_idx = max(vg.index for vg in obj.vertex_groups)
+            idx_to_target = [None] * (max_idx + 1)
+            
+            for t_name, sources in merge_actions:
+                for s in sources:
+                    idx_to_target[s.index] = t_name
 
-        # Required data for MODE 1:
-        vertex_groups = ["replace_with_first_vertex_group_name", "second_vertex_group_name", "third_name_etc"]
+            # 4. Collect weight updates
+            # target_name -> { vertex_idx: accumulated_weight }
+            updates = {}
 
-        # Required data for MODE 2:
-        smallest_group_number = 000
-        largest_group_number = 999
+            # Iterate vertices
+            for v in obj.data.vertices:
+                for g in v.groups:
+                    if g.group <= max_idx:
+                        t_name = idx_to_target[g.group]
+                        if t_name:
+                            # Accumulate
+                            if t_name not in updates:
+                                updates[t_name] = {}
+                            
+                            u_dict = updates[t_name]
+                            if v.index in u_dict:
+                                u_dict[v.index] += g.weight
+                            else:
+                                u_dict[v.index] = g.weight
 
-        ######
+            # 5. Apply updates
+            for t_name, w_dict in updates.items():
+                vg = obj.vertex_groups.get(t_name)
+                if not vg: continue
 
-        if mode == 1:
-            vgroup_names = [vertex_groups]
-        elif mode == 2:
-            vgroup_names = [[f"{i}" for i in range(smallest_group_number, largest_group_number + 1)]]
-        elif mode == 3:
-            vgroup_names = [[x.name.split(".")[0] for x in y.vertex_groups] for y in selected_obj]
-        else:
-            raise Fatal("Mode not recognized, exiting")
-
-        if not vgroup_names:
-            raise Fatal(
-                "No vertex groups found, please double check an object is selected and required data has been entered")
-
-        for cur_obj, cur_vgroup in zip(selected_obj, itertools.cycle(vgroup_names)):
-            for vname in cur_vgroup:
-                relevant = [x.name for x in cur_obj.vertex_groups if x.name.split(".")[0] == f"{vname}"]
-
-                if relevant:
-
-                    vgroup = cur_obj.vertex_groups.new(name=f"x{vname}")
-
-                    for vert_id, vert in enumerate(cur_obj.data.vertices):
-                        available_groups = [v_group_elem.group for v_group_elem in vert.groups]
-
-                        combined = 0
-                        for v in relevant:
-                            if cur_obj.vertex_groups[v].index in available_groups:
-                                combined += cur_obj.vertex_groups[v].weight(vert_id)
-
-                        if combined > 0:
-                            vgroup.add([vert_id], combined, 'ADD')
-
-                    for vg in [x for x in cur_obj.vertex_groups if x.name.split(".")[0] == f"{vname}"]:
-                        cur_obj.vertex_groups.remove(vg)
-
-                    for vg in cur_obj.vertex_groups:
-                        if vg.name[0].lower() == "x":
-                            vg.name = vg.name[1:]
-
-            bpy.context.view_layer.objects.active = cur_obj
+                for v_idx, w in w_dict.items():
+                    if w > 0:
+                        vg.add([v_idx], w, 'ADD')
+            
+            # 6. Remove source groups
+            for vg in all_source_vgs:
+                try:
+                    obj.vertex_groups.remove(vg)
+                except:
+                    pass # Already removed?
+            
+            bpy.context.view_layer.objects.active = obj
             bpy.ops.object.vertex_group_sort()
 
 

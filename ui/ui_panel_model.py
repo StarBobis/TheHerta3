@@ -216,7 +216,7 @@ class MergeVertexGroupsWithSameNumber(bpy.types.Operator):
         if len(bpy.context.selected_objects) == 0:
             self.report({'ERROR'}, "没有选中的对象！")
             return {'CANCELLED'}
-        VertexGroupUtils.merge_vertex_groups_with_same_number()
+        VertexGroupUtils.merge_vertex_groups_with_same_number_v2()
         self.report({'INFO'}, self.bl_label + " 成功!")
         return {'FINISHED'}
 

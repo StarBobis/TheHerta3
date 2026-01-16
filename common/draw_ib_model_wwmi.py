@@ -608,7 +608,7 @@ class DrawIBModelWWMI:
             # 那么导出时就得按顺序排列并且添加回来那些空的顶点组以确保不会出问题
             if Properties_WWMI.export_add_missing_vertex_groups():
                 ObjUtils.select_obj(component_obj)
-                # VertexGroupUtils.merge_vertex_groups_with_same_number()
+                
                 VertexGroupUtils.fill_vertex_group_gaps()
                 component_obj.select_set(False)
 
@@ -646,6 +646,12 @@ class DrawIBModelWWMI:
         obj = drawib_merged_object[0]
 
         ObjUtils.rename_object(obj, 'TEMP_EXPORT_OBJECT')
+
+        if Properties_WWMI.export_add_missing_vertex_groups():
+            ObjUtils.select_obj(obj)
+            VertexGroupUtils.merge_vertex_groups_with_same_number_v2()
+            # VertexGroupUtils.fill_vertex_group_gaps()
+            obj.select_set(False)
 
         deselect_all_objects()
         select_object(obj)

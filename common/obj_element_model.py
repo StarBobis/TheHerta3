@@ -238,24 +238,12 @@ class ObjElementModel:
                     new_array[:, 3] = numpy.ones(positions.shape[0], dtype=numpy.float16)
                     positions = new_array
 
-                if GlobalConfig.logic_name == LogicName.WWMI:
-                    # 鸣潮需要翻转：Position (-x, -y, z),所以X和Y都乘以-1
-                    # 鸣潮POSITION需要放大100倍，因为我们SSMT提取出来的模型缩小了100倍
-                    positions[:, 0] *= -100
-                    positions[:, 1] *= -100
-                    positions[:, 2] *= 100
-
                 self.original_elementname_data_dict[d3d11_element_name] = positions
 
             elif d3d11_element_name == 'NORMAL':
                 # 统一获取法线数据
                 normals = numpy.empty(mesh_loops_length * 3, dtype=numpy.float32)
                 mesh_loops.foreach_get('normal', normals)
-
-                # 鸣潮逆向翻转：Normal (-x, -y, z)
-                if GlobalConfig.logic_name == LogicName.WWMI:
-                    normals[0::3] *= -1
-                    normals[1::3] *= -1
 
                 if d3d11_element.Format == 'R16G16B16A16_FLOAT':
                     result = numpy.ones(mesh_loops_length * 4, dtype=numpy.float32)
@@ -337,11 +325,6 @@ class ObjElementModel:
                 # 使用 foreach_get 批量获取切线和副切线符号数据
                 tangents = numpy.empty(mesh_loops_length * 3, dtype=numpy.float32)
                 mesh_loops.foreach_get("tangent", tangents)
-                
-                if GlobalConfig.logic_name == LogicName.WWMI:
-                    # 鸣潮逆向翻转：Tangent (-x, -y, z)
-                    tangents[0::3] *= -1
-                    tangents[1::3] *= -1
 
                 # 将切线分量放置到输出数组中
                 result[0::4] = tangents[0::3]  # x 分量

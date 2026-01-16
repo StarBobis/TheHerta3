@@ -589,6 +589,21 @@ class DrawIBModelWWMI:
 
             component_obj = component_merged_object[0]
 
+            # 鸣潮导出时整体预处理，比直接操作Buffer文件中的内容方便且规范
+            if GlobalConfig.logic_name == LogicName.WWMI:
+                ObjUtils.select_obj(component_obj)
+
+                # 鸣潮需要把旋转角度清零
+                component_obj.rotation_euler[0] = 0
+                component_obj.rotation_euler[1] = 0
+                component_obj.rotation_euler[2] = math.radians(180)
+
+                # 鸣潮导出时放大100倍
+                component_obj.scale = (100,100,100)
+                
+                # 应用旋转和缩放
+                bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+
             # 如果导入时勾选了忽略空顶点组
             # 那么导出时就得按顺序排列并且添加回来那些空的顶点组以确保不会出问题
             if Properties_WWMI.export_add_missing_vertex_groups():

@@ -45,7 +45,7 @@ class PanelModelImportConfig(bpy.types.Panel):
         layout.operator("ssmt.import_all_from_workspace_v3",icon='IMPORT')
 
         # 决定导入时是否调用法线贴图
-        layout.prop(context.scene.properties_import_model, "isUsingNormalMapWhileImporting", text="导入时使用法线贴图")
+        layout.prop(context.scene.properties_import_model, "use_normal_map", text="导入时使用法线贴图")
 
 
 

@@ -28,16 +28,16 @@ class Properties_ImportModel(bpy.types.PropertyGroup):
         '''
         return bpy.context.scene.properties_import_model.use_mirror_workflow
 
-    isUsingNormalMapWhileImporting: bpy.props.BoolProperty(
+    use_normal_map: bpy.props.BoolProperty(
         name="导入时使用法线贴图",
         description="启用后在导入模型时自动附加法线贴图节点, 在材质预览模式下得到略微更好的视觉效果",
         default=False,
     )  # type: ignore
 
     @classmethod
-    def isUsingNormalMapWhileImporting(cls):
+    def use_normal_map(cls):
         '''
-        bpy.context.scene.properties_import_model.isUsingNormalMapWhileImporting
+        bpy.context.scene.properties_import_model.use_normal_map
         '''
-        return bpy.context.scene.properties_import_model.isUsingNormalMapWhileImporting
+        return bpy.context.scene.properties_import_model.use_normal_map
 

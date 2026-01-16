@@ -3,7 +3,7 @@
 '''
 import bpy
 
-from ..config.main_config import GlobalConfig
+from ..config.main_config import GlobalConfig, LogicName
 from ..config.plugin_config import PluginConfig
 
 from ..utils.translate_utils import TR
@@ -27,12 +27,12 @@ class PanelBasicInformation(bpy.types.Panel):
 
         self.bl_label =  "TheHerta3 v" +  PluginConfig.get_version_string()
         layout.label(text=TR.translate("SSMT缓存文件夹路径: ") + GlobalConfig.dbmtlocation)
-        layout.label(text=TR.translate("当前游戏: ") + GlobalConfig.gamename)
-        layout.label(text=TR.translate("当前逻辑: ") + GlobalConfig.logic_name)
+        layout.label(text=TR.translate("当前配置名称: ") + GlobalConfig.gamename)
+        layout.label(text=TR.translate("当前执行逻辑: ") + GlobalConfig.logic_name)
         layout.label(text=TR.translate("当前工作空间: ") + GlobalConfig.workspacename)
-
+ 
         # layout.prop(context.scene.properties_import_model,"use_mirror_workflow",text="使用非镜像工作流")
-
+        
         context = bpy.context  # 直接使用 bpy.context 获取完整上下文
         if len(context.selected_objects) != 0:
             obj = context.selected_objects[0]
@@ -45,3 +45,16 @@ class PanelBasicInformation(bpy.types.Panel):
             layout.label(text="GameType: " + gametypename)
             layout.label(text="RecalculateTANGENT: " + str(recalculate_tangent))
             layout.label(text="RecalculateCOLOR: " + str(recalculate_color))
+
+        # 导入 ib vb fmt格式文件
+        layout.operator("import_mesh.migoto_raw_buffers_mmt",icon='IMPORT')
+
+        # 一键导入当前工作空间
+        layout.operator("ssmt.import_all_from_workspace_v3",icon='IMPORT')
+
+        if GlobalConfig.logic_name == LogicName.WWMI:
+            layout.prop(context.scene.properties_wwmi,"import_merged_vgmap")
+            layout.prop(context.scene.properties_wwmi,"import_skip_empty_vertex_groups")
+
+        # 决定导入时是否调用法线贴图
+        layout.prop(context.scene.properties_import_model, "use_normal_map")

@@ -6,7 +6,7 @@ from .ui.ui_panel_model import *
 from .ui.ui_panel_rightclick import *
 from .ui.ui_panel_sword import *
 from .ui.ui_panel_export import SSMTGenerateMod, PanelGenerateModConfig, SSMTSelectGenerateModFolder
-from .ui.ui_panel_import import Import3DMigotoRaw, SSMTImportAllFromCurrentWorkSpaceV3, PanelModelImportConfig
+from .ui.ui_panel_import import Import3DMigotoRaw, SSMTImportAllFromCurrentWorkSpaceV3
 from .ui.ui_panel_fast_texture import *
 
 # 自动更新功能
@@ -122,6 +122,10 @@ register_classes = (
     # 导入3Dmigoto模型功能
     Import3DMigotoRaw,
     SSMTImportAllFromCurrentWorkSpaceV3,
+
+
+
+
     # 生成Mod功能
     SSMTGenerateMod,
 
@@ -154,16 +158,28 @@ register_classes = (
     Catter_MarkCollection_Toggle,
     SSMT_LinkObjectsToCollection,
     SSMT_UnlinkObjectsFromCollection,
-    # UI
+
+    # 根据DrawIndexed拆分模型功能
+    ExtractSubmeshOperator,
+
+    
+    # 模型导入面板
     PanelBasicInformation,
 
-    PanelModelImportConfig,
+    # 快速上贴图面板，位于导入模型和生成Mod之间
+    SSMT_UL_FastImportTextureList,
+    SSMT_ImportTexture_WM_OT_ApplyImageToMaterial,
+    SSMT_ImportTexture_WM_OT_AutoDetectTextureFolder,
+    SSMT_FastTexture_ComponentOnly,
+    SSMT_ImportTexture_VIEW3D_PT_ImageMaterialPanel,
+
+    # 生成Mod面板
     PanelGenerateModConfig,
+
+    # 模型处理面板
     PanelModelProcess,
 
-    ExtractSubmeshOperator,
-    PanelModelSplit,
-
+    # 自动更新面板
     HertaUpdatePreference,
     UpdaterPanel,
 
@@ -175,12 +191,9 @@ register_classes = (
     Sword_ImportTexture_WM_OT_ApplyImageToMaterial,
     Sword_ImportTexture_WM_OT_SelectImageFolder,
     SwordImportAllReversed,
+    Sword_SplitModel_By_DrawIndexed_Panel,
 
-    SSMT_UL_FastImportTextureList,
-    SSMT_ImportTexture_WM_OT_ApplyImageToMaterial,
-    SSMT_ImportTexture_VIEW3D_PT_ImageMaterialPanel,
-    SSMT_ImportTexture_WM_OT_AutoDetectTextureFolder,
-    SSMT_FastTexture_ComponentOnly,
+
 )
 
 

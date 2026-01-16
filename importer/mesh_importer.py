@@ -187,7 +187,6 @@ class MeshImporter:
         
         MeshImporter.create_bsdf_with_diffuse_linked(obj, mesh_name=mbf.mesh_name,directory=os.path.dirname(mbf.fmt_path))
         MeshImporter.set_import_rotate_angle(obj=obj, mbf=mbf)
-        MeshImporter.set_import_scale(obj=obj, mbf=mbf)
 
         # WWMI的Merged架构需要清理空顶点组，这里我们PerCompoennt也清理算了，不然做出区分后续优化太麻烦
         if GlobalConfig.logic_name == LogicName.WWMI:
@@ -222,24 +221,6 @@ class MeshImporter:
 
 
 
-    @classmethod
-    def set_import_scale(cls,obj,mbf:MigotoBinaryFile):
-        '''
-        Deprecated
-
-        TODO 未来要移除这个处理，所有内容在模型提取端设置完成
-        这种底层操作尽可能不要暴漏给用户
-        '''
-
-        # 设置导入时模型大小比例，Unreal模型常用
-        scalefactor = Properties_ImportModel.model_scale()
-        if scalefactor == 1.0:
-            if mbf.fmt_file.scale != "1.0":
-                obj.scale.x = float(mbf.fmt_file.scale)
-                obj.scale.y = float(mbf.fmt_file.scale)
-                obj.scale.z = float(mbf.fmt_file.scale)
-        else:
-            obj.scale = scalefactor,scalefactor,scalefactor
 
     @classmethod
     def set_import_rotate_angle(cls,obj,mbf:MigotoBinaryFile):

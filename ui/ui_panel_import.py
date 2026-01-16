@@ -19,33 +19,10 @@ from ..config.main_config import GlobalConfig, LogicName
 from ..importer.mesh_importer import MeshImporter,MigotoBinaryFile
 from ..base.drawib_pair import DrawIBPair
 
-class PanelModelImportConfig(bpy.types.Panel):
-    '''
-    导入模型文件面板
-    '''
-    bl_label = "导入模型文件"
-    bl_idname = "VIEW3D_PT_CATTER_WorkSpace_IO_panel"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_category = 'TheHerta3'
-    # bl_options = {'DEFAULT_CLOSED'}
 
-    def draw(self, context):
-        layout = self.layout
-        layout.prop(context.scene.properties_import_model,"model_scale",text="模型导入大小比例")
-        
-        if GlobalConfig.logic_name == LogicName.WWMI:
-            layout.prop(context.scene.properties_wwmi,"import_merged_vgmap",text="使用融合统一顶点组")
-            layout.prop(context.scene.properties_wwmi,"import_skip_empty_vertex_groups",text="导入时跳过空顶点组")
-        
-        # 导入 ib vb fmt格式文件
-        layout.operator("import_mesh.migoto_raw_buffers_mmt",icon='IMPORT')
 
-        # 一键导入当前工作空间
-        layout.operator("ssmt.import_all_from_workspace_v3",icon='IMPORT')
 
-        # 决定导入时是否调用法线贴图
-        layout.prop(context.scene.properties_import_model, "use_normal_map", text="导入时使用法线贴图")
+
 
 
 
@@ -221,8 +198,6 @@ def ImprotFromWorkSpaceSSMTV4(self, context):
     
     # 因为用户习惯了导入后就是全部选中的状态，所以默认选中所有导入的obj
     CollectionUtils.select_collection_objects(workspace_collection)
-
-
 
 
 class SSMTImportAllFromCurrentWorkSpaceV3(bpy.types.Operator):

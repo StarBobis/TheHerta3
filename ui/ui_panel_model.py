@@ -651,34 +651,13 @@ class PanelModelProcess(bpy.types.Panel):
         
         layout.operator(RecalculateTANGENTWithVectorNormalizedNormal.bl_idname)
         layout.operator(RecalculateCOLORWithVectorNormalizedNormal.bl_idname)
-
-class PanelModelSplit(bpy.types.Panel):
-    '''
-    由于功能特别多，所以按照使用类型对模型分割单独划分出一块儿面板使用
-    '''
-    bl_label = "模型分割" 
-    bl_idname = "VIEW3D_PT_Herta_ModelSplit_Panel"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_category = 'TheHerta3'
-    bl_options = {'DEFAULT_CLOSED'}
-
-    def draw(self, context):
-        layout = self.layout
-
+        layout.separator()
+        
         layout.operator(ModelSplitByLoosePart.bl_idname)
         layout.operator(SplitMeshByCommonVertexGroup.bl_idname)
         layout.operator(ModelSplitByVertexGroup.bl_idname)
-        layout.separator()
 
-        scene = context.scene
 
-        layout.prop(scene, "submesh_start")
-        layout.prop(scene, "submesh_count")
-        
-        op = layout.operator("mesh.extract_submesh")
-        op.start_index = scene.submesh_start
-        op.index_count = scene.submesh_count
 
 
 class CatterRightClickMenu(bpy.types.Menu):

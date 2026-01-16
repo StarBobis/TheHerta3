@@ -69,11 +69,6 @@ class PanelGenerateModConfig(bpy.types.Panel):
         if not context.scene.active_workspace_collection:
             layout.label(text="请先在下拉列表中选择一个工作空间集合用于生成Mod", icon='ERROR')
         layout.prop_search(context.scene, "active_workspace_collection", bpy.data, "collections", text="")
-
-        # 生成Mod按钮
-        if GlobalConfig.logic_name == LogicName.WWMI:
-            layout.label(text="鸣潮请优先使用WWMI-Tools生成Mod",icon='ERROR')
-            layout.label(text="TheHerta3对鸣潮支持仍在开发测试中",icon='ERROR')
         
         layout.operator("ssmt.generate_mod",icon='EXPORT')
 

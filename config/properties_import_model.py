@@ -1,19 +1,6 @@
 import bpy
 
 class Properties_ImportModel(bpy.types.PropertyGroup):
-    model_scale: bpy.props.FloatProperty(
-        name="模型导入大小比例",
-        description="默认为1.0",
-        default=1.0,
-    ) # type: ignore
-
-    @classmethod
-    def model_scale(cls):
-        '''
-        bpy.context.scene.properties_import_model.model_scale
-        '''
-        return bpy.context.scene.properties_import_model.model_scale
-
 
     use_mirror_workflow: bpy.props.BoolProperty(
         name="使用非镜像工作流",
@@ -29,7 +16,7 @@ class Properties_ImportModel(bpy.types.PropertyGroup):
         return bpy.context.scene.properties_import_model.use_mirror_workflow
 
     use_normal_map: bpy.props.BoolProperty(
-        name="导入时使用法线贴图",
+        name="自动上贴图时使用法线贴图",
         description="启用后在导入模型时自动附加法线贴图节点, 在材质预览模式下得到略微更好的视觉效果",
         default=False,
     )  # type: ignore

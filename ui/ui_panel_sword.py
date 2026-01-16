@@ -392,4 +392,24 @@ class Sword_ImportTexture_VIEW3D_PT_ImageMaterialPanel(Panel):
                 box = layout.box()
                 box.label(text="Preview:")
                 box.template_icon(icon_value=pcoll[selected_item.name].icon_id, scale=10.0)
+
+
+class Sword_SplitModel_By_DrawIndexed_Panel(Panel):
+    bl_label = "手动逆向后根据DrawIndexed值分割模型"
+    bl_idname = "VIEW3D_PT_Sword_SplitModel_By_DrawIndexed_Panel"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = 'Sword'
+    # bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+
+        layout.prop(scene, "submesh_start")
+        layout.prop(scene, "submesh_count")
+        
+        op = layout.operator("mesh.extract_submesh")
+        op.start_index = scene.submesh_start
+        op.index_count = scene.submesh_count
                 

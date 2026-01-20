@@ -76,7 +76,7 @@ class PanelGenerateModConfig(bpy.types.Panel):
         # 因为UnrealVS显然无法支持这里所有的特性，每个游戏只能支持一部分特性。
 
         # 任何游戏都能贴图标记
-        if GlobalConfig.logic_name == LogicName.WWMI:
+        if GlobalConfig.logic_name == LogicName.WWMI or GlobalConfig.logic_name == LogicName.WuWa:
             layout.prop(context.scene.properties_wwmi, "ignore_muted_shape_keys")
             layout.prop(context.scene.properties_wwmi, "apply_all_modifiers")
             layout.prop(context.scene.properties_wwmi, "export_add_missing_vertex_groups")
@@ -144,10 +144,9 @@ class SSMTGenerateMod(bpy.types.Operator):
             return {'FINISHED'}
     
         # 调用对应游戏的生成Mod逻辑
-        if GlobalConfig.logic_name == LogicName.WWMI:
+        if GlobalConfig.logic_name == LogicName.WWMI or GlobalConfig.logic_name == LogicName.WuWa:
             migoto_mod_model = ModModelWWMI(workspace_collection=workspace_collection)
             migoto_mod_model.generate_unreal_vs_config_ini()
-
         elif GlobalConfig.logic_name == LogicName.YYSLS:
             migoto_mod_model = ModModelYYSLS(workspace_collection=workspace_collection)
             migoto_mod_model.generate_unity_vs_config_ini()

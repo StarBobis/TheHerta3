@@ -590,7 +590,7 @@ class DrawIBModelWWMI:
             component_obj = component_merged_object[0]
 
             # 鸣潮导出时整体预处理，比直接操作Buffer文件中的内容方便且规范
-            if GlobalConfig.logic_name == LogicName.WWMI:
+            if GlobalConfig.logic_name == LogicName.WWMI or GlobalConfig.logic_name == LogicName.WuWa:
                 ObjUtils.select_obj(component_obj)
 
                 # 鸣潮需要把旋转角度清零

@@ -148,7 +148,7 @@ class MeshImporter:
 
         #  metadata.json, if contains then we can import merged vgmap.
         component = None
-        if Properties_WWMI.import_merged_vgmap() and GlobalConfig.logic_name == LogicName.WWMI:
+        if Properties_WWMI.import_merged_vgmap() and (GlobalConfig.logic_name == LogicName.WWMI or GlobalConfig.logic_name == LogicName.WuWa):
             print("尝试读取Metadata.json")
             metadatajsonpath = os.path.join(os.path.dirname(mbf.fmt_path),'Metadata.json')
             if os.path.exists(metadatajsonpath):
@@ -178,7 +178,7 @@ class MeshImporter:
         MeshImporter.create_bsdf_with_diffuse_linked(obj, mesh_name=mbf.mesh_name,directory=os.path.dirname(mbf.fmt_path))
         
         # 通过fmt文件中标明的logic_name来进行预处理
-        if mbf.fmt_file.logic_name == LogicName.WWMI:
+        if mbf.fmt_file.logic_name == LogicName.WWMI or mbf.fmt_file.logic_name == LogicName.WuWa:
             # 鸣潮需要把旋转角度清零
             obj.rotation_euler[0] = 0
             obj.rotation_euler[1] = 0
@@ -186,13 +186,12 @@ class MeshImporter:
 
             # 鸣潮需要缩小100倍
             obj.scale = (0.01,0.01,0.01)
-
         else:
             MeshImporter.set_import_rotate_angle(obj=obj, mbf=mbf)
         
 
         # WWMI的Merged架构需要清理空顶点组，这里我们PerCompoennt也清理算了，不然做出区分后续优化太麻烦
-        if GlobalConfig.logic_name == LogicName.WWMI:
+        if GlobalConfig.logic_name == LogicName.WWMI or GlobalConfig.logic_name == LogicName.WuWa:
             if Properties_WWMI.import_skip_empty_vertex_groups():
                 VertexGroupUtils.remove_unused_vertex_groups(obj)
 
@@ -243,7 +242,7 @@ class MeshImporter:
         # print(mbf.ib_data[0],mbf.ib_data[1],mbf.ib_data[2])
 
         # 鸣潮的模型导入时必须翻转面朝向
-        if mbf.fmt_file.logic_name == LogicName.WWMI:
+        if mbf.fmt_file.logic_name == LogicName.WWMI or mbf.fmt_file.logic_name == LogicName.WuWa:
             flipped_indices = []
             for i in range(0, len(mbf.ib_data), 3):
                 triangle = mbf.ib_data[i:i+3]

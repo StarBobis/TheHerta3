@@ -52,7 +52,7 @@ class PanelBasicInformation(bpy.types.Panel):
         # 一键导入当前工作空间
         layout.operator("ssmt.import_all_from_workspace_v3",icon='IMPORT')
 
-        if GlobalConfig.logic_name == LogicName.WWMI:
+        if GlobalConfig.logic_name == LogicName.WWMI or GlobalConfig.logic_name == LogicName.WuWa:
             layout.prop(context.scene.properties_wwmi,"import_merged_vgmap")
             layout.prop(context.scene.properties_wwmi,"import_skip_empty_vertex_groups")
 

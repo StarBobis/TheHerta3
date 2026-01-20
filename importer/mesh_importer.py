@@ -34,12 +34,12 @@ class MeshImporter:
     这个类依赖于提供的MigotoBinaryFile进行数据导入和处理
     '''
     @classmethod
-    def create_mesh_obj_from_mbf(cls, mbf:MigotoBinaryFile):
+    def create_mesh_obj_from_mbf(cls, mbf:MigotoBinaryFile,import_collection:bpy.types.Collection):
         TimerUtils.Start("Import 3Dmigoto Raw")
         print("导入模型: " + mbf.mesh_name)
         
         if not mbf.file_size_check():
-            return None
+            return
 
         # 创建mesh和obj
         mesh = bpy.data.meshes.new(mbf.mesh_name)
@@ -177,6 +177,7 @@ class MeshImporter:
         
         MeshImporter.create_bsdf_with_diffuse_linked(obj, mesh_name=mbf.mesh_name,directory=os.path.dirname(mbf.fmt_path))
         
+
         # 通过fmt文件中标明的logic_name来进行预处理
         if mbf.fmt_file.logic_name == LogicName.WWMI or mbf.fmt_file.logic_name == LogicName.WuWa:
             # 鸣潮需要把旋转角度清零
@@ -186,18 +187,39 @@ class MeshImporter:
 
             # 鸣潮需要缩小100倍
             obj.scale = (0.01,0.01,0.01)
-        else:
-            MeshImporter.set_import_rotate_angle(obj=obj, mbf=mbf)
+        
+        print("导入模型完成: " + mbf.fmt_file.logic_name)
+        if mbf.fmt_file.logic_name == LogicName.ZZMI:
+
+            # ZZMI需要清零旋转角度
+            obj.rotation_euler[0] = 0
+            obj.rotation_euler[1] = 0
+            obj.rotation_euler[2] = 0
+
         
 
         # WWMI的Merged架构需要清理空顶点组，这里我们PerCompoennt也清理算了，不然做出区分后续优化太麻烦
         if GlobalConfig.logic_name == LogicName.WWMI or GlobalConfig.logic_name == LogicName.WuWa:
             if Properties_WWMI.import_skip_empty_vertex_groups():
                 VertexGroupUtils.remove_unused_vertex_groups(obj)
+        
+
+        # 绑定到导入的集合中
+        import_collection.objects.link(obj)
+
+        # 选中此obj
+        ObjUtils.select_obj(obj)
+                
+        # 应用旋转和缩放
+        bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+
+        # 刷新视图以得到流畅的导入逐渐增多的视觉效果
+        bpy.context.view_layer.update()
+
+        # 强制Blender刷新界面
+        bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
 
         TimerUtils.End("Import 3Dmigoto Raw")
-
-        return obj
     
     @classmethod
     def set_import_attributes(cls, obj, mbf:MigotoBinaryFile):
@@ -224,17 +246,7 @@ class MeshImporter:
 
 
 
-    @classmethod
-    def set_import_rotate_angle(cls,obj,mbf:MigotoBinaryFile):
-        # 设置导入时的模型旋转角度，每个游戏都不一样，由生成fmt的程序控制。
-        if mbf.fmt_file.rotate_angle:
-            obj.rotation_euler[0] = math.radians(mbf.fmt_file.rotate_angle_x)
-            obj.rotation_euler[1] = math.radians(mbf.fmt_file.rotate_angle_y)
-            obj.rotation_euler[2] = math.radians(mbf.fmt_file.rotate_angle_z)
-        else:
-            obj.rotation_euler[0] = 0
-            obj.rotation_euler[1] = 0
-            obj.rotation_euler[2] = 0
+   
 
     @classmethod
     def initialize_mesh(cls,mesh, mbf:MigotoBinaryFile):

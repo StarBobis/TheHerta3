@@ -74,22 +74,8 @@ class Import3DMigotoRaw(bpy.types.Operator, ImportHelper):
         for fmt_file_name in import_filename_list:
             fmt_file_path = os.path.join(dirname, fmt_file_name)
             mbf = MigotoBinaryFile(fmt_path=fmt_file_path)
-            obj_result = MeshImporter.create_mesh_obj_from_mbf(mbf=mbf)
-            collection.objects.link(obj_result)
+            MeshImporter.create_mesh_obj_from_mbf(mbf=mbf,import_collection=collection)
 
-            # 选中此obj
-            ObjUtils.select_obj(obj_result)
-            
-            # 应用旋转和缩放
-            bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
-
-            # 刷新视图以得到流畅的导入逐渐增多的视觉效果
-            bpy.context.view_layer.update()
-
-            # 强制Blender刷新界面
-            bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
-
-        
         # Select all objects under collection (因为用户习惯了导入后就是全部选中的状态). 
         CollectionUtils.select_collection_objects(collection)
 
@@ -177,23 +163,7 @@ def ImprotFromWorkSpaceSSMTV4(self, context):
                     
                     fmt_file_path = os.path.join(import_folder_path, prefix + ".fmt")
                     mbf = MigotoBinaryFile(fmt_path=fmt_file_path,mesh_name=draw_ib + "-" + str(part_count) + "-" + alias_name)
-                    obj_result = MeshImporter.create_mesh_obj_from_mbf(mbf=mbf)
-
-                    # 把obj添加到默认显示集合里
-                    default_show_collection.objects.link(obj_result)
-
-                    # 选中此obj
-                    ObjUtils.select_obj(obj_result)
-                    
-                    # 应用旋转和缩放
-                    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
-
-                    # 刷新视图以得到流畅的导入逐渐增多的视觉效果
-                    bpy.context.view_layer.update()
-
-                    # 强制Blender刷新界面
-                    bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
-
+                    MeshImporter.create_mesh_obj_from_mbf(mbf=mbf,import_collection=default_show_collection)
 
                     part_count = part_count + 1
             except Exception as e:

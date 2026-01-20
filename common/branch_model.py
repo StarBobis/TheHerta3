@@ -1,5 +1,8 @@
+import math
 import bpy
 import copy
+
+from ..config.main_config import GlobalConfig, LogicName
 
 from ..utils.obj_utils import ObjUtils
 from ..utils.log_utils import LOG
@@ -259,6 +262,22 @@ class BranchModel:
                     all_vgs_locked = ObjUtils.is_all_vertex_groups_locked(obj)
                     if not all_vgs_locked:
                         ObjUtils.normalize_all(obj)
+                
+                # 预处理翻转过去
+                # TODO 目前的处理方式是翻转过去，然后读取完数据再翻转回来
+                # 实际上这套流程和WWMI的处理有相似的地方，可以合二为一变为一套统一的流程
+                # 不过懒得搞了，以后再说吧
+                if (GlobalConfig.logic_name == LogicName.SRMI 
+                    or GlobalConfig.logic_name == LogicName.GIMI
+                    or GlobalConfig.logic_name == LogicName.HIMI):
+                    ObjUtils.select_obj(obj)
+
+                    obj.rotation_euler[0] = math.radians(-90)
+                    obj.rotation_euler[1] = 0
+                    obj.rotation_euler[2] = 0
+                
+                    # 应用旋转和缩放
+                    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
 
                 # print("DrawIB BranchModel")
                 obj_element_model = ObjElementModel(d3d11_game_type=d3d11_game_type,obj_name=obj_name)
@@ -267,6 +286,19 @@ class BranchModel:
                 obj_buffer_model = ObjBufferModelUnity(obj_element_model=obj_element_model)
                 # print(len(category_buffer_dict["Blend"]))
                 # print(len(index_vertex_id_dict))
+
+                # 后处理翻转回来
+                if (GlobalConfig.logic_name == LogicName.SRMI 
+                    or GlobalConfig.logic_name == LogicName.GIMI
+                    or GlobalConfig.logic_name == LogicName.HIMI):
+                    ObjUtils.select_obj(obj)
+
+                    obj.rotation_euler[0] = math.radians(90)
+                    obj.rotation_euler[1] = 0
+                    obj.rotation_euler[2] = 0
+                
+                    # 应用旋转和缩放
+                    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
                 
                 __obj_name_ib_dict[obj.name] = obj_buffer_model.ib
                 __obj_name_category_buffer_list_dict[obj.name] = obj_buffer_model.category_buffer_dict

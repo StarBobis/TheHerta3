@@ -297,31 +297,8 @@ class SwordImportAllReversed(bpy.types.Operator):
                 filename_without_extension = os.path.splitext(filename_with_extension)[0]
                 # 调用导入功能
                 mbf = MigotoBinaryFile(fmt_path=fmt_filepath,mesh_name=filename_without_extension)
-                obj_result = MeshImporter.create_mesh_obj_from_mbf(mbf=mbf)
+                MeshImporter.create_mesh_obj_from_mbf(mbf=mbf,import_collection=datatype_collection)
 
-                datatype_collection.objects.link(obj_result)
-                # 这里先链接SourceCollection，确保它在上面
-
-                # 选中此obj
-                ObjUtils.select_obj(obj_result)
-                
-                # 应用旋转和缩放
-                bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
-
-
-                # 刷新视图以得到流畅的导入逐渐增多的视觉效果
-                bpy.context.view_layer.update()
-                # 强制Blender刷新界面
-                bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
-
-                # 在这里调用对obj应用全部Transformation
-
-                if mbf.fmt_file.apply_rotation_transformation:
-                    bpy.ops.object.select_all(action='DESELECT')
-                    obj_result.select_set(True)
-                    bpy.context.view_layer.objects.active = obj_result
-                    bpy.ops.object.transform_apply(location=True, rotation=True, scale=False)
-                    obj_result.select_set(False)
                 
                 # Nico: 这里不再自动清除法线了，留给用户自己选择
                 # 为什么呢？因为鸣潮部分模型导入的法线，本来就是没问题的

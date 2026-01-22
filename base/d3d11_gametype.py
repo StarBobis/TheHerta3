@@ -4,7 +4,9 @@
 
 import json
 import os
+import numpy
 
+from ..utils.format_utils import FormatUtils
 from dataclasses import dataclass, field
 from typing import Dict
 from ..base.d3d11_element import D3D11Element
@@ -120,4 +122,20 @@ class D3D11GameType:
             pass
         return 4
 
-  
+    def get_total_structured_dtype(self) -> numpy.dtype:
+        total_structured_dtype:numpy.dtype = numpy.dtype([])
+
+        # 预设的权重个数，也就是每个顶点组受多少个权重影响
+        for d3d11_element_name in self.OrderedFullElementList:
+            d3d11_element = self.ElementNameD3D11ElementDict[d3d11_element_name]
+            np_type = FormatUtils.get_nptype_from_format(d3d11_element.Format)
+
+            format_len = int(d3d11_element.ByteWidth / numpy.dtype(np_type).itemsize)
+                
+            # XXX 长度为1时必须手动指定为(1,)否则会变成1维数组
+            if format_len == 1:
+                total_structured_dtype = numpy.dtype(total_structured_dtype.descr + [(d3d11_element_name, (np_type, (1,)))])
+            else:
+                total_structured_dtype = numpy.dtype(total_structured_dtype.descr + [(d3d11_element_name, (np_type, format_len))])
+
+        return total_structured_dtype

@@ -300,18 +300,10 @@ class SwordImportAllReversed(bpy.types.Operator):
                 MeshImporter.create_mesh_obj_from_mbf(mbf=mbf,import_collection=datatype_collection)
 
                 
-                # Nico: 这里不再自动清除法线了，留给用户自己选择
-                # 为什么呢？因为鸣潮部分模型导入的法线，本来就是没问题的
-                # 只有一些特殊的法线处理方式会导致有问题
-                # 所以这里还是决定让用户自己去清除
+                # Nico: 注意，鸣潮Mod逆向的模型导入后，可能会出现法线不正确的问题
+                # 此时不应该自动处理，而是用户手动处理，因为部分模型有部分模型没有
+                # 强行清除可能会导致法线不正确
 
-                # if mbf.fmt_file.clean_custom_normal:
-                #     # 清除自定义法线
-                #     print("准备清除自定义法线")
-                  
-                #     context.view_layer.objects.active = obj_result
-                #     bpy.ops.object.mode_set(mode='OBJECT')
-                #     bpy.ops.mesh.customdata_custom_splitnormals_clear() 
 
 
         # 随后把图片路径指定为当前路径

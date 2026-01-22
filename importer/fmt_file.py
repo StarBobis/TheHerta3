@@ -9,16 +9,7 @@ class FMTFile:
         self.format = ""
         self.gametypename = ""
         self.prefix = ""
-        self.scale = "1.0"
         self.logic_name = ""
-        self.rotate_angle:bool = False
-        self.rotate_angle_x:float = 0
-        self.rotate_angle_y:float = 0
-        self.rotate_angle_z:float = 0
-        self.flip_face_orientation:bool = False
-        self.apply_rotation_transformation:bool = False
-        self.clean_custom_normal:bool = False
-
         self.elements:list[D3D11Element] = []
 
         with open(fmt_file_path, 'r') as file:
@@ -43,25 +34,7 @@ class FMTFile:
                 self.prefix = value
             elif key == "logic_name":
                 self.logic_name = value
-            elif key == "scale":
-                self.scale = value
-            elif key == "rotate_angle":
-                self.rotate_angle = value.lower() == "true"
-            elif key == "rotate_angle_x":
-                self.rotate_angle_x = float(value)
-            elif key == "rotate_angle_y":
-                self.rotate_angle_y = float(value)
-            elif key == "rotate_angle_z":
-                self.rotate_angle_z = float(value)
-            
-            elif key == "flip_face_orientation":
-                self.flip_face_orientation = value.lower() == "true"
-            elif key == "apply_rotation_transformation":
-                self.apply_rotation_transformation = value.lower() == "true"
 
-            # clean_custom_normal
-            elif key == "clean_custom_normal":
-                self.clean_custom_normal = value.lower() == "true"
 
             elif key.startswith("element"):
                 # 处理element块

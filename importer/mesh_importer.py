@@ -49,8 +49,6 @@ class MeshImporter:
         MeshImporter.set_import_attributes(obj=obj, mbf=mbf)
         MeshImporter.initialize_mesh(mesh, mbf)
 
-        
-
         blend_indices = {}
         blend_weights = {}
         texcoords = {}
@@ -261,25 +259,7 @@ class MeshImporter:
                 flipped_triangle = triangle[::-1]
                 flipped_indices.extend(flipped_triangle)
             mbf.ib_data = flipped_indices
-        else:
-            # TODO 这里后续肯定要删除的，但是必须每个游戏都过一遍预设逻辑的过程
-            # 暂时留着来兼容旧版本
-            if Properties_ImportModel.use_mirror_workflow():
-                if not mbf.fmt_file.flip_face_orientation:  # 假设你有一个标志位控制是否翻转
-                    flipped_indices = []
-                    for i in range(0, len(mbf.ib_data), 3):
-                        triangle = mbf.ib_data[i:i+3]
-                        flipped_triangle = triangle[::-1]
-                        flipped_indices.extend(flipped_triangle)
-                    mbf.ib_data = flipped_indices
-            else:
-                if mbf.fmt_file.flip_face_orientation:  # 假设你有一个标志位控制是否翻转
-                    flipped_indices = []
-                    for i in range(0, len(mbf.ib_data), 3):
-                        triangle = mbf.ib_data[i:i+3]
-                        flipped_triangle = triangle[::-1]
-                        flipped_indices.extend(flipped_triangle)
-                    mbf.ib_data = flipped_indices
+        
         
         # 输出查看翻转后的前三个索引
         # print(mbf.ib_data[0],mbf.ib_data[1],mbf.ib_data[2])

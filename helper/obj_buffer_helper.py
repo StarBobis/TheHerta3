@@ -65,20 +65,15 @@ class ObjBufferHelper:
         loop_vertex_indices = numpy.empty(mesh_loops_length, dtype=int)
         mesh_loops.foreach_get("vertex_index", loop_vertex_indices)
 
-        
-
         # 预设的权重个数，也就是每个顶点组受多少个权重影响
         blend_size = 4
 
         if GlobalConfig.logic_name == LogicName.WWMI or GlobalConfig.logic_name == LogicName.WuWa:
             blend_size = d3d11_game_type.get_blendindices_count_wwmi()
 
-        
-
         normalize_weights = "Blend" in d3d11_game_type.OrderedCategoryNameList
 
         # normalize_weights = False
-
         if GlobalConfig.logic_name == LogicName.WWMI or GlobalConfig.logic_name == LogicName.WuWa:
             # print("鸣潮专属测试版权重处理：")
             blendweights_dict, blendindices_dict = VertexGroupUtils.get_blendweights_blendindices_v4_fast(mesh=mesh,normalize_weights = normalize_weights,blend_size=blend_size)
@@ -436,4 +431,170 @@ class ObjBufferHelper:
         return original_elementname_data_dict
 
 
+    @classmethod
+    def convert_to_element_vertex_ndarray(
+        cls,
+        d3d11_game_type:D3D11GameType, 
+        mesh:bpy.types.Mesh,
+        original_elementname_data_dict:dict,
+        final_elementname_data_dict:dict):
+
+        total_structured_dtype:numpy.dtype = d3d11_game_type.get_total_structured_dtype()
+
+        # Create the element array with the original dtype (matching ByteWidth)
+        element_vertex_ndarray = numpy.zeros(len(mesh.loops), dtype=total_structured_dtype)
+        # For each expected element, prefer the remapped/modified value in
+        # `final_elementname_data_dict` if present; otherwise use the parsed
+        # value from `original_elementname_data_dict`.
+        for d3d11_element_name in d3d11_game_type.OrderedFullElementList:
+            if d3d11_element_name in final_elementname_data_dict:
+                data = final_elementname_data_dict[d3d11_element_name]
+            else:
+                data = original_elementname_data_dict.get(d3d11_element_name, None)
+
+            if data is None:
+                # Missing data is a fatal condition — better to raise so caller
+                # can diagnose than to silently write zeros for an expected
+                # element (which would corrupt downstream buffers).
+                raise Fatal(f"Missing element data for '{d3d11_element_name}' when packing vertex ndarray")
+            print("尝试赋值 Element: " + d3d11_element_name)
+            element_vertex_ndarray[d3d11_element_name] = data
         
+        return element_vertex_ndarray
+    
+
+    @classmethod
+    def calc_index_vertex_buffer_wwmi_v2(
+        cls,
+        mesh:bpy.types.Mesh, 
+        element_vertex_ndarray:numpy.ndarray, 
+        dtype:numpy.dtype,
+        d3d11_game_type:D3D11GameType):
+        '''
+        - 用 numpy 将结构化顶点视图为一行字节，避免逐顶点 bytes() 与 dict 哈希。
+        - 使用 numpy.unique(..., axis=0, return_index=True, return_inverse=True) 在 C 层完成唯一化与逆映射。
+        - 仅在构建 per-polygon IB 时使用少量 Python 切片，整体效率大幅提高。
+        - 当 structured dtype 非连续时，内部会做一次拷贝（ascontiguousarray）；通常开销小于逐顶点哈希开销。
+        '''
+
+        # (1) loop -> vertex mapping
+        loops = mesh.loops
+        n_loops = len(loops)
+        loop_vertex_indices = numpy.empty(n_loops, dtype=int)
+        loops.foreach_get("vertex_index", loop_vertex_indices)
+
+        # (2) 将 element_vertex_ndarray 保证为连续，并视为 (n_loops, row_bytes) uint8 矩阵
+        vb = numpy.ascontiguousarray(element_vertex_ndarray)
+        row_size = vb.dtype.itemsize
+        try:
+            row_bytes = vb.view(numpy.uint8).reshape(n_loops, row_size)
+        except Exception:
+            raw = vb.tobytes()
+            row_bytes = numpy.frombuffer(raw, dtype=numpy.uint8).reshape(n_loops, row_size)
+
+        # WWMI-Tools deduplicates loop rows including the loop's VertexId -> they
+        # effectively perform uniqueness on loop attributes + VertexId treated as
+        # a field. To replicate that reliably (preserving structured field layout
+        # and alignment) we build a structured array that copies all existing
+        # fields and appends a 'VERTEXID' uint32 field, then call numpy.unique on it.
+        # Afterwards we select unique rows from the original `row_bytes` using
+        # the indices returned by numpy.unique to preserve exact original layout.
+
+        # Build 4-byte vertex index array (little-endian) and concatenate to row bytes
+        # to form combined rows: [row_bytes | vid_bytes]. Use numpy.unique on combined
+        # rows to get uniqueness, then reorder unique results to match insertion
+        # order (first occurrence). This vectorized path keeps behavior identical
+        # to the OrderedDict+bytes approach but runs much faster in numpy.
+        # Build 4-byte vertex index array (little-endian)
+        vid_bytes = loop_vertex_indices.astype(numpy.uint32).view(numpy.uint8).reshape(n_loops, 4)
+
+        # Combine row bytes + vid bytes, but to make numpy.unique faster we pad the
+        # combined row to a multiple of 8 bytes and view it as uint64 blocks.
+        total_bytes = row_size + 4
+        pad = (-total_bytes) % 8
+        padded_width = total_bytes + pad
+
+        # Allocate padded combined buffer and fill
+        combined_padded = numpy.zeros((n_loops, padded_width), dtype=numpy.uint8)
+        combined_padded[:, :row_size] = row_bytes
+        combined_padded[:, row_size:row_size+4] = vid_bytes
+
+        # View as uint64 blocks (shape: n_loops x n_blocks)
+        n_blocks = padded_width // 8
+        combined_u64 = combined_padded.view(numpy.uint64).reshape(n_loops, n_blocks)
+
+        # Create a structured view so numpy.unique treats each row as a single record
+        dtype_descr = [(f'f{i}', numpy.uint64) for i in range(n_blocks)]
+        structured = combined_u64.view(numpy.dtype(dtype_descr)).reshape(n_loops)
+
+        unique_struct, unique_first_indices, inverse = numpy.unique(
+            structured, return_index=True, return_inverse=True
+        )
+
+        # Remap unique ids to insertion order (first occurrence order)
+        order = numpy.argsort(unique_first_indices)
+        new_id = numpy.empty_like(order)
+        new_id[order] = numpy.arange(len(order), dtype=new_id.dtype)
+        inverse = new_id[inverse]
+
+        unique_first_indices_insertion = unique_first_indices[order]
+
+        # Pick original unique rows from row_bytes using insertion-ordered indices
+        unique_rows = row_bytes[unique_first_indices_insertion]
+
+        # Expose the loop indices (first-occurrence loop indices) used to select
+        # the unique rows. Callers can sample per-loop original arrays using
+        # these indices to reconstruct per-unique-row original element values.
+        unique_first_loop_indices = unique_first_indices_insertion
+
+        # Reconstruct a structured ndarray of the unique element rows.
+        # This lets callers access element fields by name for the unique
+        # vertex set (useful for debugging or further processing).
+        # Ensure the byte width matches the dtype itemsize.
+        if unique_rows.shape[1] != dtype.itemsize:
+            raise Fatal(f"Unique row byte-size ({unique_rows.shape[1]}) does not match structured dtype itemsize ({dtype.itemsize})")
+
+        n_unique = unique_rows.shape[0]
+        unique_rows_contig = numpy.ascontiguousarray(unique_rows)
+        try:
+            # Zero-copy view where possible
+            unique_element_vertex_ndarray = unique_rows_contig.view(dtype).reshape(n_unique)
+        except Exception:
+            # Fallback to a safe copy-based reconstruction
+            unique_element_vertex_ndarray = numpy.frombuffer(unique_rows_contig.tobytes(), dtype=dtype).reshape(n_unique)
+
+        # Expose for downstream use: structure-aligned unique vertex records
+        # self.unique_element_vertex_ndarray = unique_element_vertex_ndarray
+
+        # 构建 index -> original vertex id（使用每个 unique 行的第一个 loop 对应的 vertex）
+        original_vertex_ids = loop_vertex_indices[unique_first_indices_insertion]
+        index_vertex_id_dict = dict(enumerate(original_vertex_ids.astype(int).tolist()))
+
+        # (4) 为每个 polygon 构建 IB（使用 inverse 映射）
+        # inverse is already ordered by loops; concatenating polygon slices in
+        # polygon order is equivalent to taking inverse in sequence.
+        flattened_ib_arr = inverse.astype(numpy.int32)
+
+        # (5) 按 category 从 unique_rows 切分 bytes 序列
+        category_stride_dict = d3d11_game_type.get_real_category_stride_dict()
+        category_buffer_dict = {}
+        stride_offset = 0
+        for cname, cstride in category_stride_dict.items():
+            category_buffer_dict[cname] = unique_rows[:, stride_offset:stride_offset + cstride].flatten()
+            stride_offset += cstride
+
+        # (6) 翻转三角形方向（高效）
+        # 鸣潮需要翻转这一下
+        flat_arr = flattened_ib_arr
+        if flat_arr.size % 3 == 0:
+            flipped = flat_arr.reshape(-1, 3)[:, ::-1].flatten().tolist()
+        else:
+            # Rare irregular case: fallback to python loop on numpy array
+            flipped = []
+            iarr = flat_arr.tolist()
+            for i in range(0, len(iarr), 3):
+                tri = iarr[i:i + 3]
+                flipped.extend(tri[::-1])
+
+        ib = flipped
+        return ib, category_buffer_dict, index_vertex_id_dict, unique_element_vertex_ndarray,unique_first_loop_indices

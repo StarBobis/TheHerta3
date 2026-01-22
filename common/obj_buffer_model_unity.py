@@ -119,17 +119,10 @@ class ObjBufferModelUnity:
 
         self.ib = flattened_ib
 
-        flip_face_direction = False
 
-        if Properties_ImportModel.use_mirror_workflow():
-            flip_face_direction = True
-            if GlobalConfig.logic_name == LogicName.YYSLS:
-                flip_face_direction = False
-        else:
-            if GlobalConfig.logic_name == LogicName.YYSLS:
-                flip_face_direction = True
-
-        if flip_face_direction:
+        # TODO YYSLS是目前除了鸣潮外，唯一需要翻转面朝向的游戏
+        # 但是也许后续非镜像工作流统一后可以解决这个问题？
+        if GlobalConfig.logic_name == LogicName.YYSLS:
             print("导出时翻转面朝向")
 
             flipped_indices = []

@@ -75,7 +75,7 @@ class ObjElementModel:
     # 然后再由 fill_into_element_vertex_ndarray() 优先使用 final 的内容进行打包。
     final_elementname_data_dict: dict = field(init=False, repr=False, default_factory=dict)
 
-    # 然后再把数据写入
+    # 最终数据被写入到这个 ndarray 中，传递给buffer model
     element_vertex_ndarray:numpy.ndarray = field(init=False,repr=False)
 
     def __post_init__(self) -> None:
@@ -102,6 +102,10 @@ class ObjElementModel:
 
 
         '''
+
+        # 以Shape.开头的形态键名单列表，用于生成对应的.buf文件
+        # shape_keyname_list = []
+
         shape_key_values = {}
         if self.obj.data.shape_keys:
             # 必须遍历 key_blocks 才能获取每个键的值
@@ -110,6 +114,21 @@ class ObjElementModel:
                 # 只有不以 Export. 开头的形态键才会被归零
                 if not key_block.name.startswith("Export."):
                     key_block.value = 0.0
+                
+                # 如果是以Shape.开头的，就加入到Shape.的名单列表中
+                # if key_block.name.startswith("Shape."):
+                #     shape_keyname_list.append(key_block.name)
+        
+        # TODO 对每个shape的name，填入mesh，直接计算出最终的element_vertex_ndarray并以Key值作为标识存储起来
+        # 存到字典中，然后这个变量赋值到类中，后续调用的时候去生成对应的buf文件
+        # 但是这样好像不行，因为整套设计都是基于一个obj整体的
+        # 所以必须重构整个架构，拆分出最优解，即能够填入obj，直接获取这个obj的buf数据
+        # 问题是这个buf数据是由顶点索引决定的。
+
+        # 不仅如此，最终还要通过算法拼接在一起，形成最终的buf文件，这么一整套下来，对于单个DrawIB来说的流程太繁琐复杂了
+        # 除非让那个obj的每个shapekey都生成一个单独的obj，然后再去走完整流程获取buf数据
+        # 这样要改动的代码更多，所以这个的前置需求是：
+        # TODO 把当前DrawIB的所有obj合并成一个obj，然后再进行buf的生成
         
         # 这里获取应用了形态键之后的mesh数据
         mesh = ObjUtils.get_mesh_evaluate_from_obj(obj=self.obj)
@@ -120,25 +139,9 @@ class ObjElementModel:
         # Calculates tangents and makes loop normals valid (still with our custom normal data from import time):
         # 前提是有UVMap，前面的步骤应该保证了模型至少有一个TEXCOORD.xy
         mesh.calc_tangents()
-
-        # Cache frequently accessed mesh collections/lengths to avoid repeated attribute lookups
-        # 提前获取到变量，这样避免用到的时候重复获取，也许能节省开销？不确定，应该节省不了多少
+        
         self.mesh = mesh
-        self.mesh_loops = mesh.loops
-        self.mesh_loops_length = len(self.mesh_loops)
-        self.mesh_vertices = mesh.vertices
-        self.mesh_vertices_length = len(self.mesh_vertices)
-        self.vertex_colors = mesh.vertex_colors
-        self.uv_layers = mesh.uv_layers
-    
-        # 读取并解析数据（填充到 `original_elementname_data_dict`）
-        # NOTE: we only parse into `original_elementname_data_dict` here and defer
-        # packing into the structured `element_vertex_ndarray` until an
-        # external caller invokes `fill_into_element_vertex_ndarray()`.
-        # This allows callers to modify `final_elementname_data_dict` (for
-        # example, to apply per-component BLENDINDICES remaps) before the
-        # structured dtype is allocated and packed, avoiding uint8
-        # truncation issues.
+
         self.original_elementname_data_dict = ObjBufferHelper.parse_elementname_data_dict(mesh=mesh, d3d11_game_type=self.d3d11_game_type)
 
 
@@ -146,7 +149,7 @@ class ObjElementModel:
         self.total_structured_dtype:numpy.dtype = self.d3d11_game_type.get_total_structured_dtype()
 
         # Create the element array with the original dtype (matching ByteWidth)
-        self.element_vertex_ndarray = numpy.zeros(self.mesh_loops_length, dtype=self.total_structured_dtype)
+        self.element_vertex_ndarray = numpy.zeros(len(self.mesh.loops), dtype=self.total_structured_dtype)
         # For each expected element, prefer the remapped/modified value in
         # `final_elementname_data_dict` if present; otherwise use the parsed
         # value from `original_elementname_data_dict`.

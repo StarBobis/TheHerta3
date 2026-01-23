@@ -51,7 +51,7 @@ class ObjBufferModelWWMI:
     shapekey_vertex_ids:list = field(init=False,repr=False,default_factory=list)
     shapekey_vertex_offsets:list = field(init=False,repr=False,default_factory=list)
 
-    export_shapekey:bool =  field(init=False,repr=False,default=False)
+    export_shapekey:bool = field(init=False,repr=False,default=False)
 
     def __post_init__(self) -> None:
         self.obj = self.obj_element_model.obj
@@ -67,7 +67,7 @@ class ObjBufferModelWWMI:
             element_vertex_ndarray=self.element_vertex_ndarray,
             dtype=self.dtype,
             d3d11_game_type=self.d3d11_game_type
-            )
+        )
         
         # 获取ShapeKey数据
         if self.obj.data.shape_keys is None or len(getattr(self.obj.data.shape_keys, 'key_blocks', [])) == 0:

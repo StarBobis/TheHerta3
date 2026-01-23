@@ -598,3 +598,8 @@ class ObjBufferHelper:
 
         ib = flipped
         return ib, category_buffer_dict, index_vertex_id_dict, unique_element_vertex_ndarray,unique_first_loop_indices
+
+
+
+
+

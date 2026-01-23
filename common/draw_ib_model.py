@@ -17,7 +17,7 @@ from ..config.main_config import *
 from ..config.import_config import ImportConfig
 
 from .branch_model import BranchModel
-from .obj_writer import ObjWriter
+from ..helper.buffer_export_helper import BufferExportHelper
 
 class DrawIBModel:
     '''
@@ -311,7 +311,7 @@ class DrawIBModel:
                 print("Export Skip, Can't get ib buf for partname: " + partname)
             else:
                 buf_filename = self.PartName_IBBufferFileName_Dict[partname]
-                ObjWriter.write_buf_ib_r32_uint(ib_buf,buf_filename)
+                BufferExportHelper.write_buf_ib_r32_uint(ib_buf,buf_filename)
                 
         # print("Export Category Buffers::")
         # Export category buffer files.

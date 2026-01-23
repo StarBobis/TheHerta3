@@ -5,7 +5,7 @@ import numpy
 from ..config.main_config import GlobalConfig
 
 
-class ObjWriter:
+class BufferExportHelper:
     '''
     工具类
     专门负责把ObjBufferModel中的数据写入到文件中
@@ -18,6 +18,14 @@ class ObjWriter:
     - 文件夹: Texture                   存放所有贴图文件
     - 文件:   工作空间名称.ini           所有ini内容要全部写在一起,如果写在多个ini里面通过namespace关联,则可能会导致Mod开启或关闭时有一瞬间的上贴图延迟
     '''
+
+    @staticmethod
+    def write_category_buffer_files(category_buffer_dict:dict, draw_ib:str):
+        # 直接遍历 OrderedCategoryNameList 进行写出，保持了顺序和筛选逻辑
+        for category_name,category_buf in category_buffer_dict.items():
+            buf_path = GlobalConfig.path_generatemod_buffer_folder() + draw_ib + "-" + category_name + ".buf"
+            with open(buf_path, 'wb') as ibf:
+                category_buf.tofile(ibf)
 
     @staticmethod
     def write_buf_ib_r32_uint(index_list:list[int],buf_file_name:str):

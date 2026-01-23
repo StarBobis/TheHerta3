@@ -3,19 +3,14 @@ import numpy
 import bpy
 
 from dataclasses import dataclass, field
-from typing import Dict
 
-from ..utils.format_utils import FormatUtils, Fatal
 from ..utils.timer_utils import TimerUtils
-from ..utils.vertexgroup_utils import VertexGroupUtils
-from ..utils.obj_utils import ObjUtils
 
 from ..config.main_config import GlobalConfig, LogicName
 from ..config.properties_import_model import Properties_ImportModel
 from ..config.properties_generate_mod import Properties_GenerateMod
 
 from ..base.d3d11_gametype import D3D11GameType
-from ..base.obj_data_model import ObjDataModel
 from .obj_element_model import ObjElementModel
 
 @dataclass

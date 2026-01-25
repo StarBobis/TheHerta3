@@ -195,6 +195,98 @@ def ImprotFromWorkSpaceSSMTV4(self, context):
     # 因为用户习惯了导入后就是全部选中的状态，所以默认选中所有导入的obj
     CollectionUtils.select_collection_objects(workspace_collection)
 
+    # ==========================
+    # 自动生成蓝图节点逻辑
+    # ==========================
+    try:
+        # 1. 获取或创建蓝图树
+        tree_name = f"Mod_{GlobalConfig.workspacename}" if GlobalConfig.workspacename else "SSMT_Mod_Logic"
+        tree = bpy.data.node_groups.get(tree_name)
+        if not tree:
+            # 重要：先检查类型是否已注册
+            if 'SSMTBlueprintTreeType' in bpy.types.NodeTree.bl_rna.properties['type'].enum_items:
+                 pass # 如果能直接 new 最好
+                 
+            try:
+                tree = bpy.data.node_groups.new(name=tree_name, type='SSMTBlueprintTreeType')
+            except Exception as e:
+                print(f"Failed to create new node tree: {e}. Check if SSMTBlueprintTreeType is registered.")
+                # Fallback or return
+                return
+
+            tree.use_fake_user = True
+        
+        # 2. 清空现有节点并重新生成
+        tree.nodes.clear()
+        
+        # 添加开始节点
+        start_node = tree.nodes.new('SSMTNode_Event_Start')
+        start_node.location = (-300, 0)
+        
+        # 3. 遍历导入的对象并创建对应节点
+        current_x = 200
+        current_y = 0
+        y_gap = 250 # 增加垂直间距
+        
+        count = 0
+        
+        # 此时 default_show_collection 应该在作用域内，因为它是上面的局部变量
+        # 且导入的模型都放在这个集合里
+        if 'default_show_collection' in locals() and default_show_collection:
+             target_objects = default_show_collection.objects
+        else:
+             # Fallback: 尝试通过名称寻找，或者使用 workspace_collection
+             target_objects = []
+             if 'workspace_collection' in locals() and workspace_collection:
+                 # 简易递归或直接查子集合
+                 for child in workspace_collection.children:
+                     if child.name == "DefaultShow":
+                         target_objects = child.objects
+                         break
+        
+        if not target_objects:
+             print("Warning: Could not find DefaultShow collection to generate blueprint nodes.")
+
+        for draw_ib_pair in draw_ib_pair_list:
+            draw_ib = draw_ib_pair.DrawIB
+            alias_name = draw_ib_pair.AliasName
+            
+            real_alias_name = alias_name if alias_name else "Original"
+            
+            # 在导入集合中寻找属于当前 DrawIB 的对象
+            # 命名规则通常是: DrawIB-Part-Alias
+            # 我们匹配 names starting with draw_ib
+            
+            found_objs = [obj for obj in target_objects if obj.name.startswith(draw_ib)]
+            
+            for obj in found_objs:
+                 if obj.type == 'MESH':
+                    # 创建节点
+                    node = tree.nodes.new('SSMTNode_Object_Info')
+                    node.location = (current_x, current_y)
+                    
+                    # 排列逻辑：每列排 5 个
+                    count += 1
+                    current_y -= y_gap
+                    if count % 5 == 0:
+                            current_y = 0
+                            current_x += 300
+                    
+                    # 填充属性
+                    node.object_name = obj.name
+                    node.draw_ib = draw_ib
+                    node.component = real_alias_name
+                    node.label = obj.name # 设置节点标题方便识别
+                        
+        print(f"Blueprint {tree_name} updated with imported objects.")
+                        
+        print(f"Blueprint {tree_name} updated with imported objects.")
+        
+    except Exception as e:
+        print(f"Error generating blueprint nodes: {e}")
+        import traceback
+        traceback.print_exc()
+
 
 class SSMTImportAllFromCurrentWorkSpaceV3(bpy.types.Operator):
     bl_idname = "ssmt.import_all_from_workspace_v3"

@@ -8,6 +8,8 @@ from .ui.ui_panel_sword import *
 from .ui.ui_panel_export import SSMTGenerateMod, PanelGenerateModConfig, SSMTSelectGenerateModFolder
 from .ui.ui_panel_import import Import3DMigotoRaw, SSMTImportAllFromCurrentWorkSpaceV3
 from .ui.ui_panel_fast_texture import *
+from .ui.ui_shader_window import *
+from .blueprint import blueprint as blueprint_system
 
 # 自动更新功能
 from . import addon_updater_ops
@@ -194,7 +196,9 @@ register_classes = (
     SwordImportAllReversed,
     Sword_SplitModel_By_DrawIndexed_Panel,
 
-
+    # Shader窗口功能
+    THEHERTA3_OT_OpenPersistentBlueprint,
+    THEHERTA3_PT_ShaderWindow,
 )
 
 
@@ -205,6 +209,8 @@ def register():
 
     fast_pcoll = bpy.utils.previews.new()
     fast_preview_collections["main"] = fast_pcoll
+
+    blueprint_system.register()
 
     for cls in register_classes:
         bpy.utils.register_class(cls)
@@ -268,6 +274,8 @@ def register():
 
 
 def unregister():
+
+    blueprint_system.unregister()
 
     # 清除预览集合
     for pcoll in preview_collections.values():

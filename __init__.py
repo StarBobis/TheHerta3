@@ -149,17 +149,16 @@ def unregister():
     ui_panel_model.unregister()
     ui_panel_basic.unregister()
 
+    # 2. Addon Updater (local classes)
     bpy.utils.unregister_class(HertaUpdatePreference)
     bpy.utils.unregister_class(UpdaterPanel)
     addon_updater_ops.unregister()
 
+    # 1. Configs
     properties_extract_model.unregister()
     properties_generate_mod.unregister()
     properties_wwmi.unregister()
     properties_import_model.unregister()
-    
-
-    register()
 
 
 

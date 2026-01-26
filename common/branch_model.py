@@ -87,8 +87,6 @@ class BranchModel:
                 '''
                 如果子集合是【按键开关集合】则要添加一个Key，更新全局Key字典，更新Key列表并传递解析下去
                 '''
-                
-
 
                 # Create Toggle Key.
                 m_key = M_Key()

@@ -42,7 +42,26 @@ class BlueprintExportHelper:
                          connected_groups.append(source_node)
         
         return connected_groups
-
+    
+    @staticmethod
+    def get_connected_nodes(current_node):
+        """
+        按照插槽顺序返回所有连接的节点
+        """
+        connected_groups = []
+        if not current_node:
+            return connected_groups
+            
+        # 遍历 Output 节点的所有输入插槽
+        for socket in current_node.inputs:
+            if socket.is_linked:
+                # 遍历连线 (通常一个插槽只有一个连线，但数据结构是列表)
+                for link in socket.links:
+                    source_node = link.from_node
+                    connected_groups.append(source_node)
+        
+        return connected_groups
+    
     @staticmethod
     def get_objects_from_group(group_node):
         """

@@ -143,14 +143,10 @@ def ImprotFromWorkSpaceSSMTBlueprint(self, context):
         # 2. 清空现有节点并重新生成
         tree.nodes.clear()
         
-        # 创建 Frame 节点
-        frame_node = tree.nodes.new('NodeFrame')
-        frame_node.label = "Default"
         
         # 创建 Group 节点 (并在循环中连接)
         group_node = tree.nodes.new('SSMTNode_Object_Group')
         group_node.label = "Default Group"
-        group_node.parent = frame_node
         
         # 3. 遍历导入的对象并创建对应节点
         current_x = 0
@@ -176,19 +172,15 @@ def ImprotFromWorkSpaceSSMTBlueprint(self, context):
             draw_ib = draw_ib_pair.DrawIB
             alias_name = draw_ib_pair.AliasName
             
-            real_alias_name = alias_name if alias_name else "Original"
-            
             # 在导入集合中寻找属于当前 DrawIB 的对象
             # 命名规则通常是: DrawIB-Part-Alias
             # 我们匹配 names starting with draw_ib
-            
             found_objs = [obj for obj in target_objects if obj.name.startswith(draw_ib)]
             
             for obj in found_objs:
                  if obj.type == 'MESH':
                     # 创建节点
                     node = tree.nodes.new('SSMTNode_Object_Info')
-                    node.parent = frame_node
                     node.location = (current_x, current_y)
                     
                     # 填充属性
@@ -239,7 +231,7 @@ def ImprotFromWorkSpaceSSMTBlueprint(self, context):
         # 触发一次group node的更新（虽然脚本连线有时不需要，但为了保险起见）
         if hasattr(group_node, "update"):
              group_node.update()
-
+        
         print(f"Blueprint {tree_name} updated with imported objects.")
         
     except Exception as e:

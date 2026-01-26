@@ -9,17 +9,22 @@ from ..utils.collection_utils import CollectionUtils
 from ..config.main_config import GlobalConfig, LogicName
 from ..common.branch_model import M_GlobalKeyCounter
 
-from ..games.himi import ModModelHIMI
-from ..games.gimi import ModModelGIMI
+# from ..games.himi import ModModelHIMI
+# from ..games.gimi import ModModelGIMI
 
-from ..games.zzmi import ModModelZZMI
+# from ..games.zzmi import ModModelZZMI
 
-from ..games.unity import ModModelUnity
-from ..games.srmi import ModModelSRMI
-from ..games.identityv import ModModelIdentityV
-from ..games.yysls import ModModelYYSLS
-from ..games.wwmi import ModModelWWMI
-from ..games.snowbreak import ModModelSnowBreak
+# from ..games.unity import ModModelUnity
+# from ..games.srmi import ModModelSRMI
+# from ..games.identityv import ModModelIdentityV
+# from ..games.yysls import ModModelYYSLS
+# from ..games.wwmi import ModModelWWMI
+# from ..games.snowbreak import ModModelSnowBreak
+
+from ..games_new.zzmi_new import ModModelZZMI
+
+
+
 from ..config.properties_generate_mod import Properties_GenerateMod
 
 from .blueprint_model import BluePrintModel
@@ -79,12 +84,15 @@ class SSMTGenerateModBlueprint(bpy.types.Operator):
 
 
         # TODO 暂时现在这里测试流程，流程通过后迁移到zzmi_new.py里去
-        blueprint_model:BluePrintModel = BluePrintModel()
+        if GlobalConfig.logic_name == LogicName.ZZMI:
+            migoto_mod_model = ModModelZZMI()
+            migoto_mod_model.generate_unity_vs_config_ini()
+
 
 
         self.report({'INFO'},TR.translate("Generate Mod Success!"))
         TimerUtils.End("GenerateMod Mod")
-        # CommandUtils.OpenGeneratedModFolder()
+        CommandUtils.OpenGeneratedModFolder()
         return {'FINISHED'}
     
 

@@ -72,19 +72,10 @@ class SSMTNode_Object_Group(SSMTNodeBase):
     bl_label = 'Group'
     bl_icon = 'GROUP'
 
-    key_name: bpy.props.StringProperty(name="Key Name", default="") # type: ignore
-    values: bpy.props.StringProperty(name="Values", default="") # type: ignore
-    value_type: bpy.props.StringProperty(name="Type", default="") # type: ignore
-
     def init(self, context):
         self.inputs.new('SSMTSocketObject', "Input 1")
         self.outputs.new('SSMTSocketObject', "Output")
         self.width = 200
-
-    def draw_buttons(self, context, layout):
-        layout.prop(self, "key_name", text="Key")
-        layout.prop(self, "values", text="Values")
-        layout.prop(self, "value_type", text="Type")
 
     def update(self):
         # 类似 Join Geometry 的逻辑：总保持最后一个为空，方便连接新的
@@ -96,6 +87,67 @@ class SSMTNode_Object_Group(SSMTNodeBase):
         # 防止无限增长，或者用户断开最后一个连接的情况
         if len(self.inputs) > 1 and not self.inputs[-1].is_linked and not self.inputs[-2].is_linked:
              self.inputs.remove(self.inputs[-1])
+
+
+class SSMTNode_ToggleKey(SSMTNodeBase):
+    '''【按键开关】会控制所有连接到它输入端口的对象'''
+    bl_idname = 'SSMTNode_ToggleKey'
+    bl_label = 'Toggle Key'
+    bl_icon = 'GROUP'
+
+    key_name: bpy.props.StringProperty(name="Key Name", default="") # type: ignore
+    default_on: bpy.props.BoolProperty(name="Default On", default=False) # type: ignore
+
+    def init(self, context):
+        self.label = "按键开关"
+        self.inputs.new('SSMTSocketObject', "Input 1")
+        self.outputs.new('SSMTSocketObject', "Output")
+        self.width = 200
+
+    def draw_buttons(self, context, layout):
+        layout.prop(self, "key_name", text="按键")
+        layout.prop(self, "default_on", text="默认开启")
+
+    def update(self):
+        # 类似 Join Geometry 的逻辑：总保持最后一个为空，方便连接新的
+        if self.inputs and self.inputs[-1].is_linked:
+            self.inputs.new('SSMTSocketObject', f"Input {len(self.inputs) + 1}")
+        
+        # 移除中间断开的连接，或者整理列表（可选）
+        # 这里实现一个简单的逻辑：如果倒数第二个也没有连接，就移除最后一个
+        # 防止无限增长，或者用户断开最后一个连接的情况
+        if len(self.inputs) > 1 and not self.inputs[-1].is_linked and not self.inputs[-2].is_linked:
+             self.inputs.remove(self.inputs[-1])
+
+
+class SSMTNode_SwitchKey(SSMTNodeBase):
+    '''【按键切换】会把每个连入的分支分配到单独的变量'''
+    bl_idname = 'SSMTNode_SwitchKey'
+    bl_label = 'Switch Key'
+    bl_icon = 'GROUP'
+
+    key_name: bpy.props.StringProperty(name="Key Name", default="") # type: ignore
+
+    def init(self, context):
+        self.label = "按键切换"
+        self.inputs.new('SSMTSocketObject', "分支 1")
+        self.outputs.new('SSMTSocketObject', "Output")
+        self.width = 200
+
+    def draw_buttons(self, context, layout):
+        layout.prop(self, "key_name", text="按键")
+
+    def update(self):
+        # 类似 Join Geometry 的逻辑：总保持最后一个为空，方便连接新的
+        if self.inputs and self.inputs[-1].is_linked:
+            self.inputs.new('SSMTSocketObject', f"分支 {len(self.inputs) + 1}")
+        
+        # 移除中间断开的连接，或者整理列表（可选）
+        # 这里实现一个简单的逻辑：如果倒数第二个也没有连接，就移除最后一个
+        # 防止无限增长，或者用户断开最后一个连接的情况
+        if len(self.inputs) > 1 and not self.inputs[-1].is_linked and not self.inputs[-2].is_linked:
+             self.inputs.remove(self.inputs[-1])
+
 
 # 结果输出节点
 class SSMTNode_Result_Output(SSMTNodeBase):
@@ -124,7 +176,9 @@ classes = (
     SSMTBlueprintTree,
     SSMTNode_Object_Info,
     SSMTNode_Object_Group,
-    SSMTNode_Result_Output
+    SSMTNode_Result_Output,
+    SSMTNode_ToggleKey,
+    SSMTNode_SwitchKey,
 )
 
 def draw_node_add_menu(self, context):
@@ -137,6 +191,8 @@ def draw_node_add_menu(self, context):
     layout.operator("node.add_node", text="Object Info", icon='OBJECT_DATAMODE').type = "SSMTNode_Object_Info"
     layout.operator("node.add_node", text="Group", icon='GROUP').type = "SSMTNode_Object_Group"
     layout.operator("node.add_node", text="Mod Output", icon='EXPORT').type = "SSMTNode_Result_Output"
+    layout.operator("node.add_node", text="Toggle Key", icon='GROUP').type = "SSMTNode_ToggleKey"
+    layout.operator("node.add_node", text="Switch Key", icon='GROUP').type = "SSMTNode_SwitchKey"
     layout.separator()
 
     # Frame节点没有任何功能，它是Blender自带的一种辅助节点，用于在节点编辑器中组织和分组节点

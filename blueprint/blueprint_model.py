@@ -64,93 +64,133 @@ class BluePrintModel:
         '''
         
         for unknown_node in BlueprintExportHelper.get_connected_nodes(current_node):
+            self.parse_single_node(unknown_node, chain_key_list)
 
-            if unknown_node.bl_idname == "SSMTNode_Object_Group":
-                # 如果是单纯的分组节点，则不进行任何处理直接传递下去
-                self.parse_current_node(unknown_node, chain_key_list)
+    def parse_single_node(self, unknown_node:bpy.types.Node, chain_key_list:list[M_Key]):
 
-            elif unknown_node.bl_idname == "SSMTNode_ToggleKey":
-                # 如果是按键开关节点，则添加一个Key，更新全局Key字典，更新Key列表并传递解析下去
+        if unknown_node.bl_idname == "SSMTNode_Object_Group":
+            # 如果是单纯的分组节点，则不进行任何处理直接传递下去
+            self.parse_current_node(unknown_node, chain_key_list)
+
+        elif unknown_node.bl_idname == "SSMTNode_ToggleKey":
+            # 如果是按键开关节点，则添加一个Key，更新全局Key字典，更新Key列表并传递解析下去
+            m_key = M_Key()
+            current_add_key_index = len(self.keyname_mkey_dict.keys())
+            m_key.key_name = "$swapkey" + str(M_GlobalKeyCounter.global_key_index)
+
+            m_key.value_list = [0,1]
+
+            # 设置键具体是哪个键，由用户指定
+            m_key.initialize_vk_str = unknown_node.key_name
+
+            # 设置是否默认开启
+            if unknown_node.default_on:
+                m_key.initialize_value = 1
+            else:
+                m_key.initialize_value = 0
+            
+            # 创建的key加入全局key列表
+            self.keyname_mkey_dict[m_key.key_name] = m_key
+
+            if len(self.keyname_mkey_dict.keys()) > current_add_key_index:
+                M_GlobalKeyCounter.global_key_index = M_GlobalKeyCounter.global_key_index + 1
+            
+            # 创建的key要加入chain_key_list传递下去
+            # 因为传递解析下去的话，要让这个key生效，而又因为它是按键开关key，所以value为1生效，所以tmp_value设为1
+            chain_tmp_key = copy.deepcopy(m_key)
+            chain_tmp_key.tmp_value = 1
+
+            tmp_chain_key_list = copy.deepcopy(chain_key_list)
+            tmp_chain_key_list.append(chain_tmp_key)
+
+            # 递归解析
+            self.parse_current_node(unknown_node, tmp_chain_key_list)
+
+        elif unknown_node.bl_idname == "SSMTNode_SwitchKey":
+            # 如果是按键切换节点，则该节点所有的分支节点，并逐个处理
+            # 这里我们直接遍历所有的inputs，而不是get_connected_nodes，
+            # 因为get_connected_nodes会忽略未连接(空)的端口，导致分支数量计算错误
+            
+            # 获取有效的分支数量（除去最后一个为了方便添加而存在的空端口）
+            # 只有当最后一个端口确实没有连接的时候才能排除，虽然Node定义里是这样写的逻辑，但最好判断一下link
+            valid_input_sockets = unknown_node.inputs[:-1] if (len(unknown_node.inputs) > 1 and not unknown_node.inputs[-1].is_linked) else unknown_node.inputs[:]
+            
+            # 如果所有端口都没有连接，则直接跳过
+            is_all_socket_linked = False
+            for sock in valid_input_sockets:
+                if sock.is_linked:
+                    is_all_socket_linked = True
+                    break
+            
+            if not is_all_socket_linked:
+                # 如果没有任何连接，不做处理
+                return
+
+            if len(valid_input_sockets) == 1:
+                # 如果只有 1 个有效分支端口：
+                # 1. 如果它是连接的 -> 视为 Group 节点透传
+                # 2. 如果它是断开的 -> 视为无意义，不做处理(上面all_socket_linked已过滤)
+                if valid_input_sockets[0].is_linked:
+                        for link in valid_input_sockets[0].links:
+                            self.parse_single_node(link.from_node, chain_key_list)
+            else:
+                # 如果有 > 1 个有效分支端口，则必须创建 Key，哪怕某些端口是空的（代表空分支）
                 m_key = M_Key()
                 current_add_key_index = len(self.keyname_mkey_dict.keys())
                 m_key.key_name = "$swapkey" + str(M_GlobalKeyCounter.global_key_index)
 
-                m_key.value_list = [0,1]
+                # 值列表就是分支索引的列表 [0, 1, 2, ...]
+                m_key.value_list = list(range(len(valid_input_sockets)))
 
-                # 设置键具体是哪个键，由用户指定
                 m_key.initialize_vk_str = unknown_node.key_name
+                m_key.initialize_value = 0  # 默认选择第一个分支
 
-                # 设置是否默认开启
-                if unknown_node.default_on:
-                    m_key.initialize_value = 1
-                else:
-                    m_key.initialize_value = 0
-                
                 # 创建的key加入全局key列表
                 self.keyname_mkey_dict[m_key.key_name] = m_key
 
+                # 更新全局key索引
                 if len(self.keyname_mkey_dict.keys()) > current_add_key_index:
                     M_GlobalKeyCounter.global_key_index = M_GlobalKeyCounter.global_key_index + 1
-                
-                # 创建的key要加入chain_key_list传递下去
-                # 因为传递解析下去的话，要让这个key生效，而又因为它是按键开关key，所以value为1生效，所以tmp_value设为1
-                chain_tmp_key = copy.deepcopy(m_key)
-                chain_tmp_key.tmp_value = 1
 
-                tmp_chain_key_list = copy.deepcopy(chain_key_list)
-                tmp_chain_key_list.append(chain_tmp_key)
+                # 逐个处理每个分支节点（包括空分支）
+                key_tmp_value = 0
+                for socket in valid_input_sockets:
+                    # 无论这个 socket 是否连接了节点，或者是空的，都对应一个 key value
+                    
+                    if socket.is_linked:
+                        # 如果连接了节点，则需要把这个 value 对应的 key 传递下去解析
+                        for link in socket.links:
+                            # 为每个分支创建一个临时key传递下去
+                            chain_tmp_key = copy.deepcopy(m_key)
+                            chain_tmp_key.tmp_value = key_tmp_value # 当前分支对应的 value
 
-                # 递归解析
-                self.parse_current_node(unknown_node, tmp_chain_key_list)
+                            tmp_chain_key_list = copy.deepcopy(chain_key_list)
+                            tmp_chain_key_list.append(chain_tmp_key)
 
-            elif unknown_node.bl_idname == "SSMTNode_SwitchKey":
-                # 如果是按键切换节点，则该节点所有的分支节点，并逐个处理
-                switch_node_list = BlueprintExportHelper.get_connected_nodes(unknown_node)
-                if len(switch_node_list) == 1:
-                    # 如果只有一个分支的话，就当成组节点进行处理
-                    self.parse_current_node(switch_node_list[0], chain_key_list)
-                else:
-                    m_key = M_Key()
-                    current_add_key_index = len(self.keyname_mkey_dict.keys())
-                    m_key.key_name = "$switchkey" + str(M_GlobalKeyCounter.global_key_index)
+                            # 递归解析连接的节点
+                            # 注意：这里我们调用 parse_single_node，因为我们直接找到了目标节点
+                            self.parse_single_node(link.from_node, tmp_chain_key_list)
+                    else:
+                        # 如果是空端口（没有连接），则代表这个 value 对应的是空物体
+                        # 我们不需要做任何 parse 操作，因为没有任何 obj 需要在这个条件下生成
+                        # 这个 key value 存在于 key.value_list 中，但没有任何 obj 的 condition 会匹配到这个 value
+                        # 这样就实现了“切换到这个分支时，什么都不显示”的效果
+                        pass
 
-                    m_key.value_list = list(range(len(switch_node_list)))
+                    key_tmp_value = key_tmp_value + 1
 
-                    m_key.initialize_vk_str = unknown_node.key_name
-                    m_key.initialize_value = 0  # 默认选择第一个分支
+        elif unknown_node.bl_idname == "SSMTNode_Object_Info":
+            obj_model = ObjDataModel(obj_name=unknown_node.object_name)
+            
+            obj_model.draw_ib = unknown_node.draw_ib
+            obj_model.component_count = int(unknown_node.component) 
+            obj_model.obj_alias_name = unknown_node.alias_name
 
-                    # 创建的key加入全局key列表
-                    self.keyname_mkey_dict[m_key.key_name] = m_key
+            obj_model.condition = M_Condition(work_key_list=copy.deepcopy(chain_key_list))
+            
+            # 每遇到一个obj，都把这个obj加入顺序渲染列表
+            self.ordered_draw_obj_data_model_list.append(obj_model)
 
-                    # 更新全局key索引
-                    if len(self.keyname_mkey_dict.keys()) > current_add_key_index:
-                        M_GlobalKeyCounter.global_key_index = M_GlobalKeyCounter.global_key_index + 1
-
-                    # 逐个处理每个分支节点
-                    key_tmp_value = 0
-                    for switch_node in switch_node_list:
-                        # 为每个分支创建一个临时key传递下去
-                        chain_tmp_key = copy.deepcopy(m_key)
-                        chain_tmp_key.tmp_value = key_tmp_value
-
-                        tmp_chain_key_list = copy.deepcopy(chain_key_list)
-                        tmp_chain_key_list.append(chain_tmp_key)
-
-                        key_tmp_value = key_tmp_value + 1
-
-                        # 递归解析
-                        self.parse_current_node(switch_node, tmp_chain_key_list)
-            elif unknown_node.bl_idname == "SSMTNode_Object_Info":
-                obj_model = ObjDataModel(obj_name=unknown_node.object_name)
-                
-                obj_model.draw_ib = unknown_node.draw_ib
-                obj_model.component_count = int(unknown_node.component) 
-                obj_model.obj_alias_name = unknown_node.alias_name
-
-                obj_model.condition = M_Condition(work_key_list=copy.deepcopy(chain_key_list))
-                
-                # 每遇到一个obj，都把这个obj加入顺序渲染列表
-                self.ordered_draw_obj_data_model_list.append(obj_model)
 
 
     def get_obj_data_model_list_by_draw_ib(self,draw_ib:str):

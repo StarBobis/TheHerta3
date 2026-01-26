@@ -41,16 +41,6 @@ class SSMTNodeBase(Node):
     def poll(cls, ntree):
         return ntree.bl_idname == 'SSMTBlueprintTreeType'
 
-# 示例节点：开始节点
-class SSMTNode_Event_Start(SSMTNodeBase):
-    '''SSMT Start Node'''
-    bl_idname = 'SSMTNode_Event_Start'
-    bl_label = 'Event: Mod Generation'
-    bl_icon = 'PLAY'
-
-    def init(self, context):
-        self.outputs.new('SSMTSocketFlow', "Next")
-
 
 
 # 对象信息节点
@@ -65,9 +55,15 @@ class SSMTNode_Object_Info(SSMTNodeBase):
     # 但在 Runtime UI 中通常结合 prop_search 使用 StringProperty 来模拟体验。
     # 为了更好的体验，我们使用 StringProperty 并配合 prop_search 绘制。
     
+    def update_object_name(self, context):
+        if self.object_name:
+            self.label = self.object_name
+        else:
+            self.label = "Object Info"
+
     draw_ib: bpy.props.StringProperty(name="DrawIB", default="") # type: ignore
     component: bpy.props.StringProperty(name="Component", default="") # type: ignore
-    object_name: bpy.props.StringProperty(name="Object Name", default="") # type: ignore
+    object_name: bpy.props.StringProperty(name="Object Name", default="", update=update_object_name) # type: ignore
 
     def init(self, context):
         self.outputs.new('SSMTSocketObject', "Object")
@@ -82,10 +78,6 @@ class SSMTNode_Object_Info(SSMTNodeBase):
         # 2. DrawIB 和 Component 自由修改
         layout.prop(self, "draw_ib", text="DrawIB")
         layout.prop(self, "component", text="Component")
-        
-        # 自动根据选择的物体更新 Label (可选)
-        if self.object_name:
-            self.label = self.object_name
 
 # 结果输出节点
 class SSMTNode_Result_Output(SSMTNodeBase):
@@ -103,7 +95,6 @@ classes = (
     SSMTSocketFlow,
     SSMTSocketObject,
     SSMTBlueprintTree,
-    SSMTNode_Event_Start,
     SSMTNode_Object_Info,
     SSMTNode_Result_Output
 )
@@ -115,9 +106,6 @@ class SSMTNodeCategory(NodeCategory):
         return context.space_data.tree_type == 'SSMTBlueprintTreeType'
 
 node_categories = [
-    SSMTNodeCategory("SSMT_EVENTS", "Events", items=[
-        NodeItem("SSMTNode_Event_Start"),
-    ]),
     SSMTNodeCategory("SSMT_DATA", "Data", items=[
         NodeItem("SSMTNode_Object_Info"),
     ]),

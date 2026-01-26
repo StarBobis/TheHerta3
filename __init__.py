@@ -8,8 +8,8 @@ from .ui import ui_panel_sword
 from .ui import ui_panel_export
 from .ui import ui_panel_import
 from .ui import ui_panel_fast_texture
-from .ui import ui_shader_window
-from .blueprint import blueprint as blueprint_system
+from .ui import ui_window_blueprint
+from .blueprint import node as blueprint_system
 
 # 自动更新功能
 from . import addon_updater_ops
@@ -134,13 +134,13 @@ def register():
     ui_panel_export.register()
     ui_panel_import.register()
     ui_panel_fast_texture.register()
-    ui_shader_window.register()
+    ui_window_blueprint.register()
     blueprint_system.register()
 
 
 def unregister():
     blueprint_system.unregister()
-    ui_shader_window.unregister()
+    ui_window_blueprint.unregister()
     ui_panel_fast_texture.unregister()
     ui_panel_import.unregister()
     ui_panel_export.unregister()

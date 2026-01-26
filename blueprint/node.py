@@ -51,17 +51,7 @@ class SSMTNode_Event_Start(SSMTNodeBase):
     def init(self, context):
         self.outputs.new('SSMTSocketFlow', "Next")
 
-# 示例节点：打印日志节点
-class SSMTNode_Action_Print(SSMTNodeBase):
-    '''Print Log'''
-    bl_idname = 'SSMTNode_Action_Print'
-    bl_label = 'Print Log'
-    bl_icon = 'INFO'
 
-    def init(self, context):
-        self.inputs.new('SSMTSocketFlow', "Prev")
-        self.inputs.new('NodeSocketString', "Message").default_value = "Hello World"
-        self.outputs.new('SSMTSocketFlow', "Next")
 
 # 对象信息节点
 class SSMTNode_Object_Info(SSMTNodeBase):
@@ -114,7 +104,6 @@ classes = (
     SSMTSocketObject,
     SSMTBlueprintTree,
     SSMTNode_Event_Start,
-    SSMTNode_Action_Print,
     SSMTNode_Object_Info,
     SSMTNode_Result_Output
 )
@@ -129,9 +118,6 @@ node_categories = [
     SSMTNodeCategory("SSMT_EVENTS", "Events", items=[
         NodeItem("SSMTNode_Event_Start"),
     ]),
-    SSMTNodeCategory("SSMT_ACTIONS", "Actions", items=[
-        NodeItem("SSMTNode_Action_Print"),
-    ]),
     SSMTNodeCategory("SSMT_DATA", "Data", items=[
         NodeItem("SSMTNode_Object_Info"),
     ]),
@@ -140,6 +126,9 @@ node_categories = [
     ]),
 ]
 
+
+# 注册与注销函数，在大型Blender插件开发中，不能在最外面的__init__.py中直接注册
+# 否则会导致__init__.py过于臃肿，不利于维护，所以在各自的模块中定义register和unregister函数
 def register():
     for cls in classes:
         try:

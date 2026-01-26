@@ -57,16 +57,16 @@ class BluePrintModel:
             self.draw_ib__component_count_list__dict[draw_ib] = component_count_list
 
     def parse_current_node(self, current_node:bpy.types.Node, chain_key_list:list[M_Key]):
-        '''
-        这个是递归方法，就好像BranchModel中的递归一样
-
-        解析当前节点，获取其连接的所有节点的信息,分类进行解析
-        '''
+        
         
         for unknown_node in BlueprintExportHelper.get_connected_nodes(current_node):
             self.parse_single_node(unknown_node, chain_key_list)
 
     def parse_single_node(self, unknown_node:bpy.types.Node, chain_key_list:list[M_Key]):
+        '''
+        这个是递归方法
+        解析当前节点，获取其连接的所有节点的信息,分类进行解析
+        '''
 
         if unknown_node.bl_idname == "SSMTNode_Object_Group":
             # 如果是单纯的分组节点，则不进行任何处理直接传递下去
@@ -214,7 +214,6 @@ class BluePrintModel:
     
 
     def get_buffered_obj_data_model_list_by_draw_ib_and_game_type(self,draw_ib:str,d3d11_game_type:D3D11GameType):
-        # print("BranchModel.get_buffered_obj_data_model_list_by_draw_ib_and_game_type()")
         '''
         调用这个方法的时候才转换Buffer，不调用的话不转换
         (1) 读取obj的category_buffer

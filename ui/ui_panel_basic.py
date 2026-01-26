@@ -54,9 +54,7 @@ class PanelBasicInformation(bpy.types.Panel):
         # 导入 ib vb fmt格式文件
         layout.operator("import_mesh.migoto_raw_buffers_mmt",icon='IMPORT')
 
-        # 一键导入当前工作空间
-        layout.operator("ssmt.import_all_from_workspace_v3",icon='IMPORT')
-        # import_all_from_workspace_blueprint
+        # 一键导入当前工作空间为蓝图架构
         layout.operator("ssmt.import_all_from_workspace_blueprint",icon='IMPORT')
 
         if GlobalConfig.logic_name == LogicName.WWMI or GlobalConfig.logic_name == LogicName.WuWa:

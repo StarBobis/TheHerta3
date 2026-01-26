@@ -16,7 +16,8 @@ from ..base.m_draw_indexed import M_DrawIndexed
 from ..config.main_config import *
 from ..config.import_config import ImportConfig
 
-from .branch_model import BranchModel
+from ..blueprint.blueprint_model import BluePrintModel
+
 from ..helper.buffer_export_helper import BufferExportHelper
 
 class DrawIBModel:
@@ -29,7 +30,7 @@ class DrawIBModel:
 
 
     # 通过default_factory让每个类的实例的变量分割开来，不再共享类的静态变量
-    def __init__(self, draw_ib:str, branch_model:BranchModel):
+    def __init__(self, draw_ib:str, branch_model:BluePrintModel):
         # (1) 读取工作空间下的Config.json来设置当前DrawIB的别名
         draw_ib_alias_name_dict:dict[str,str] = ConfigUtils.get_draw_ib_alias_name_dict()
         self.draw_ib:str = draw_ib

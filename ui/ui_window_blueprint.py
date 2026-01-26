@@ -47,21 +47,9 @@ class THEHERTA3_OT_OpenPersistentBlueprint(bpy.types.Operator):
                         
         return {'FINISHED'}
 
-class THEHERTA3_PT_ShaderWindow(bpy.types.Panel):
-    bl_label = TR.translate("蓝图工具")
-    bl_idname = "THEHERTA3_PT_ShaderWindow"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_category = 'TheHerta3'
-
-    def draw(self, context):
-        layout = self.layout
-        layout.operator("theherta3.open_persistent_blueprint", icon='NODETREE')
 
 def register():
     bpy.utils.register_class(THEHERTA3_OT_OpenPersistentBlueprint)
-    bpy.utils.register_class(THEHERTA3_PT_ShaderWindow)
 
 def unregister():
-    bpy.utils.unregister_class(THEHERTA3_PT_ShaderWindow)
     bpy.utils.unregister_class(THEHERTA3_OT_OpenPersistentBlueprint)

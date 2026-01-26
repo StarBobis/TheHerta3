@@ -5,7 +5,8 @@ from .m_ini_builder import *
 from ..utils.json_utils import JsonUtils
 from ..config.main_config import GlobalConfig,LogicName
 from ..config.properties_generate_mod import Properties_GenerateMod
-from .branch_model import M_GlobalKeyCounter
+from ..base.m_global_key_counter import M_GlobalKeyCounter
+
 from .draw_ib_model import DrawIBModel
 from ..base.m_key import M_Key
 from ..base.obj_data_model import ObjDataModel

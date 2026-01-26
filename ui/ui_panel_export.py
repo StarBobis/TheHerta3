@@ -9,7 +9,8 @@ from ..utils.command_utils import CommandUtils
 from ..utils.collection_utils import CollectionUtils
 
 from ..config.main_config import GlobalConfig, LogicName
-from ..common.branch_model import M_GlobalKeyCounter
+from ..base.m_global_key_counter import M_GlobalKeyCounter
+
 
 from ..games.himi import ModModelHIMI
 from ..games.gimi import ModModelGIMI
@@ -51,93 +52,6 @@ class SSMTSelectGenerateModFolder(bpy.types.Operator):
         return {'RUNNING_MODAL'}
 
 
-
-
-class SSMTGenerateMod(bpy.types.Operator):
-    bl_idname = "ssmt.generate_mod"
-    bl_label = TR.translate("生成Mod")
-    bl_description = "一键导出当前工作空间集合中的Mod，隐藏显示的模型不会被导出，隐藏的DrawIB为名称的集合不会被导出。使用前确保取消隐藏所有要导出的模型以及集合"
-    bl_options = {'REGISTER'}
-
-    def execute(self, context):
-        TimerUtils.Start("GenerateMod Mod")
-
-        M_GlobalKeyCounter.initialize()
-
-        # 先校验当前选中的工作空间是不是一个有效的工作空间集合
-        if not context.scene.active_workspace_collection:
-            self.report({'ERROR'},"请先在下拉列表中选择一个工作空间集合用于生成Mod")
-            return {'FINISHED'}
-        workspace_collection = context.scene.active_workspace_collection
-        result = CollectionUtils.is_valid_ssmt_workspace_collection_v2(workspace_collection)
-        if result != "":
-            self.report({'ERROR'},result)
-            return {'FINISHED'}
-    
-        # 调用对应游戏的生成Mod逻辑
-        if GlobalConfig.logic_name == LogicName.WWMI or GlobalConfig.logic_name == LogicName.WuWa:
-            migoto_mod_model = ModModelWWMI(workspace_collection=workspace_collection)
-            migoto_mod_model.generate_unreal_vs_config_ini()
-        elif GlobalConfig.logic_name == LogicName.YYSLS:
-            migoto_mod_model = ModModelYYSLS(workspace_collection=workspace_collection)
-            migoto_mod_model.generate_unity_vs_config_ini()
-
-        elif GlobalConfig.logic_name == LogicName.CTXMC or GlobalConfig.logic_name == LogicName.IdentityV2 or GlobalConfig.logic_name == LogicName.NierR:
-            migoto_mod_model = ModModelIdentityV(workspace_collection=workspace_collection)
-
-            migoto_mod_model.generate_unity_vs_config_ini()
-        
-        # 老米四件套
-        elif GlobalConfig.logic_name == LogicName.HIMI:
-            migoto_mod_model = ModModelHIMI(workspace_collection=workspace_collection)
-            migoto_mod_model.generate_unity_vs_config_ini()
-        elif GlobalConfig.logic_name == LogicName.GIMI:
-            migoto_mod_model = ModModelGIMI(workspace_collection=workspace_collection)
-            migoto_mod_model.generate_unity_vs_config_ini()
-        elif GlobalConfig.logic_name == LogicName.SRMI:
-            migoto_mod_model = ModModelSRMI(workspace_collection=workspace_collection)
-            migoto_mod_model.generate_unity_cs_config_ini()
-        elif GlobalConfig.logic_name == LogicName.ZZMI:
-            migoto_mod_model = ModModelZZMI(workspace_collection=workspace_collection)
-            migoto_mod_model.generate_unity_vs_config_ini()
-
-        # UnityVS
-        elif GlobalConfig.logic_name == LogicName.UnityVS:
-            migoto_mod_model = ModModelUnity(workspace_collection=workspace_collection)
-            migoto_mod_model.generate_unity_vs_config_ini()
-
-        # AILIMIT
-        elif GlobalConfig.logic_name == LogicName.AILIMIT or GlobalConfig.logic_name == LogicName.UnityCS:
-            migoto_mod_model = ModModelUnity(workspace_collection=workspace_collection)
-            migoto_mod_model.generate_unity_cs_config_ini()
-        
-        # UnityCPU 例如少女前线2、虚空之眼等等，绝大部分手游都是UnityCPU
-        elif GlobalConfig.logic_name == LogicName.UnityCPU:
-            migoto_mod_model = ModModelUnity(workspace_collection=workspace_collection)
-            migoto_mod_model.generate_unity_vs_config_ini()
-        
-        # UnityCSM
-        elif GlobalConfig.logic_name == LogicName.UnityCSM:
-            migoto_mod_model = ModModelUnity(workspace_collection=workspace_collection)
-            migoto_mod_model.generate_unity_cs_config_ini()
-
-        # 尘白禁区、卡拉比丘
-        elif GlobalConfig.logic_name == LogicName.SnowBreak:
-            migoto_mod_model = ModModelSnowBreak(workspace_collection=workspace_collection)
-            migoto_mod_model.generate_ini()
-        else:
-            self.report({'ERROR'},"当前逻辑暂不支持生成Mod")
-            return {'FINISHED'}
-        
-
-        self.report({'INFO'},TR.translate("Generate Mod Success!"))
-        TimerUtils.End("GenerateMod Mod")
-
-        CommandUtils.OpenGeneratedModFolder()
-        return {'FINISHED'}
-
-
-
 class PanelGenerateModConfig(bpy.types.Panel):
     '''
     生成Mod面板
@@ -152,12 +66,8 @@ class PanelGenerateModConfig(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
 
-        # TODO 如果当前没有选中任何工作空间集合，就提示用户先选中一个，在面板上显示一个提示
-        if not context.scene.active_workspace_collection:
-            layout.label(text="请先在下拉列表中选择一个工作空间集合用于生成Mod", icon='ERROR')
-        layout.prop_search(context.scene, "active_workspace_collection", bpy.data, "collections", text="")
-        
-        layout.operator("ssmt.generate_mod",icon='EXPORT')
+        # SSMT蓝图
+        layout.operator("theherta3.open_persistent_blueprint", icon='NODETREE')
 
         # generate_mod_blueprint
         layout.operator("ssmt.generate_mod_blueprint",icon='EXPORT')
@@ -214,41 +124,11 @@ class PanelGenerateModConfig(bpy.types.Panel):
             layout.operator("ssmt.select_generate_mod_folder", icon='FILE_FOLDER')
         
 
-# 注册一个用于选择工作空间集合的属性，带poll函数过滤红色集合
-def poll_red_collection(self, object):
-    return object.color_tag == 'COLOR_01'
-
-addon_keymaps = []
-
 def register():
     bpy.utils.register_class(SSMTSelectGenerateModFolder)
     bpy.utils.register_class(PanelGenerateModConfig)
-    bpy.utils.register_class(SSMTGenerateMod)
-
-    bpy.types.Scene.active_workspace_collection = bpy.props.PointerProperty(
-        type=bpy.types.Collection,
-        name="Generate Mod Workspace Collection",
-        description="生成Mod之前必须在这里选择一个当前工作空间为名称的集合",
-        poll=poll_red_collection
-    )
-    
-    # 添加快捷键
-    wm = bpy.context.window_manager
-    kc = wm.keyconfigs.addon
-    if kc:
-        km = kc.keymaps.new(name='3D View', space_type='VIEW_3D')
-        kmi = km.keymap_items.new(SSMTGenerateMod.bl_idname, 
-                                    type='O', value='PRESS',
-                                    ctrl=True, alt=True, shift=False)
-        addon_keymaps.append((km, kmi))
 
 def unregister():
-    for km, kmi in addon_keymaps:
-        km.keymap_items.remove(kmi)
-    addon_keymaps.clear()
-
-    bpy.utils.unregister_class(SSMTGenerateMod)
     bpy.utils.unregister_class(PanelGenerateModConfig)
     bpy.utils.unregister_class(SSMTSelectGenerateModFolder)
 
-    del bpy.types.Scene.active_workspace_collection

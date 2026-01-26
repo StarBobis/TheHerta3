@@ -27,7 +27,7 @@ from ..config.import_config import ImportConfig
 
 from .obj_element_model import ObjElementModel
 from .obj_buffer_model_wwmi import ObjBufferModelWWMI
-from .branch_model import BranchModel
+from ..blueprint.blueprint_model import BluePrintModel
 from ..helper.buffer_export_helper import BufferExportHelper
 
 from ..helper.obj_buffer_helper import ObjBufferHelper
@@ -43,7 +43,7 @@ class DrawIBModelWWMI:
     (例如WWMI就有自己的一套DrawIBModel) 
     '''
     draw_ib: str
-    branch_model: BranchModel
+    branch_model: BluePrintModel
 
     draw_ib_alias: str = field(init=False)
     # ImportConfig 需要传入 draw_ib 参数，因此不要在这里用 default_factory 自动实例化

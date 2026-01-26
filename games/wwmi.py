@@ -5,7 +5,9 @@ import math
 from ..config.import_config import GlobalConfig
 from ..common.draw_ib_model_wwmi import DrawIBModelWWMI
 
-from ..common.branch_model import BranchModel,M_GlobalKeyCounter
+from ..base.m_global_key_counter import M_GlobalKeyCounter
+from ..blueprint.blueprint_model import BluePrintModel
+
 from ..common.m_ini_builder import M_IniBuilder,M_IniSection,M_SectionType
 from ..config.properties_generate_mod import Properties_GenerateMod
 from ..common.m_ini_helper import M_IniHelper,M_IniHelper
@@ -14,9 +16,9 @@ from ..config.properties_wwmi import Properties_WWMI
 
 
 class ModModelWWMI:
-    def __init__(self,workspace_collection:bpy.types.Collection):
+    def __init__(self):
         # (1) 统计全局分支模型
-        self.branch_model = BranchModel(workspace_collection=workspace_collection)
+        self.branch_model = BluePrintModel()
 
         # (2) 抽象每个DrawIB为DrawIBModel
         self.drawib_drawibmodel_dict:dict[str,DrawIBModelWWMI] = {}

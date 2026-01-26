@@ -19,11 +19,6 @@ def ImprotFromWorkSpaceSSMTBlueprint(self, context):
     workspace_collection = CollectionUtils.create_new_collection(collection_name=GlobalConfig.workspacename,color_tag=CollectionColor.Red)
     bpy.context.scene.collection.children.link(workspace_collection)
 
-
-    # 如果此时生成Mod的下拉列表没有任何集合，就让那个下拉列表选中这个集合
-    if not context.scene.active_workspace_collection:
-        context.scene.active_workspace_collection = workspace_collection
-
     # 获取当前工作空间文件夹路径
     current_workspace_folder = GlobalConfig.path_workspace_folder()
 
@@ -193,7 +188,7 @@ def ImprotFromWorkSpaceSSMTBlueprint(self, context):
                         node.component = name_parts[1]
                     else:
                         node.component = "1"
-                        
+
                     node.alias_name = alias_name
                         
                     node.label = obj.name # 设置节点标题方便识别
@@ -261,11 +256,30 @@ class SSMTImportAllFromCurrentWorkSpaceBlueprint(bpy.types.Operator):
             TimerUtils.End("ImportFromWorkSpaceBlueprint")
         
         return {'FINISHED'}
+    
+addon_keymaps = []
 
 def register():
     bpy.utils.register_class(SSMTImportAllFromCurrentWorkSpaceBlueprint)
 
+    # 添加快捷键
+    wm = bpy.context.window_manager
+    kc = wm.keyconfigs.addon
+    if kc:
+        km = kc.keymaps.new(name='3D View', space_type='VIEW_3D')
+        kmi = km.keymap_items.new(SSMTImportAllFromCurrentWorkSpaceBlueprint.bl_idname, 
+                                    type='I', value='PRESS', 
+                                    ctrl=True, alt=True, shift=False)
+        addon_keymaps.append((km, kmi))
+
+
 def unregister():
+    # 移除快捷键
+    for km, kmi in addon_keymaps:
+        km.keymap_items.remove(kmi)
+    addon_keymaps.clear()
+
     bpy.utils.unregister_class(SSMTImportAllFromCurrentWorkSpaceBlueprint)
 
-    
+
+

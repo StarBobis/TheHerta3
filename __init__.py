@@ -7,10 +7,11 @@ from .ui import ui_panel_sword
 from .ui import ui_panel_export
 from .ui import ui_panel_import
 from .ui import ui_panel_fast_texture
-from .blueprint import blueprint_node
+from .blueprint import blueprint_node_obj
 from .blueprint import blueprint_import
 from .blueprint import blueprint_export
 from .blueprint import blueprint_node_base
+from .blueprint import blueprint_node_menu
 
 # 自动更新功能
 from . import addon_updater_ops
@@ -137,17 +138,19 @@ def register():
     ui_panel_fast_texture.register()
 
     # 蓝图系统
-    blueprint_node.register()
+    blueprint_node_obj.register()
     blueprint_import.register()
     blueprint_export.register()
+    blueprint_node_menu.register()
 
 
 
 def unregister():
     # 蓝图系统
-    blueprint_node.unregister()
+    blueprint_node_obj.unregister()
     blueprint_import.unregister()
     blueprint_export.unregister()
+    blueprint_node_menu.unregister()
 
     blueprint_node_base.unregister()
     ui_panel_fast_texture.unregister()

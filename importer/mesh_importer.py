@@ -205,7 +205,7 @@ class MeshImporter:
             obj.scale = (0.01,0.01,0.01)
         
         print("导入模型完成: " + mbf.fmt_file.logic_name)
-        if mbf.fmt_file.logic_name == LogicName.ZZMI:
+        if mbf.fmt_file.logic_name == LogicName.ZZMI or mbf.fmt_file.logic_name == LogicName.UnityCS:
 
             # ZZMI需要清零旋转角度
             obj.rotation_euler[0] = 0

@@ -2,20 +2,6 @@ import bpy
 
 
 class Properties_GenerateMod(bpy.types.PropertyGroup):
-    generate_shapekey_slider_buffer: bpy.props.BoolProperty(
-        name="形态键体型调节技术",
-        description="勾选后，所有以Shape.开头的形态键将被处理为体型调节形态键，生成Mod时会生成对应的体型调节数据，未勾选则不会生成形态键相关数据，适用于高阶Mod作者制作滑块儿面板Mod",
-        default=False
-    ) # type: ignore
-    
-    @classmethod
-    def generate_shapekey_slider_buffer(cls):
-        '''
-        bpy.context.scene.properties_generate_mod.generate_shapekey_slider_buffer
-        '''
-        return bpy.context.scene.properties_generate_mod.generate_shapekey_slider_buffer
-
-
 
     open_mod_folder_after_generate_mod: bpy.props.BoolProperty(
         name="生成后打开Mod文件夹",

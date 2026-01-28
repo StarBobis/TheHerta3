@@ -18,6 +18,8 @@ from ..helper.obj_buffer_helper import ObjBufferHelper
 from ..utils.obj_utils import ObjUtils
 from .shapekey_buffer_model import ShapeKeyBufferModel
 
+from ..blueprint.blueprint_export_helper import BlueprintExportHelper
+
 @dataclass
 class ObjBufferModelUnity:
     obj:bpy.types.Object
@@ -62,7 +64,11 @@ class ObjBufferModelUnity:
         self.shape_key_buffer_dict = {}
 
         # 开关判断：是否生成 ShapeKey Slider Buffer
-        is_generate_shapekey = Properties_GenerateMod.generate_shapekey_slider_buffer()
+        is_generate_shapekey = False
+
+        shapekeyname_mkey_dict = BlueprintExportHelper.get_current_shapekeyname_mkey_dict()
+        if len(shapekeyname_mkey_dict.keys()) > 0:
+            is_generate_shapekey = True
         
         if is_generate_shapekey and self.obj.data.shape_keys and self.obj.data.shape_keys.key_blocks:
             # 获取所有以 Shape. 开头的形态键

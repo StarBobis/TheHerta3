@@ -254,6 +254,19 @@ class M_IniHelper:
         
         ini_builder.append_section(resource_section)
 
+        # [Key]
+        # 用于按下测试的Key，也可以作为在没有面板时的按键切换形态键快捷键
+        key_section = M_IniSection(M_SectionType.Key)
+        for shapekey_name, m_key in shapekeyname_mkey_dict.items():
+            if m_key.initialize_vk_str != "":
+                key_section.append("[Key_ShapeKey_" +shapekey_name + "]")
+                key_section.append("key = " + m_key.initialize_vk_str)
+                key_section.append("type = cycle")
+                key_section.append(m_key.key_name + " = 0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1")
+                key_section.new_line()
+
+        ini_builder.append_section(key_section)
+
 
 
     @classmethod

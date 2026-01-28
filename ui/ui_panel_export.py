@@ -80,9 +80,6 @@ class PanelGenerateModConfig(bpy.types.Panel):
             layout.prop(context.scene.properties_wwmi, "ignore_muted_shape_keys")
             layout.prop(context.scene.properties_wwmi, "apply_all_modifiers")
             layout.prop(context.scene.properties_wwmi, "export_add_missing_vertex_groups")
-        else:
-            # generate_shapekey_slider_buffer
-            layout.prop(context.scene.properties_generate_mod, "generate_shapekey_slider_buffer")
 
         layout.prop(context.scene.properties_generate_mod, 
                     "forbid_auto_texture_ini",text="禁止自动贴图流程")

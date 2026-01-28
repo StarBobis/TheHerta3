@@ -337,9 +337,12 @@ class DrawIBModel:
             # 需要把Shape.hlsl复制到Mod文件夹下面的res文件夹下面
             res_path = os.path.join(GlobalConfig.path_generate_mod_folder(),"res\\")
 
+            if not os.path.exists(res_path):
+                os.makedirs(res_path)
+
             # 获取当前文件(draw_ib_model.py)所在目录下的res文件夹
             current_res_path = os.path.join(os.path.dirname(__file__), "res")
-            shape_hlsl_path = os.path.join(current_res_path, "Shape.hlsl")
+            shape_hlsl_path = os.path.join(current_res_path, "Shapes.hlsl")
             
             if os.path.exists(shape_hlsl_path):
                 if not os.path.exists(res_path):

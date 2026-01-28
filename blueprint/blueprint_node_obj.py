@@ -7,6 +7,36 @@ from ..config.main_config import GlobalConfig
 from .blueprint_node_base import SSMTBlueprintTree, SSMTNodeBase
 
 
+class SSMT_OT_SelectNodeObject(bpy.types.Operator):
+    '''Select this object in 3D View'''
+    bl_idname = "ssmt.select_node_object"
+    bl_label = "Select Object"
+    
+    object_name: bpy.props.StringProperty() # type: ignore
+
+    def execute(self, context):
+        obj_name = self.object_name
+        if not obj_name:
+            return {'CANCELLED'}
+        
+        obj = bpy.data.objects.get(obj_name)
+        if obj:
+            # Deselect all
+            try:
+                bpy.ops.object.select_all(action='DESELECT')
+            except:
+                pass
+                
+            # Select target
+            obj.select_set(True)
+            context.view_layer.objects.active = obj
+            self.report({'INFO'}, f"Selected: {obj_name}")
+        else:
+            self.report({'WARNING'}, f"Object '{obj_name}' not found")
+        
+        return {'FINISHED'}
+
+
 # 对象信息节点
 class SSMTNode_Object_Info(SSMTNodeBase):
     '''Object Info Node'''
@@ -45,8 +75,14 @@ class SSMTNode_Object_Info(SSMTNodeBase):
         # 1. 物体选择：使用 prop_search 让用户可以像属性面板一样搜索选择
         # 但是 node 本身没有 PointerProperty 指向 ID 类型的简单 GUI 支持，
         # 所以通常是用 search 指向 bpy.data.objects
-        layout.prop_search(self, "object_name", bpy.data, "objects", text="", icon='OBJECT_DATA')
         
+        row = layout.row(align=True)
+        row.prop_search(self, "object_name", bpy.data, "objects", text="", icon='OBJECT_DATA')
+        
+        if self.object_name:
+            op = row.operator("ssmt.select_node_object", text="", icon='RESTRICT_SELECT_OFF')
+            op.object_name = self.object_name
+
         # 2. DrawIB 和 Component 自由修改
         layout.prop(self, "draw_ib", text="DrawIB")
         layout.prop(self, "component", text="Component")
@@ -286,7 +322,10 @@ class SSMT_OT_View_Group_Objects(bpy.types.Operator):
 
         return {'FINISHED'}
 
+
+
 classes = (
+    SSMT_OT_SelectNodeObject,
     SSMT_OT_View_Group_Objects,
     SSMTNode_Object_Info,
     SSMTNode_Object_Group,

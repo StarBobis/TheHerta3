@@ -228,6 +228,13 @@ class SSMTNode_Result_Output(SSMTNodeBase):
         self.inputs.new('SSMTSocketObject', "Group 1")
         self.width = 200
 
+    def draw_buttons(self, context, layout):
+        op = layout.operator("ssmt.generate_mod_blueprint", text="Generate Mod", icon='EXPORT')
+        # 如果当前上下文存在 node_tree (即该节点所在的树)，则传入该树的名称
+        # id_data 对于节点来说通常是 NodeTree
+        if hasattr(self, "id_data") and self.id_data:
+             op.node_tree_name = self.id_data.name
+
     def update(self):
         # 类似 Join Geometry 的逻辑：总保持最后一个为空，方便连接新的
         if self.inputs and self.inputs[-1].is_linked:
@@ -237,6 +244,7 @@ class SSMTNode_Result_Output(SSMTNodeBase):
         # 保留 inputs[0](至少一个Group)
         if len(self.inputs) > 1 and not self.inputs[-1].is_linked and not self.inputs[-2].is_linked:
              self.inputs.remove(self.inputs[-1])
+
 
 
 

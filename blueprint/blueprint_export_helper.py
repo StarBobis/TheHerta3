@@ -4,13 +4,16 @@ from ..base.m_key import M_Key
 
 class BlueprintExportHelper:
 
-
-    
+    # 静态变量，用于强行指定当前要导出的蓝图树（如果在Operator中指定了树名）
+    # 如果为 None，则使用默认的 GlobalConfig.workspacename 逻辑
+    forced_target_tree_name = None
     
     @staticmethod
     def get_current_blueprint_tree():
         """获取当前工作空间对应的蓝图树"""
-        tree_name = f"Mod_{GlobalConfig.workspacename}" if GlobalConfig.workspacename else "SSMT_Mod_Logic"
+        if BlueprintExportHelper.forced_target_tree_name:
+           tree_name = BlueprintExportHelper.forced_target_tree_name
+        
         tree = bpy.data.node_groups.get(tree_name)
         return tree
 

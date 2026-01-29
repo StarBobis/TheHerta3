@@ -69,8 +69,6 @@ class PanelGenerateModConfig(bpy.types.Panel):
         # SSMT蓝图
         layout.operator("theherta3.open_persistent_blueprint", icon='NODETREE')
 
-        # generate_mod_blueprint
-        layout.operator("ssmt.generate_mod_blueprint",icon='EXPORT')
 
         # 根据当前游戏类型判断哪些应该显示哪些不显示。
         # 因为UnrealVS显然无法支持这里所有的特性，每个游戏只能支持一部分特性。

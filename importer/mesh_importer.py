@@ -119,22 +119,59 @@ class MeshImporter:
                     print("终末地压缩法线处理(AEMI Packed Normals)")
                     
                     # Ensure we work with uint32
-                    if data.ndim == 1:
-                        raw = data.astype(numpy.uint32)
-                    else:
-                        raw = data[:, 0].astype(numpy.uint32)
+                    raw = data
+                    if raw.dtype != numpy.uint32:
+                        raw = raw.view(numpy.uint32)
+
+                    if raw.ndim > 1:
+                        raw = raw[:, 0]
                     
-                    mask = 0x3FF 
+                    # AEMI Octahedral Normal Encoding (10-10-Packed)
+                    # Based on HLSL logic
+                    
+                    mask_10bit = 0x3FF
+                    x_raw = raw & mask_10bit
+                    y_raw = (raw >> 10) & mask_10bit
+                    
+                    # Sign extension 10-bit -> signed int
+                    x_int = x_raw.astype(numpy.int32)
+                    y_int = y_raw.astype(numpy.int32)
+                    
+                    x_int = numpy.where(x_int >= 512, x_int - 1024, x_int)
+                    y_int = numpy.where(y_int >= 512, y_int - 1024, y_int)
 
-                    # Decode components (10-10-10-2)
-                    x = raw & mask
-                    y = (raw >> 10) & mask
-                    z = (raw >> 20) & mask
+                    # Normalize to roughly [-1, 1]
+                    scale = 0.00195694715 
+                    x = x_int * scale
+                    y = y_int * scale
 
-                    # Normalize [0, 1023] -> [-1, 1]
-                    nx = (x / 1023.0) * 2.0 - 1.0
-                    ny = (y / 1023.0) * 2.0 - 1.0
-                    nz = (z / 1023.0) * 2.0 - 1.0
+                    # Reconstruct Z
+                    # r3.z = 1 - abs(x) - abs(y)
+                    z = 1.0 - numpy.abs(x) - numpy.abs(y)
+
+                    # Octahedral mapping wrap
+                    # if z < 0:
+                    #   x = (1 - abs(y)) * sign(x)
+                    #   y = (1 - abs(x)) * sign(y)
+                    t = z < 0
+                    
+                    sign_x = numpy.where(x_int >= 0, 1.0, -1.0)
+                    sign_y = numpy.where(y_int >= 0, 1.0, -1.0)
+                    
+                    wrapped_x = (1.0 - numpy.abs(y)) * sign_x
+                    wrapped_y = (1.0 - numpy.abs(x)) * sign_y
+                    
+                    nx = numpy.where(t, wrapped_x, x)
+                    ny = numpy.where(t, wrapped_y, y)
+                    nz = z
+
+                    # Normalize vector
+                    norm = numpy.sqrt(nx*nx + ny*ny + nz*nz)
+                    norm = numpy.where(norm == 0, 1.0, norm) # Avoid div by zero
+
+                    nx /= norm
+                    ny /= norm
+                    nz /= norm
 
                     normals = numpy.column_stack((nx, ny, nz)).tolist()
 

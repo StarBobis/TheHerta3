@@ -196,6 +196,13 @@ class BluePrintModel:
             # 每遇到一个obj，都把这个obj加入顺序渲染列表
             self.ordered_draw_obj_data_model_list.append(obj_model)
 
+        elif unknown_node.bl_idname == "SSMTNode_DataType":
+            # 数据类型节点：用于覆盖哈希值和指定数据类型
+            # 这个节点只是传递，不创建 obj_model，但会保存其配置信息
+            # 实际的哈希值覆盖会在生成 INI 时应用
+            # 需要继续递归解析后面的节点
+            self.parse_current_node(unknown_node, chain_key_list)
+
 
 
     def get_obj_data_model_list_by_draw_ib(self,draw_ib:str):

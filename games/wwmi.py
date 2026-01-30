@@ -620,13 +620,15 @@ class ModModelWWMI:
 
     def add_resource_buffer(self,ini_builder:M_IniBuilder,draw_ib_model:DrawIBModelWWMI):
         resource_buffer_section = M_IniSection(M_SectionType.ResourceBuffer)
+        
+        buffer_folder_name = GlobalConfig.get_buffer_folder_name()
 
         # IndexBuffer
         resource_buffer_section.append("[ResourceIndexBuffer]")
         resource_buffer_section.append("type = Buffer")
         resource_buffer_section.append("format = DXGI_FORMAT_R32_UINT")
         resource_buffer_section.append("stride = 12")
-        resource_buffer_section.append("filename = Buffer/" + draw_ib_model.draw_ib + "-" + "Component1.buf")
+        resource_buffer_section.append("filename = " + buffer_folder_name + "/" + draw_ib_model.draw_ib + "-" + "Component1.buf")
         resource_buffer_section.new_line()
 
         # CategoryBuffer
@@ -647,7 +649,7 @@ class ModModelWWMI:
                 resource_buffer_section.append("format = DXGI_FORMAT_R16G16_FLOAT")
             
             resource_buffer_section.append("stride = " + str(category_stride))
-            resource_buffer_section.append("filename = Buffer/" + draw_ib_model.draw_ib + "-" + category_name + ".buf")
+            resource_buffer_section.append("filename = " + buffer_folder_name + "/" + draw_ib_model.draw_ib + "-" + category_name + ".buf")
             resource_buffer_section.new_line()
 
             if category_name == "Blend" and draw_ib_model.blend_remap:
@@ -656,7 +658,7 @@ class ModModelWWMI:
                 resource_buffer_section.append("type = Buffer")
                 resource_buffer_section.append("format = DXGI_FORMAT_R8_UINT")
                 # resource_buffer_section.append("stride = 1")
-                resource_buffer_section.append("filename = Buffer/" + draw_ib_model.draw_ib + "-" + category_name + ".buf")
+                resource_buffer_section.append("filename = " + buffer_folder_name + "/" + draw_ib_model.draw_ib + "-" + category_name + ".buf")
                 resource_buffer_section.new_line()
         
         # print("BLENDREMAP: " + str(draw_ib_model.blend_remap))
@@ -666,19 +668,19 @@ class ModModelWWMI:
             resource_buffer_section.append("[ResourceBlendRemapVertexVGBuffer]")
             resource_buffer_section.append("type = Buffer")
             resource_buffer_section.append("format = DXGI_FORMAT_R16_UINT")
-            resource_buffer_section.append("filename = Buffer/" + draw_ib_model.draw_ib + "-" + "BlendRemapVertexVG.buf")
+            resource_buffer_section.append("filename = " + buffer_folder_name + "/" + draw_ib_model.draw_ib + "-" + "BlendRemapVertexVG.buf")
             resource_buffer_section.new_line()
 
             resource_buffer_section.append("[ResourceBlendRemapForwardBuffer]")
             resource_buffer_section.append("type = Buffer")
             resource_buffer_section.append("format = DXGI_FORMAT_R16_UINT")
-            resource_buffer_section.append("filename = Buffer/" + draw_ib_model.draw_ib + "-" + "BlendRemapForward.buf")
+            resource_buffer_section.append("filename = " + buffer_folder_name + "/" + draw_ib_model.draw_ib + "-" + "BlendRemapForward.buf")
             resource_buffer_section.new_line()
 
             resource_buffer_section.append("[ResourceBlendRemapReverseBuffer]")
             resource_buffer_section.append("type = Buffer")
             resource_buffer_section.append("format = DXGI_FORMAT_R16_UINT")
-            resource_buffer_section.append("filename = Buffer/" + draw_ib_model.draw_ib + "-" + "BlendRemapReverse.buf")
+            resource_buffer_section.append("filename = " + buffer_folder_name + "/" + draw_ib_model.draw_ib + "-" + "BlendRemapReverse.buf")
             resource_buffer_section.new_line()
 
 
@@ -687,21 +689,21 @@ class ModModelWWMI:
         resource_buffer_section.append("type = Buffer")
         resource_buffer_section.append("format = DXGI_FORMAT_R32G32B32A32_UINT")
         resource_buffer_section.append("stride = 16")
-        resource_buffer_section.append("filename = Buffer/" + draw_ib_model.draw_ib + "-" + "ShapeKeyOffset.buf")
+        resource_buffer_section.append("filename = " + buffer_folder_name + "/" + draw_ib_model.draw_ib + "-" + "ShapeKeyOffset.buf")
         resource_buffer_section.new_line()
 
         resource_buffer_section.append("[ResourceShapeKeyVertexIdBuffer]")
         resource_buffer_section.append("type = Buffer")
         resource_buffer_section.append("format = DXGI_FORMAT_R32_UINT")
         resource_buffer_section.append("stride = 4")
-        resource_buffer_section.append("filename = Buffer/" + draw_ib_model.draw_ib + "-" + "ShapeKeyVertexId.buf")
+        resource_buffer_section.append("filename = " + buffer_folder_name + "/" + draw_ib_model.draw_ib + "-" + "ShapeKeyVertexId.buf")
         resource_buffer_section.new_line()
 
         resource_buffer_section.append("[ResourceShapeKeyVertexOffsetBuffer]")
         resource_buffer_section.append("type = Buffer")
         resource_buffer_section.append("format = DXGI_FORMAT_R16_FLOAT")
         resource_buffer_section.append("stride = 2")
-        resource_buffer_section.append("filename = Buffer/" + draw_ib_model.draw_ib + "-" + "ShapeKeyVertexOffset.buf")
+        resource_buffer_section.append("filename = " + buffer_folder_name + "/" + draw_ib_model.draw_ib + "-" + "ShapeKeyVertexOffset.buf")
         resource_buffer_section.new_line()
 
         ini_builder.append_section(resource_buffer_section)

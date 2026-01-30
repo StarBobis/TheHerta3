@@ -33,6 +33,9 @@ class BluePrintModel:
         # 全局obj_model列表，主要是obj_model里装了每个obj的生效条件。
         self.ordered_draw_obj_data_model_list:list[ObjDataModel] = [] 
 
+        # 多文件导出节点列表
+        self.multifile_export_nodes:list = [] 
+
         # 从输出节点开始递归解析所有的节点
         tree = BlueprintExportHelper.get_current_blueprint_tree()
         output_node = BlueprintExportHelper.get_node_from_bl_idname(tree, 'SSMTNode_Result_Output')
@@ -196,6 +199,28 @@ class BluePrintModel:
             # 每遇到一个obj，都把这个obj加入顺序渲染列表
             self.ordered_draw_obj_data_model_list.append(obj_model)
 
+        elif unknown_node.bl_idname == "SSMTNode_MultiFile_Export":
+            # 多文件导出节点：创建一个占位的 ObjDataModel
+            # 实际的物体信息会在导出时根据当前导出次数动态更新
+            # 先使用第一个物体的信息创建占位对象
+            if len(unknown_node.object_list) > 0:
+                first_item = unknown_node.object_list[0]
+                obj_model = ObjDataModel(obj_name=first_item.object_name)
+                obj_model.draw_ib = first_item.draw_ib
+                obj_model.component_count = int(first_item.component) if first_item.component else 0
+                obj_model.obj_alias_name = first_item.alias_name
+                obj_model.condition = M_Condition(work_key_list=copy.deepcopy(chain_key_list))
+                obj_model.is_multifile_export = True
+                obj_model.multifile_node_name = unknown_node.name
+                
+                # 每遇到一个obj，都把这个obj加入顺序渲染列表
+                self.ordered_draw_obj_data_model_list.append(obj_model)
+            
+            # 存储节点引用以便后续使用
+            self.multifile_export_nodes.append(unknown_node)
+            # 需要继续递归解析后面的节点
+            self.parse_current_node(unknown_node, chain_key_list)
+
         elif unknown_node.bl_idname == "SSMTNode_DataType":
             # 数据类型节点：用于覆盖哈希值和指定数据类型
             # 这个节点只是传递，不创建 obj_model，但会保存其配置信息
@@ -244,6 +269,34 @@ class BluePrintModel:
             if obj_model.draw_ib != draw_ib:
                 continue
 
+            # 检查是否是多文件导出节点创建的对象
+            if hasattr(obj_model, 'is_multifile_export') and obj_model.is_multifile_export:
+                # 通过节点名称查找节点对象
+                tree = BlueprintExportHelper.get_current_blueprint_tree()
+                multifile_node = tree.nodes.get(obj_model.multifile_node_name) if tree else None
+                
+                if not multifile_node:
+                    LOG.warning(f"无法找到多文件导出节点: {obj_model.multifile_node_name}")
+                    continue
+                
+                # 获取当前导出次数对应的物体信息
+                export_index = BlueprintExportHelper.get_current_export_index() - 1
+                multifile_object_info = multifile_node.get_current_object_info(export_index)
+                
+                if multifile_object_info:
+                    # 更新物体信息
+                    obj_name = multifile_object_info["object_name"]
+                    obj_model.obj_name = obj_name
+                    obj_model.draw_ib = multifile_object_info["draw_ib"]
+                    obj_model.component_count = int(multifile_object_info["component"]) if multifile_object_info["component"] else 0
+                    obj_model.obj_alias_name = multifile_object_info["alias_name"]
+                    
+                    LOG.info(f"多文件导出节点更新物体: {obj_name} (第{export_index + 1}次导出)")
+                else:
+                    # 如果没有对应的物体信息，跳过这个对象
+                    LOG.warning(f"多文件导出节点在第{export_index + 1}次导出时没有对应的物体，跳过")
+                    continue
+            
             obj_name = obj_model.obj_name
 
             obj = bpy.data.objects[obj_name]

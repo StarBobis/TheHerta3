@@ -8,6 +8,13 @@ class BlueprintExportHelper:
     # 如果为 None，则使用默认的 GlobalConfig.workspacename 逻辑
     forced_target_tree_name = None
     
+    # 静态变量，用于多文件导出功能
+    # 存储当前导出次数（从1开始）
+    current_export_index = 1
+    
+    # 静态变量，存储最大导出次数
+    max_export_count = 1
+    
     @staticmethod
     def get_current_blueprint_tree():
         """获取当前工作空间对应的蓝图树"""
@@ -187,6 +194,93 @@ class BlueprintExportHelper:
             datatype_nodes.extend(BlueprintExportHelper._find_datatype_nodes_connected_to_output(connected_node, visited))
         
         return datatype_nodes
+    
+    @staticmethod
+    def get_multifile_export_nodes():
+        """获取当前蓝图中所有多文件导出节点"""
+        tree = BlueprintExportHelper.get_current_blueprint_tree()
+        if not tree:
+            return []
+        
+        multifile_nodes = []
+        for node in tree.nodes:
+            if node.bl_idname == 'SSMTNode_MultiFile_Export':
+                multifile_nodes.append(node)
+        
+        return multifile_nodes
+    
+    @staticmethod
+    def calculate_max_export_count():
+        """计算最大导出次数"""
+        multifile_nodes = BlueprintExportHelper.get_multifile_export_nodes()
+        
+        if not multifile_nodes:
+            return 1
+        
+        max_count = 1
+        for node in multifile_nodes:
+            object_count = len(node.object_list)
+            if object_count > max_count:
+                max_count = object_count
+        
+        BlueprintExportHelper.max_export_count = max_count
+        return max_count
+    
+    @staticmethod
+    def reset_export_state():
+        """重置导出状态"""
+        BlueprintExportHelper.current_export_index = 1
+        BlueprintExportHelper.max_export_count = 1
+    
+    @staticmethod
+    def increment_export_index():
+        """增加导出次数"""
+        BlueprintExportHelper.current_export_index += 1
+    
+    @staticmethod
+    def get_current_export_index():
+        """获取当前导出次数"""
+        return BlueprintExportHelper.current_export_index
+    
+    @staticmethod
+    def get_max_export_count():
+        """获取最大导出次数"""
+        return BlueprintExportHelper.max_export_count
+    
+    @staticmethod
+    def update_multifile_export_nodes(export_index):
+        """更新多文件导出节点的当前物体信息"""
+        from ..blueprint.blueprint_model import BluePrintModel
+        
+        multifile_nodes = BlueprintExportHelper.get_multifile_export_nodes()
+        if not multifile_nodes:
+            return
+        
+        for node in multifile_nodes:
+            node.current_export_index = export_index
+    
+    @staticmethod
+    def update_export_path(export_index):
+        """更新导出路径（Buffer01、Buffer02等）"""
+        from ..config.main_config import GlobalConfig
+        
+        multifile_nodes = BlueprintExportHelper.get_multifile_export_nodes()
+        has_multifile_nodes = len(multifile_nodes) > 0
+        
+        if has_multifile_nodes:
+            GlobalConfig.buffer_folder_suffix = f"{export_index:02d}"
+        else:
+            GlobalConfig.buffer_folder_suffix = ""
+        
+        print(f"更新Buffer文件夹后缀: Buffer{GlobalConfig.buffer_folder_suffix}")
+    
+    @staticmethod
+    def restore_export_path():
+        """恢复原始导出路径"""
+        from ..config.main_config import GlobalConfig
+        
+        GlobalConfig.buffer_folder_suffix = ""
+        print(f"恢复Buffer文件夹后缀: Buffer")
 
 
 

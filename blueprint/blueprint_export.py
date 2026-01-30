@@ -86,86 +86,108 @@ class SSMTGenerateModBlueprint(bpy.types.Operator):
             BlueprintExportHelper.forced_target_tree_name = None
 
         try:
-            M_GlobalKeyCounter.initialize()
-
-            # 调用对应游戏的生成Mod逻辑
-            if GlobalConfig.logic_name == LogicName.WWMI or GlobalConfig.logic_name == LogicName.WuWa:
-                from ..games.wwmi import ModModelWWMI
-                migoto_mod_model = ModModelWWMI()
-                migoto_mod_model.generate_unreal_vs_config_ini()
-            elif GlobalConfig.logic_name == LogicName.YYSLS:
-                from ..games.yysls import ModModelYYSLS
-                migoto_mod_model = ModModelYYSLS()
-                migoto_mod_model.generate_unity_vs_config_ini()
-
-            elif GlobalConfig.logic_name == LogicName.CTXMC or GlobalConfig.logic_name == LogicName.IdentityV2 or GlobalConfig.logic_name == LogicName.NierR:
-                from ..games.identityv import ModModelIdentityV
-                migoto_mod_model = ModModelIdentityV()
-
-                migoto_mod_model.generate_unity_vs_config_ini()
+            # 计算最大导出次数
+            max_export_count = BlueprintExportHelper.calculate_max_export_count()
+            print(f"最大导出次数: {max_export_count}")
             
-            # 老米四件套
-            elif GlobalConfig.logic_name == LogicName.HIMI:
-                from ..games.himi import ModModelHIMI
-                migoto_mod_model = ModModelHIMI()
-                migoto_mod_model.generate_unity_vs_config_ini()
-            elif GlobalConfig.logic_name == LogicName.GIMI:
-                from ..games.gimi import ModModelGIMI
-                migoto_mod_model = ModModelGIMI()
-                migoto_mod_model.generate_unity_vs_config_ini()
-            elif GlobalConfig.logic_name == LogicName.SRMI:
-                from ..games.srmi import ModModelSRMI
-                migoto_mod_model = ModModelSRMI()
-                migoto_mod_model.generate_unity_cs_config_ini()
-            elif GlobalConfig.logic_name == LogicName.ZZMI:
-                from ..games.zzmi import ModModelZZMI
-                migoto_mod_model = ModModelZZMI()
-                migoto_mod_model.generate_unity_vs_config_ini()
-
-            # 终末地测试AEMI，到时候老外的NDMI发布之后，再开一套新逻辑兼容他们的，咱们用这个先测试
-            elif GlobalConfig.logic_name == LogicName.AEMI:
-                from ..games.yysls import ModModelYYSLS
-                migoto_mod_model = ModModelYYSLS()
-                migoto_mod_model.generate_unity_vs_config_ini()
-            # UnityVS
-            elif GlobalConfig.logic_name == LogicName.UnityVS:
-                from ..games.unity import ModModelUnity
-                migoto_mod_model = ModModelUnity()
-                migoto_mod_model.generate_unity_vs_config_ini()
-
-            # AILIMIT
-            elif GlobalConfig.logic_name == LogicName.AILIMIT or GlobalConfig.logic_name == LogicName.UnityCS:
-                from ..games.unity import ModModelUnity
-                migoto_mod_model = ModModelUnity()
-                migoto_mod_model.generate_unity_cs_config_ini()
+            # 重置导出状态
+            BlueprintExportHelper.reset_export_state()
             
-            # UnityCPU 例如少女前线2、虚空之眼等等，绝大部分手游都是UnityCPU
-            elif GlobalConfig.logic_name == LogicName.UnityCPU:
-                from ..games.unity import ModModelUnity
-                migoto_mod_model = ModModelUnity()
-                migoto_mod_model.generate_unity_vs_config_ini()
+            # 循环执行多次导出
+            for export_index in range(1, max_export_count + 1):
+                BlueprintExportHelper.current_export_index = export_index
+                print(f"开始第 {export_index}/{max_export_count} 次导出")
+                
+                # 更新多文件导出节点的当前物体
+                BlueprintExportHelper.update_multifile_export_nodes(export_index)
+                
+                # 更新导出路径
+                BlueprintExportHelper.update_export_path(export_index)
+                
+                M_GlobalKeyCounter.initialize()
+
+                # 调用对应游戏的生成Mod逻辑
+                if GlobalConfig.logic_name == LogicName.WWMI or GlobalConfig.logic_name == LogicName.WuWa:
+                    from ..games.wwmi import ModModelWWMI
+                    migoto_mod_model = ModModelWWMI()
+                    migoto_mod_model.generate_unreal_vs_config_ini()
+                elif GlobalConfig.logic_name == LogicName.YYSLS:
+                    from ..games.yysls import ModModelYYSLS
+                    migoto_mod_model = ModModelYYSLS()
+                    migoto_mod_model.generate_unity_vs_config_ini()
+
+                elif GlobalConfig.logic_name == LogicName.CTXMC or GlobalConfig.logic_name == LogicName.IdentityV2 or GlobalConfig.logic_name == LogicName.NierR:
+                    from ..games.identityv import ModModelIdentityV
+                    migoto_mod_model = ModModelIdentityV()
+
+                    migoto_mod_model.generate_unity_vs_config_ini()
+                
+                # 老米四件套
+                elif GlobalConfig.logic_name == LogicName.HIMI:
+                    from ..games.himi import ModModelHIMI
+                    migoto_mod_model = ModModelHIMI()
+                    migoto_mod_model.generate_unity_vs_config_ini()
+                elif GlobalConfig.logic_name == LogicName.GIMI:
+                    from ..games.gimi import ModModelGIMI
+                    migoto_mod_model = ModModelGIMI()
+                    migoto_mod_model.generate_unity_vs_config_ini()
+                elif GlobalConfig.logic_name == LogicName.SRMI:
+                    from ..games.srmi import ModModelSRMI
+                    migoto_mod_model = ModModelSRMI()
+                    migoto_mod_model.generate_unity_cs_config_ini()
+                elif GlobalConfig.logic_name == LogicName.ZZMI:
+                    from ..games.zzmi import ModModelZZMI
+                    migoto_mod_model = ModModelZZMI()
+                    migoto_mod_model.generate_unity_vs_config_ini()
+
+                # 终末地测试AEMI，到时候老外的NDMI发布之后，再开一套新逻辑兼容他们的，咱们用这个先测试
+                elif GlobalConfig.logic_name == LogicName.AEMI:
+                    from ..games.yysls import ModModelYYSLS
+                    migoto_mod_model = ModModelYYSLS()
+                    migoto_mod_model.generate_unity_vs_config_ini()
+                # UnityVS
+                elif GlobalConfig.logic_name == LogicName.UnityVS:
+                    from ..games.unity import ModModelUnity
+                    migoto_mod_model = ModModelUnity()
+                    migoto_mod_model.generate_unity_vs_config_ini()
+
+                # AILIMIT
+                elif GlobalConfig.logic_name == LogicName.AILIMIT or GlobalConfig.logic_name == LogicName.UnityCS:
+                    from ..games.unity import ModModelUnity
+                    migoto_mod_model = ModModelUnity()
+                    migoto_mod_model.generate_unity_cs_config_ini()
+                
+                # UnityCPU 例如少女前线2、虚空之眼等等，绝大部分手游都是UnityCPU
+                elif GlobalConfig.logic_name == LogicName.UnityCPU:
+                    from ..games.unity import ModModelUnity
+                    migoto_mod_model = ModModelUnity()
+                    migoto_mod_model.generate_unity_vs_config_ini()
+                
+                # UnityCSM
+                elif GlobalConfig.logic_name == LogicName.UnityCSM:
+                    from ..games.unity import ModModelUnity
+                    migoto_mod_model = ModModelUnity()
+                    migoto_mod_model.generate_unity_cs_config_ini()
+
+                # 尘白禁区、卡拉比丘
+                elif GlobalConfig.logic_name == LogicName.SnowBreak:
+                    from ..games.snowbreak import ModModelSnowBreak
+                    migoto_mod_model = ModModelSnowBreak()
+                    migoto_mod_model.generate_ini()
+                else:
+                    self.report({'ERROR'},"当前逻辑暂不支持生成Mod")
+                    return {'FINISHED'}
+
+                print(f"第 {export_index}/{max_export_count} 次导出完成")
             
-            # UnityCSM
-            elif GlobalConfig.logic_name == LogicName.UnityCSM:
-                from ..games.unity import ModModelUnity
-                migoto_mod_model = ModModelUnity()
-                migoto_mod_model.generate_unity_cs_config_ini()
-
-            # 尘白禁区、卡拉比丘
-            elif GlobalConfig.logic_name == LogicName.SnowBreak:
-                from ..games.snowbreak import ModModelSnowBreak
-                migoto_mod_model = ModModelSnowBreak()
-                migoto_mod_model.generate_ini()
-            else:
-                self.report({'ERROR'},"当前逻辑暂不支持生成Mod")
-                return {'FINISHED'}
-
             self.report({'INFO'},TR.translate("Generate Mod Success!"))
             TimerUtils.End("GenerateMod Mod")
             CommandUtils.OpenGeneratedModFolder()
         finally:
             # Clean up override
             BlueprintExportHelper.forced_target_tree_name = None
+            # 恢复原始导出路径
+            BlueprintExportHelper.restore_export_path()
             
         return {'FINISHED'}
     

@@ -237,12 +237,14 @@ class ModModelZZMI:
 
     def add_resource_buffer_sections(self,ini_builder,draw_ib_model:DrawIBModel):
         resource_buffer_section = M_IniSection(M_SectionType.ResourceBuffer)
+        
+        buffer_folder_name = GlobalConfig.get_buffer_folder_name()
 
         for category_name in draw_ib_model.d3d11GameType.OrderedCategoryNameList:
             resource_buffer_section.append("[Resource" + draw_ib_model.draw_ib + category_name + "]")
             resource_buffer_section.append("type = Buffer")
             resource_buffer_section.append("stride = " + str(draw_ib_model.d3d11GameType.CategoryStrideDict[category_name]))
-            resource_buffer_section.append("filename = Buffer/" + draw_ib_model.draw_ib + "-" + category_name + ".buf")
+            resource_buffer_section.append("filename = " + buffer_folder_name + "/" + draw_ib_model.draw_ib + "-" + category_name + ".buf")
             resource_buffer_section.new_line()
         
         for partname, ib_filename in draw_ib_model.PartName_IBBufferFileName_Dict.items():
@@ -250,7 +252,7 @@ class ModModelZZMI:
             resource_buffer_section.append("[" + ib_resource_name + "]")
             resource_buffer_section.append("type = Buffer")
             resource_buffer_section.append("format = DXGI_FORMAT_R32_UINT")
-            resource_buffer_section.append("filename = Buffer/" + ib_filename)
+            resource_buffer_section.append("filename = " + buffer_folder_name + "/" + ib_filename)
             resource_buffer_section.new_line()
 
         ini_builder.append_section(resource_buffer_section)

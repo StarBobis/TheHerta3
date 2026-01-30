@@ -429,6 +429,7 @@ class SSMT_MT_NodeMenu_Advanced(bpy.types.Menu):
     def draw(self, context):
         layout = self.layout
         layout.operator("node.add_node", text="数据类型", icon='FILE_TEXT').type = "SSMTNode_DataType"
+        layout.operator("node.add_node", text="多文件导出", icon='FILE_FOLDER').type = "SSMTNode_MultiFile_Export"
 
 
 class SSMT_MT_NodeMenu_Preset(bpy.types.Menu):

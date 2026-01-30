@@ -227,7 +227,8 @@ class ModModelYYSLS:
 
             resource_vb_section.append("stride = " + str(draw_ib_model.d3d11GameType.CategoryStrideDict[category_name]))
             
-            resource_vb_section.append("filename = Buffer/" + draw_ib_model.draw_ib + "-" + category_name + ".buf")
+            buffer_folder_name = GlobalConfig.get_buffer_folder_name()
+            resource_vb_section.append("filename = " + buffer_folder_name + "/" + draw_ib_model.draw_ib + "-" + category_name + ".buf")
             # resource_vb_section.append(";VertexCount: " + str(draw_ib_model.draw_number))
             resource_vb_section.new_line()
         
@@ -242,7 +243,8 @@ class ModModelYYSLS:
             resource_vb_section.append("[" + ib_resource_name + "]")
             resource_vb_section.append("type = Buffer")
             resource_vb_section.append("format = DXGI_FORMAT_R32_UINT")
-            resource_vb_section.append("filename = Buffer/" + ib_filename)
+            buffer_folder_name = GlobalConfig.get_buffer_folder_name()
+            resource_vb_section.append("filename = " + buffer_folder_name + "/" + ib_filename)
             resource_vb_section.new_line()
 
         ini_builder.append_section(resource_vb_section)

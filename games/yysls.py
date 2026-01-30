@@ -205,6 +205,9 @@ class ModModelYYSLS:
             vertexlimit_section.append("override_vertex_count = " + str(draw_ib_model.draw_number))
             vertexlimit_section.append("uav_byte_stride = 4")
 
+            if len(draw_ib_model.key_name_mkey_dict.keys()) != 0:
+                vertexlimit_section.append("$active" + str(M_GlobalKeyCounter.generated_mod_number) + " = 1")
+
             vertexlimit_section.new_line()
 
             commandlist_ini_builder.append_section(vertexlimit_section)

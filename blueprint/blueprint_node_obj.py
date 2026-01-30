@@ -37,6 +37,41 @@ class SSMT_OT_SelectNodeObject(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class SSMT_OT_AdsorbNodeObject(bpy.types.Operator):
+    '''Adsorb currently selected object to this node'''
+    bl_idname = "ssmt.adsorb_node_object"
+    bl_label = "Adsorb Object"
+    bl_description = "将当前选中的物体吸附到此节点"
+    
+    node_name: bpy.props.StringProperty() # type: ignore
+
+    def execute(self, context):
+        # 优先获取激活物体，如果没有则获取第一个选中物体
+        obj = context.active_object
+        if not obj and context.selected_objects:
+            obj = context.selected_objects[0]
+        
+        if not obj:
+            self.report({'WARNING'}, "请先在3D视图中选中一个物体")
+            return {'CANCELLED'}
+        
+        # 获取当前节点树
+        tree = getattr(context.space_data, "edit_tree", None) or getattr(context.space_data, "node_tree", None)
+        
+        if not tree:
+             self.report({'WARNING'}, "无法获取节点树上下文")
+             return {'CANCELLED'}
+        
+        node = tree.nodes.get(self.node_name)
+        if node:
+            node.object_name = obj.name
+            self.report({'INFO'}, f"已吸附物体: {obj.name}")
+        else:
+            self.report({'WARNING'}, f"无法找到节点: {self.node_name}")
+        
+        return {'FINISHED'}
+
+
 # 对象信息节点
 class SSMTNode_Object_Info(SSMTNodeBase):
     '''Object Info Node'''
@@ -77,8 +112,15 @@ class SSMTNode_Object_Info(SSMTNodeBase):
         # 所以通常是用 search 指向 bpy.data.objects
         
         row = layout.row(align=True)
+        
+
+
         row.prop_search(self, "object_name", bpy.data, "objects", text="", icon='OBJECT_DATA')
         
+        # 吸附按钮
+        op_ad = row.operator("ssmt.adsorb_node_object", text="", icon='EYEDROPPER')
+        op_ad.node_name = self.name
+
         if self.object_name:
             op = row.operator("ssmt.select_node_object", text="", icon='RESTRICT_SELECT_OFF')
             op.object_name = self.object_name
@@ -383,6 +425,7 @@ class SSMT_OT_View_Group_Objects(bpy.types.Operator):
 
 classes = (
     SSMT_OT_SelectNodeObject,
+    SSMT_OT_AdsorbNodeObject,
     SSMT_OT_View_Group_Objects,
     SSMTNode_Object_Info,
     SSMTNode_Object_Group,

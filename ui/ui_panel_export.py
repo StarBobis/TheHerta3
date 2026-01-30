@@ -11,18 +11,6 @@ from ..utils.collection_utils import CollectionUtils
 from ..config.main_config import GlobalConfig, LogicName
 from ..base.m_global_key_counter import M_GlobalKeyCounter
 
-
-from ..games.himi import ModModelHIMI
-from ..games.gimi import ModModelGIMI
-
-from ..games.zzmi import ModModelZZMI
-
-from ..games.unity import ModModelUnity
-from ..games.srmi import ModModelSRMI
-from ..games.identityv import ModModelIdentityV
-from ..games.yysls import ModModelYYSLS
-from ..games.wwmi import ModModelWWMI
-from ..games.snowbreak import ModModelSnowBreak
 from ..config.properties_generate_mod import Properties_GenerateMod
 
 
@@ -60,4 +48,3 @@ def register():
 
 def unregister():
     bpy.utils.unregister_class(SSMTSelectGenerateModFolder)
-

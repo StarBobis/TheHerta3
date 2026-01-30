@@ -181,7 +181,7 @@ class SSMT_OT_AddCommonKeySwitches(bpy.types.Operator):
 
 
 class SSMT_OT_BatchConnectNodes(bpy.types.Operator):
-    '''批量连接选中的节点：多数节点连接到少数节点'''
+    '''批量连接选中的节点：支持一对一或多对一连接'''
     bl_idname = "ssmt.batch_connect_nodes"
     bl_label = "批量连接节点"
     bl_options = {'REGISTER', 'UNDO'}
@@ -210,19 +210,138 @@ class SSMT_OT_BatchConnectNodes(bpy.types.Operator):
             node_type = node.bl_idname
             type_count_dict[node_type] = type_count_dict.get(node_type, 0) + 1
 
-        # 检查是否只有两种类型
-        if len(type_count_dict) != 2:
-            self.report({'ERROR'}, f"所选节点必须仅包含两种类型，当前有 {len(type_count_dict)} 种类型")
+        # 检查节点类型数量
+        if len(type_count_dict) > 2:
+            self.report({'ERROR'}, f"所选节点类型过多（{len(type_count_dict)}种），请选择1-2种类型的节点")
             return {'CANCELLED'}
 
-        # 识别多数节点和少数节点
-        type_items = list(type_count_dict.items())
-        if type_items[0][1] >= type_items[1][1]:
+        # 判断连接模式
+        if len(type_count_dict) == 1:
+            # 只有一种类型：无法连接
+            self.report({'ERROR'}, "所选节点类型相同，无法连接")
+            return {'CANCELLED'}
+        else:
+            # 两种类型：判断是一对一还是多对一
+            type_items = list(type_count_dict.items())
+            type_items.sort(key=lambda x: x[1], reverse=True)  # 按数量降序排序
+            
             majority_type, majority_count = type_items[0]
             minority_type, minority_count = type_items[1]
+
+            if majority_count == minority_count:
+                # 数量相等：一对一连接
+                return self.connect_one_to_one(selected_nodes, type_count_dict, node_tree)
+            else:
+                # 数量不等：多对一连接
+                return self.connect_many_to_one(selected_nodes, type_count_dict, node_tree)
+
+    def connect_one_to_one(self, selected_nodes, type_count_dict, node_tree):
+        """一对一连接模式"""
+        # 获取两种类型
+        type_items = list(type_count_dict.items())
+        type_a, count_a = type_items[0]
+        type_b, count_b = type_items[1]
+
+        # 按类型分组
+        nodes_a = [node for node in selected_nodes if node.bl_idname == type_a]
+        nodes_b = [node for node in selected_nodes if node.bl_idname == type_b]
+
+        # 判断哪个是源节点（有输出端口），哪个是目标节点（有输入端口）
+        if len(nodes_a[0].outputs) > 0 and len(nodes_a[0].inputs) > 0:
+            # 类型A既有输入又有输出，需要判断类型B
+            if len(nodes_b[0].outputs) > 0:
+                # 类型B也有输出，无法确定连接方向
+                self.report({'ERROR'}, "无法确定连接方向，请手动连接")
+                return {'CANCELLED'}
+            else:
+                # 类型B只有输入，A->B
+                source_nodes, target_nodes = nodes_a, nodes_b
+        elif len(nodes_b[0].outputs) > 0 and len(nodes_b[0].inputs) > 0:
+            # 类型B既有输入又有输出，类型A只有输出
+            if len(nodes_a[0].inputs) > 0:
+                # 类型A也有输入，无法确定
+                self.report({'ERROR'}, "无法确定连接方向，请手动连接")
+                return {'CANCELLED'}
+            else:
+                # 类型A只有输出，B->A
+                source_nodes, target_nodes = nodes_b, nodes_a
+        elif len(nodes_a[0].outputs) > 0:
+            # 类型A只有输出
+            source_nodes, target_nodes = nodes_a, nodes_b
+        elif len(nodes_b[0].outputs) > 0:
+            # 类型B只有输出
+            source_nodes, target_nodes = nodes_b, nodes_a
         else:
-            majority_type, majority_count = type_items[1]
-            minority_type, minority_count = type_items[0]
+            self.report({'ERROR'}, "所选节点都没有输出端口，无法连接")
+            return {'CANCELLED'}
+
+        # 检查目标节点是否有输入端口
+        for node in target_nodes:
+            if len(node.inputs) == 0:
+                self.report({'ERROR'}, f"节点 '{node.name}' 没有输入端口")
+                return {'CANCELLED'}
+
+        # 清除现有连接
+        for source_node in source_nodes:
+            for output in source_node.outputs:
+                for link in output.links:
+                    if link.to_node in target_nodes:
+                        node_tree.links.remove(link)
+
+        # 按位置排序（从左到右，从上到下）
+        source_nodes.sort(key=lambda n: (n.location.x, -n.location.y))
+        target_nodes.sort(key=lambda n: (n.location.x, -n.location.y))
+
+        # 一对一连接
+        connection_info = []
+        for i in range(min(len(source_nodes), len(target_nodes))):
+            source_node = source_nodes[i]
+            target_node = target_nodes[i]
+
+            # 查找可用的输入端口
+            available_input = None
+            for input_socket in target_node.inputs:
+                if not input_socket.is_linked:
+                    available_input = input_socket
+                    break
+
+            # 如果没有可用的输入端口，尝试创建新端口
+            if not available_input:
+                try:
+                    if hasattr(target_node, 'update'):
+                        target_node.inputs.new('SSMTSocketObject', f"Input {len(target_node.inputs) + 1}")
+                        available_input = target_node.inputs[-1]
+                except:
+                    self.report({'WARNING'}, f"节点 '{target_node.name}' 没有可用的输入端口")
+                    continue
+
+            # 创建连接
+            if available_input and len(source_node.outputs) > 0:
+                node_tree.links.new(source_node.outputs[0], available_input)
+                connection_info.append(f"{source_node.name} -> {target_node.name}")
+
+        # 触发节点更新
+        for node in target_nodes:
+            if hasattr(node, 'update'):
+                node.update()
+
+        # 提供反馈
+        total_connections = len(connection_info)
+        self.report({'INFO'}, f"一对一连接：成功连接 {total_connections} 个节点对")
+        print(f"一对一连接完成，共创建 {total_connections} 个连接:")
+        for info in connection_info:
+            print(f"  {info}")
+
+        return {'FINISHED'}
+
+    def connect_many_to_one(self, selected_nodes, type_count_dict, node_tree):
+        """多对一连接模式"""
+        # 识别多数节点和少数节点
+        type_items = list(type_count_dict.items())
+        type_items.sort(key=lambda x: x[1], reverse=True)
+        
+        majority_type, majority_count = type_items[0]
+        minority_type, minority_count = type_items[1]
 
         # 按类型分组节点
         majority_nodes = [node for node in selected_nodes if node.bl_idname == majority_type]
@@ -296,12 +415,20 @@ class SSMT_OT_BatchConnectNodes(bpy.types.Operator):
 
         # 提供成功反馈
         total_connections = len(connection_info)
-        self.report({'INFO'}, f"成功连接 {total_connections} 个节点对")
-        print(f"批量连接完成，共创建 {total_connections} 个连接:")
+        self.report({'INFO'}, f"多对一连接：成功连接 {total_connections} 个节点对")
+        print(f"多对一连接完成，共创建 {total_connections} 个连接:")
         for info in connection_info:
             print(f"  {info}")
 
         return {'FINISHED'}
+
+
+class SSMT_MT_NodeMenu_Advanced(bpy.types.Menu):
+    bl_label = "高级功能"
+    
+    def draw(self, context):
+        layout = self.layout
+        layout.operator("node.add_node", text="数据类型", icon='FILE_TEXT').type = "SSMTNode_DataType"
 
 
 class SSMT_MT_NodeMenu_Preset(bpy.types.Menu):
@@ -319,6 +446,7 @@ def draw_node_add_menu(self, context):
         return
     
     layout = self.layout
+    layout.menu("SSMT_MT_NodeMenu_Advanced", text="高级功能", icon='OPTIONS')
     layout.menu("SSMT_MT_NodeMenu_Preset", text="预设", icon='PRESET')
     layout.menu("SSMT_MT_NodeMenu_Branch", text="分支", icon='RNA')
     layout.menu("SSMT_MT_NodeMenu_ShapeKey", text="形态键", icon='SHAPEKEY_DATA')
@@ -352,6 +480,7 @@ def register():
     bpy.utils.register_class(SSMT_OT_AddCommonKeySwitches)
     bpy.utils.register_class(SSMT_OT_BatchConnectNodes)
     bpy.utils.register_class(SSMT_MT_ObjectContextMenuSub)
+    bpy.utils.register_class(SSMT_MT_NodeMenu_Advanced)
     bpy.utils.register_class(SSMT_MT_NodeMenu_Preset)
     bpy.utils.register_class(SSMT_MT_NodeMenu_Branch)
     bpy.utils.register_class(SSMT_MT_NodeMenu_ShapeKey)
@@ -370,6 +499,7 @@ def unregister():
     bpy.utils.unregister_class(SSMT_MT_NodeMenu_ShapeKey)
     bpy.utils.unregister_class(SSMT_MT_NodeMenu_Branch)
     bpy.utils.unregister_class(SSMT_MT_NodeMenu_Preset)
+    bpy.utils.unregister_class(SSMT_MT_NodeMenu_Advanced)
     bpy.utils.unregister_class(SSMT_MT_ObjectContextMenuSub)
     bpy.utils.unregister_class(SSMT_OT_BatchConnectNodes)
     bpy.utils.unregister_class(SSMT_OT_AddCommonKeySwitches)

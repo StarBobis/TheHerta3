@@ -62,19 +62,60 @@ class ImportConfig:
         extract_gametype_folder_path = GlobalConfig.path_extract_gametype_folder(draw_ib=self.draw_ib,gametype_name=gametypename)
         self.extract_gametype_folder_path = extract_gametype_folder_path
         tmp_json_path = os.path.join(extract_gametype_folder_path,"tmp.json")
+        
+        # 检查是否存在数据类型节点，如果存在则使用数据类型节点指定的 tmp.json 文件
+        from ..blueprint.blueprint_export_helper import BlueprintExportHelper
+        datatype_node_info_list = BlueprintExportHelper.get_datatype_node_info()
+        
+        # 查找匹配当前 DrawIB 的数据类型节点
+        matched_datatype_node_info = None
+        if datatype_node_info_list:
+            for node_info in datatype_node_info_list:
+                node = node_info["node"]
+                if node.is_draw_ib_matched(self.draw_ib):
+                    matched_datatype_node_info = node_info
+                    print(f"找到匹配的数据类型节点，DrawIB: {self.draw_ib}, 节点: {node.name}")
+                    break
+        
         if os.path.exists(tmp_json_path):
-            self.d3d11GameType:D3D11GameType = D3D11GameType(tmp_json_path)
+            # 如果存在匹配的数据类型节点，则合并两个 tmp.json 文件
+            if matched_datatype_node_info and matched_datatype_node_info.get("tmp_json_path") and os.path.exists(matched_datatype_node_info["tmp_json_path"]):
+                import json
+                with open(tmp_json_path, 'r', encoding='utf-8') as f:
+                    base_tmp_json_dict = json.load(f)
+                with open(matched_datatype_node_info["tmp_json_path"], 'r', encoding='utf-8') as f:
+                    datatype_tmp_json_dict = json.load(f)
+                
+                # 使用数据类型节点的 D3D11ElementList 覆盖原始的
+                if "D3D11ElementList" in datatype_tmp_json_dict:
+                    base_tmp_json_dict["D3D11ElementList"] = datatype_tmp_json_dict["D3D11ElementList"]
+                    print(f"使用数据类型节点的 D3D11ElementList 覆盖原始配置")
+                
+                # 保存合并后的配置到临时文件
+                import tempfile
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
+                    json.dump(base_tmp_json_dict, f, indent=2, ensure_ascii=False)
+                    merged_tmp_json_path = f.name
+                
+                self.d3d11GameType:D3D11GameType = D3D11GameType(merged_tmp_json_path)
+                tmp_json_dict = base_tmp_json_dict
+                
+                # 删除临时文件
+                try:
+                    os.unlink(merged_tmp_json_path)
+                except:
+                    pass
+            else:
+                self.d3d11GameType:D3D11GameType = D3D11GameType(tmp_json_path)
+                tmp_json_dict = JsonUtils.LoadFromFile(tmp_json_path)
         else:
             raise Fatal("您还没有提取模型并一键导入当前工作空间内容，如果您是在Mod逆向后直接生成Mod，那么步骤是错误的，Mod逆向只是拿到模型文件，要生成Mod还需要从游戏中提取原模型以获取模型的Hash值等用于生成Mod的重要信息，随后在Blender中一键导入当前工作空间内容后，即可选中工作空间集合来生成Mod。\n可以理解为：Mod逆向只是拿到模型和贴图，后面的步骤就和Mod逆向没有关系了，全部需要走Mod制作的标准流程")
         
         '''
         读取tmp.json中的内容，后续会用于生成Mod的ini文件
         需要在确定了D3D11GameType之后再执行
+        注意：这里使用已经确定的 tmp_json_dict
         '''
-        extract_gametype_folder_path = GlobalConfig.path_extract_gametype_folder(draw_ib=self.draw_ib,gametype_name=self.d3d11GameType.GameTypeName)
-        tmp_json_path = os.path.join(extract_gametype_folder_path,"tmp.json")
-        tmp_json_dict = JsonUtils.LoadFromFile(tmp_json_path)
-
         self.category_hash_dict = tmp_json_dict["CategoryHash"]
         self.import_model_list = tmp_json_dict["ImportModelList"]
         self.match_first_index_list = tmp_json_dict["MatchFirstIndex"]

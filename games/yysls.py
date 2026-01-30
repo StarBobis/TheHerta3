@@ -173,6 +173,12 @@ class ModModelYYSLS:
                 texture_override_ib_section.append("endif")
                 texture_override_ib_section.new_line()
             
+            if len(self.branch_model.keyname_mkey_dict.keys()) != 0:
+                texture_override_ib_section.append("$active" + str(M_GlobalKeyCounter.generated_mod_number) + " = 1")
+                
+                if Properties_GenerateMod.generate_branch_mod_gui():
+                        texture_override_ib_section.append("$ActiveCharacter = 1")
+            
         config_ini_builder.append_section(texture_override_ib_section)
 
     def add_unity_vs_texture_override_vlr_section(self,config_ini_builder:M_IniBuilder,commandlist_ini_builder:M_IniBuilder,draw_ib_model:DrawIBModel):
@@ -205,11 +211,7 @@ class ModModelYYSLS:
             vertexlimit_section.append("override_vertex_count = " + str(draw_ib_model.draw_number))
             vertexlimit_section.append("uav_byte_stride = 4")
 
-            if len(self.branch_model.keyname_mkey_dict.keys()) != 0:
-                vertexlimit_section.append("$active" + str(M_GlobalKeyCounter.generated_mod_number) + " = 1")
-                
-                if Properties_GenerateMod.generate_branch_mod_gui():
-                        vertexlimit_section.append("$ActiveCharacter = 1")
+            
             vertexlimit_section.new_line()
 
             commandlist_ini_builder.append_section(vertexlimit_section)

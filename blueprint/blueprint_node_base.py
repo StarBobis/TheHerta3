@@ -55,6 +55,14 @@ class THEHERTA3_OT_OpenPersistentBlueprint(bpy.types.Operator):
             tree = bpy.data.node_groups.new(name=tree_name, type='SSMTBlueprintTreeType')
             tree.use_fake_user = True
         
+        # 1.5 检查是否存在已开启的窗口，如果存在则不再创建
+        for window in context.window_manager.windows:
+            for area in window.screen.areas:
+                if area.type == 'NODE_EDITOR':
+                    for space in area.spaces:
+                        if space.type == 'NODE_EDITOR' and space.node_tree == tree:
+                            return {'FINISHED'}
+
         # 2. 打开新窗口 (复制当前Context)
         old_windows = set(context.window_manager.windows)
         

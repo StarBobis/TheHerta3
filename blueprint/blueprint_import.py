@@ -146,7 +146,7 @@ def ImprotFromWorkSpaceSSMTBlueprint(self, context):
         # 3. 遍历导入的对象并创建对应节点
         current_x = 0
         current_y = 0
-        y_gap = 100 # 增加垂直间距
+        y_gap = 200 # 增加垂直间距
         
         count = 0
         
@@ -207,9 +207,6 @@ def ImprotFromWorkSpaceSSMTBlueprint(self, context):
                     current_y -= y_gap
                     min_y = min(min_y, current_y)
 
-                    if count % 5 == 0:
-                            current_y = 0
-                            current_x += 300
         
         # 4. 放置 Group 和 Output 节点
         # 计算垂直中心大致位置

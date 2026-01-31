@@ -12,7 +12,8 @@ class SSMT_OT_MultiFileExport_AddObject(bpy.types.Operator):
     bl_label = "添加物体"
     bl_description = "手动添加物体到列表"
     
-    node_name: bpy.props.StringProperty()
+    node_name: bpy.props.StringProperty() # type: ignore
+
     
     def execute(self, context):
         tree = getattr(context.space_data, "edit_tree", None) or getattr(context.space_data, "node_tree", None)
@@ -36,8 +37,8 @@ class SSMT_OT_MultiFileExport_RemoveObject(bpy.types.Operator):
     bl_label = "移除物体"
     bl_description = "从列表中移除物体"
     
-    node_name: bpy.props.StringProperty()
-    index: bpy.props.IntProperty()
+    node_name: bpy.props.StringProperty() # type: ignore
+    index: bpy.props.IntProperty() # type: ignore
     
     def execute(self, context):
         tree = getattr(context.space_data, "edit_tree", None) or getattr(context.space_data, "node_tree", None)
@@ -61,7 +62,7 @@ class SSMT_OT_MultiFileExport_ParseCollection(bpy.types.Operator):
     bl_label = "解析合集"
     bl_description = "解析合集中的所有物体（识别_001、_002等序列）"
     
-    node_name: bpy.props.StringProperty()
+    node_name: bpy.props.StringProperty() # type: ignore
     
     def execute(self, context):
         tree = getattr(context.space_data, "edit_tree", None) or getattr(context.space_data, "node_tree", None)
@@ -84,8 +85,8 @@ class SSMT_OT_MultiFileExport_MoveUp(bpy.types.Operator):
     bl_idname = "ssmt.multifile_export_move_up"
     bl_label = "上移"
     
-    node_name: bpy.props.StringProperty()
-    index: bpy.props.IntProperty()
+    node_name: bpy.props.StringProperty() # type: ignore
+    index: bpy.props.IntProperty() # type: ignore
     
     def execute(self, context):
         tree = getattr(context.space_data, "edit_tree", None) or getattr(context.space_data, "node_tree", None)
@@ -104,8 +105,8 @@ class SSMT_OT_MultiFileExport_MoveDown(bpy.types.Operator):
     bl_idname = "ssmt.multifile_export_move_down"
     bl_label = "下移"
     
-    node_name: bpy.props.StringProperty()
-    index: bpy.props.IntProperty()
+    node_name: bpy.props.StringProperty() # type: ignore
+    index: bpy.props.IntProperty() # type: ignore
     
     def execute(self, context):
         tree = getattr(context.space_data, "edit_tree", None) or getattr(context.space_data, "node_tree", None)
@@ -120,10 +121,10 @@ class SSMT_OT_MultiFileExport_MoveDown(bpy.types.Operator):
 
 
 class MultiFileExportObjectItem(bpy.types.PropertyGroup):
-    object_name: bpy.props.StringProperty(name="物体名称", default="")
-    draw_ib: bpy.props.StringProperty(name="DrawIB", default="")
-    component: bpy.props.StringProperty(name="Component", default="")
-    alias_name: bpy.props.StringProperty(name="别名", default="")
+    object_name: bpy.props.StringProperty(name="物体名称", default="") # type: ignore
+    draw_ib: bpy.props.StringProperty(name="DrawIB", default="") # type: ignore
+    component: bpy.props.StringProperty(name="Component", default="") # type: ignore
+    alias_name: bpy.props.StringProperty(name="别名", default="") # type: ignore
 
 
 class SSMTNode_MultiFile_Export(SSMTNodeBase):
@@ -133,8 +134,8 @@ class SSMTNode_MultiFile_Export(SSMTNodeBase):
     bl_icon = 'FILE_FOLDER'
     bl_width_min = 350
     
-    object_list: bpy.props.CollectionProperty(type=MultiFileExportObjectItem)
-    current_export_index: bpy.props.IntProperty(name="当前导出次数", default=1)
+    object_list: bpy.props.CollectionProperty(type=MultiFileExportObjectItem) # type: ignore
+    current_export_index: bpy.props.IntProperty(name="当前导出次数", default=1) # type: ignore
     
     def init(self, context):
         self.outputs.new('SSMTSocketObject', "Output")
@@ -279,8 +280,8 @@ class SSMTNode_MultiFile_Export(SSMTNodeBase):
         
         return count
     
-    temp_object_name: bpy.props.StringProperty(name="临时物体名称", default="")
-    temp_collection_name: bpy.props.StringProperty(name="临时合集名称", default="")
+    temp_object_name: bpy.props.StringProperty(name="临时物体名称", default="") # type: ignore
+    temp_collection_name: bpy.props.StringProperty(name="临时合集名称", default="") # type: ignore
 
 
 classes = (

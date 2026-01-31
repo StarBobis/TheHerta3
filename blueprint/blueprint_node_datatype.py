@@ -22,21 +22,21 @@ class SSMTNode_DataType(SSMTNodeBase):
         name="匹配 DrawIB",
         description="输入要匹配的DrawIB（支持多个，用逗号分隔）",
         default=""
-    )
+    ) # type: ignore
 
     # tmp.json 文件路径
     tmp_json_path: bpy.props.StringProperty(
         name="tmp.json 文件",
         description="选择 tmp.json 文件路径",
         default=""
-    )
+    ) # type: ignore
 
     # 加载的数据
     loaded_data: bpy.props.StringProperty(
         name="已加载数据",
         description="显示已加载的 tmp.json 数据摘要",
         default="未加载"
-    )
+    ) # type: ignore
 
     def init(self, context):
         self.inputs.new('SSMTSocketObject', "Input")
@@ -122,8 +122,8 @@ class SSMT_OT_DataType_BrowseTmpJson(bpy.types.Operator):
     bl_idname = "ssmt.datatype_browse_tmp_json"
     bl_label = "选择 tmp.json"
     
-    filepath: bpy.props.StringProperty(subtype='FILE_PATH')
-    node_name: bpy.props.StringProperty()
+    filepath: bpy.props.StringProperty(subtype='FILE_PATH') # type: ignore
+    node_name: bpy.props.StringProperty() # type: ignore
     
     def invoke(self, context, event):
         context.window_manager.fileselect_add(self)

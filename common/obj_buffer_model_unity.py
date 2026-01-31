@@ -71,8 +71,9 @@ class ObjBufferModelUnity:
             is_generate_shapekey = True
         
         if is_generate_shapekey and self.obj.data.shape_keys and self.obj.data.shape_keys.key_blocks:
-            # 获取所有以 Shape. 开头的形态键
-            shape_keys = [sk for sk in self.obj.data.shape_keys.key_blocks if sk.name.startswith("Shape.")]
+            # 获取蓝图中指定的形态键
+            shapekey_names = list(shapekeyname_mkey_dict.keys())
+            shape_keys = [sk for sk in self.obj.data.shape_keys.key_blocks if sk.name in shapekey_names]
             
             if shape_keys:
                 TimerUtils.Start(f"Processing {len(shape_keys)} ShapeKeys for {self.obj.name}")
@@ -97,8 +98,10 @@ class ObjBufferModelUnity:
                 for sk in shape_keys:
                     sk_name = sk.name
                     
-                    # 1. 重置所有形态键并激活当前形态键
-                    ShapeKeyUtils.reset_shapekey_values(self.obj)
+                    # 1. 只归零蓝图中指定的形态键，保留其他形态键的值
+                    for key_block in self.obj.data.shape_keys.key_blocks:
+                        if key_block.name in shapekey_names:
+                            key_block.value = 0.0
                     sk.value = 1.0
                     
                     # 2. 获取应用了形态键后的 Mesh 数据
@@ -124,7 +127,6 @@ class ObjBufferModelUnity:
   
 
                 # 循环结束后重置状态
-                ShapeKeyUtils.reset_shapekey_values(self.obj)
                 TimerUtils.End(f"Processing {len(shape_keys)} ShapeKeys for {self.obj.name}")
 
         

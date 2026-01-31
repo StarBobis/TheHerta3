@@ -50,9 +50,6 @@ class ObjElementModel:
     def __post_init__(self) -> None:
         self.obj = ObjUtils.get_obj_by_name(name=self.obj_name)
 
-        # 重置形态键，因为用户不一定会重置，咱们帮他重置好了
-        ShapeKeyUtils.reset_shapekey_values(self.obj)
-
         # 这里获取应用了形态键之后的mesh数据
         mesh = ObjUtils.get_mesh_evaluate_from_obj(obj=self.obj)
 

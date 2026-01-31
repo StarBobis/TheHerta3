@@ -14,7 +14,7 @@ class ShapeKeyBufferModel:
     逻辑和ObjElementModel以及ObjBufferModelUnity类似
     不过呢，只处理得到Position分类的数据
     每个ObjElementModel都有一个形态键名称为key，ShapeKeyBufferModel为value的字典
-    里面装着每个以Shape.开头的形态键对应的应用值到1的Position数据
+    里面装着每个形态键对应的应用值到1的Position数据
     最终这些数据会在ObjBufferModelUnity中被合并到每个DrawIB最终的ShapeKey数据中
     然后变成对应的Buffer文件
 

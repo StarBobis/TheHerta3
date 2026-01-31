@@ -339,13 +339,4 @@ class ShapeKeyUtils:
     
     @staticmethod
     def reset_shapekey_values(obj):
-        '''
-        把Obj所有不以Export.开头的形态键值归零，用于预处理
-        '''
-
-        if obj.data.shape_keys:
-            # 必须遍历 key_blocks 才能获取每个键的值
-            for key_block in obj.data.shape_keys.key_blocks:
-                # 只有不以 Export. 开头的形态键才会被归零
-                if not key_block.name.startswith("Export."):
-                    key_block.value = 0.0
+        pass

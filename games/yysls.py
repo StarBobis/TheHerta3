@@ -351,11 +351,14 @@ class ModModelYYSLS:
         config_ini_builder = M_IniBuilder()
 
         M_IniHelper.generate_hash_style_texture_ini(ini_builder=config_ini_builder,drawib_drawibmodel_dict=self.drawib_drawibmodel_dict)
+        print("Length: " + str(len(self.drawib_drawibmodel_dict.items())))
 
         for draw_ib, draw_ib_model in self.drawib_drawibmodel_dict.items():
+            print("Generating Config INI for DrawIB: " + draw_ib)
 
             if GlobalConfig.logic_name != LogicName.YYSLS:
                 self.add_unity_vs_texture_override_vlr_section(config_ini_builder=config_ini_builder,commandlist_ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)
+            
             # self.add_unity_vs_texture_override_vb_sections(config_ini_builder=config_ini_builder,commandlist_ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)
             self.add_unity_vs_texture_override_ib_sections(config_ini_builder=config_ini_builder,commandlist_ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)
             self.add_unity_vs_resource_vb_sections(ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)

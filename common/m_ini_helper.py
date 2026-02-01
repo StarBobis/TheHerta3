@@ -49,9 +49,12 @@ class M_IniHelper:
         '''
         Hash风格贴图
         '''
+        print("Generating Hash Style Texture INI...1")
+
         if Properties_GenerateMod.forbid_auto_texture_ini():
             return
         
+        print("Generating Hash Style Texture INI...2")
 
         # 先统计当前标记的具有Slot风格的Hash值，后续Render里搞图片的时候跳过这些
         slot_style_texture_hash_list = []
@@ -60,28 +63,33 @@ class M_IniHelper:
                 for texture_markup_info in texture_markup_info_list:
                     if texture_markup_info.mark_type == "Slot":
                         slot_style_texture_hash_list.append(texture_markup_info.mark_hash)
+        
+        print("slot_style_texture_hash_list:" + str(slot_style_texture_hash_list))
                     
         repeat_hash_list = []
         # 遍历当前drawib的Render文件夹
         for draw_ib,draw_ib_model in drawib_drawibmodel_dict.items():
+            print("Generating Hash Style Texture INI for DrawIB: " + draw_ib)
 
             hash_deduped_texture_info_dict = WorkSpaceHelper.get_hash_deduped_texture_info_dict(draw_ib=draw_ib)
-
 
 
             # 添加标记的Hash风格贴图
             for texture_markup_info_list in draw_ib_model.import_config.partname_texturemarkinfolist_dict.values():
                 for texture_markup_info in texture_markup_info_list:
                     if texture_markup_info.mark_type != "Hash":
+                        print("Skipping non-Hash style texture: " + texture_markup_info.mark_filename)
                         continue
 
                     if texture_markup_info.mark_hash in repeat_hash_list:
+                        print("Skipping repeated Hash style texture: " + texture_markup_info.mark_filename)
                         continue
                     else:
                         repeat_hash_list.append(texture_markup_info.mark_hash)
 
                     original_texture_file_path = GlobalConfig.path_extract_gametype_folder(draw_ib=draw_ib,gametype_name=draw_ib_model.d3d11GameType.GameTypeName) + texture_markup_info.mark_filename
                     if not os.path.exists(original_texture_file_path):
+                        print("Skipping missing texture file: " + original_texture_file_path)
                         continue
 
                     hash_style_texture_filename = ""

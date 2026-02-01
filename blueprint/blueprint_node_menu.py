@@ -439,6 +439,22 @@ class SSMT_MT_NodeMenu_Preset(bpy.types.Menu):
         layout = self.layout
         layout.operator("ssmt.add_common_key_switches", text="常用按键开关", icon='PRESET')
 
+class SSMT_MT_NodeMenu_PostProcess(bpy.types.Menu):
+    bl_label = "后处理"
+    
+    def draw(self, context):
+        layout = self.layout
+        layout.operator("node.add_node", text="顶点属性定义", icon='PROPERTIES').type = "SSMTNode_PostProcess_VertexAttrs"
+        layout.separator()
+        layout.operator("node.add_node", text="形态键配置", icon='SHAPEKEY_DATA').type = "SSMTNode_PostProcess_ShapeKey"
+        layout.operator("node.add_node", text="多文件配置", icon='FILE_FOLDER').type = "SSMTNode_PostProcess_MultiFile"
+        layout.separator()
+        layout.operator("node.add_node", text="缓冲区清理", icon='X').type = "SSMTNode_PostProcess_BufferCleanup"
+        layout.operator("node.add_node", text="资源合并", icon='LINKED').type = "SSMTNode_PostProcess_ResourceMerge"
+        layout.operator("node.add_node", text="材质转资源", icon='MATERIAL').type = "SSMTNode_PostProcess_Material"
+        layout.separator()
+        layout.operator("node.add_node", text="血量检测", icon='DOT').type = "SSMTNode_PostProcess_HealthDetection"
+        layout.operator("node.add_node", text="滑块面板", icon='DOT').type = "SSMTNode_PostProcess_SliderPanel"
 
 def draw_node_add_menu(self, context):
     if not isinstance(context.space_data, bpy.types.SpaceNodeEditor):
@@ -451,6 +467,7 @@ def draw_node_add_menu(self, context):
     layout.menu("SSMT_MT_NodeMenu_Preset", text="预设", icon='PRESET')
     layout.menu("SSMT_MT_NodeMenu_Branch", text="分支", icon='RNA')
     layout.menu("SSMT_MT_NodeMenu_ShapeKey", text="形态键", icon='SHAPEKEY_DATA')
+    layout.menu("SSMT_MT_NodeMenu_PostProcess", text="后处理", icon='FILE_REFRESH')
     layout.separator()
 
     # Frame节点没有任何功能，它是Blender自带的一种辅助节点，用于在节点编辑器中组织和分组节点
@@ -485,6 +502,7 @@ def register():
     bpy.utils.register_class(SSMT_MT_NodeMenu_Preset)
     bpy.utils.register_class(SSMT_MT_NodeMenu_Branch)
     bpy.utils.register_class(SSMT_MT_NodeMenu_ShapeKey)
+    bpy.utils.register_class(SSMT_MT_NodeMenu_PostProcess)
 
     bpy.types.NODE_MT_add.prepend(draw_node_add_menu)
     # 添加到 3D 视图物体右键菜单
@@ -497,6 +515,7 @@ def unregister():
     bpy.types.NODE_MT_add.remove(draw_node_add_menu)
     bpy.types.VIEW3D_MT_object_context_menu.remove(draw_objects_context_menu_add)
 
+    bpy.utils.unregister_class(SSMT_MT_NodeMenu_PostProcess)
     bpy.utils.unregister_class(SSMT_MT_NodeMenu_ShapeKey)
     bpy.utils.unregister_class(SSMT_MT_NodeMenu_Branch)
     bpy.utils.unregister_class(SSMT_MT_NodeMenu_Preset)

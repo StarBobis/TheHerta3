@@ -282,6 +282,68 @@ class BlueprintExportHelper:
         GlobalConfig.buffer_folder_suffix = ""
         print(f"恢复Buffer文件夹后缀: Buffer")
 
+    @staticmethod
+    def get_postprocess_nodes():
+        """获取连接到Generate Mod输出节点的所有后处理节点，按连接顺序返回"""
+        tree = BlueprintExportHelper.get_current_blueprint_tree()
+        if not tree:
+            return []
+        
+        output_node = BlueprintExportHelper.get_node_from_bl_idname(tree, 'SSMTNode_Result_Output')
+        if not output_node:
+            return []
+        
+        postprocess_nodes = []
+        
+        def collect_postprocess_nodes(node, visited=None):
+            """递归收集后处理节点"""
+            if visited is None:
+                visited = set()
+            
+            if node.name in visited:
+                return
+            
+            visited.add(node.name)
+            
+            for output in node.outputs:
+                if output.is_linked:
+                    for link in output.links:
+                        target_node = link.to_node
+                        
+                        if target_node.bl_idname.startswith('SSMTNode_PostProcess'):
+                            postprocess_nodes.append(target_node)
+                            collect_postprocess_nodes(target_node, visited)
+        
+        collect_postprocess_nodes(output_node)
+        
+        return postprocess_nodes
+    
+    @staticmethod
+    def execute_postprocess_nodes(mod_export_path):
+        """执行所有后处理节点，按连接顺序逐个运行"""
+        postprocess_nodes = BlueprintExportHelper.get_postprocess_nodes()
+        
+        if not postprocess_nodes:
+            print("没有找到后处理节点，跳过后处理流程")
+            return
+        
+        print(f"找到 {len(postprocess_nodes)} 个后处理节点，开始执行...")
+        
+        for index, node in enumerate(postprocess_nodes):
+            print(f"执行第 {index + 1}/{len(postprocess_nodes)} 个后处理节点: {node.name}")
+            
+            try:
+                if hasattr(node, 'execute_postprocess'):
+                    node.execute_postprocess(mod_export_path)
+                else:
+                    print(f"警告: 节点 {node.name} 没有实现 execute_postprocess 方法")
+            except Exception as e:
+                print(f"执行后处理节点 {node.name} 时出错: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        print("所有后处理节点执行完成")
+
 
 
             

@@ -352,8 +352,6 @@ class ModModelYYSLS:
 
         M_IniHelper.generate_hash_style_texture_ini(ini_builder=config_ini_builder,drawib_drawibmodel_dict=self.drawib_drawibmodel_dict)
 
-
-
         for draw_ib, draw_ib_model in self.drawib_drawibmodel_dict.items():
 
             if GlobalConfig.logic_name != LogicName.YYSLS:

@@ -8,3 +8,12 @@ from .blueprint_export_helper import *
 from .blueprint_export import *
 from .blueprint_import import *
 from .blueprint_model import *
+from .blueprint_node_postprocess_base import *
+from .blueprint_node_postprocess_vertex_attrs import *
+from .blueprint_node_postprocess_shapekey import *
+from .blueprint_node_postprocess_multifile import *
+from .blueprint_node_postprocess_buffer_cleanup import *
+from .blueprint_node_postprocess_resource_merge import *
+from .blueprint_node_postprocess_material import *
+from .blueprint_node_postprocess_health import *
+from .blueprint_node_postprocess_slider import *

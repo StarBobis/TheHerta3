@@ -15,6 +15,14 @@ from .blueprint import blueprint_node_shapekey
 from .blueprint import blueprint_node_datatype
 from .blueprint import blueprint_node_multifile_export
 from .blueprint import blueprint_drag_drop
+from .blueprint import blueprint_node_postprocess_vertex_attrs
+from .blueprint import blueprint_node_postprocess_shapekey
+from .blueprint import blueprint_node_postprocess_multifile
+from .blueprint import blueprint_node_postprocess_buffer_cleanup
+from .blueprint import blueprint_node_postprocess_resource_merge
+from .blueprint import blueprint_node_postprocess_material
+from .blueprint import blueprint_node_postprocess_health
+from .blueprint import blueprint_node_postprocess_slider
 
 # 自动更新功能
 from . import addon_updater_ops
@@ -148,11 +156,27 @@ def register():
     blueprint_node_datatype.register()
     blueprint_node_multifile_export.register()
     blueprint_drag_drop.register()
+    blueprint_node_postprocess_vertex_attrs.register()
+    blueprint_node_postprocess_shapekey.register()
+    blueprint_node_postprocess_multifile.register()
+    blueprint_node_postprocess_buffer_cleanup.register()
+    blueprint_node_postprocess_resource_merge.register()
+    blueprint_node_postprocess_material.register()
+    blueprint_node_postprocess_health.register()
+    blueprint_node_postprocess_slider.register()
 
 
 
 def unregister():
     # 蓝图系统
+    blueprint_node_postprocess_slider.unregister()
+    blueprint_node_postprocess_health.unregister()
+    blueprint_node_postprocess_material.unregister()
+    blueprint_node_postprocess_resource_merge.unregister()
+    blueprint_node_postprocess_buffer_cleanup.unregister()
+    blueprint_node_postprocess_multifile.unregister()
+    blueprint_node_postprocess_shapekey.unregister()
+    blueprint_node_postprocess_vertex_attrs.unregister()
     blueprint_node_obj.unregister()
     blueprint_import.unregister()
     blueprint_export.unregister()

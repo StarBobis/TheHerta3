@@ -23,6 +23,17 @@ class SSMTSocketObject(NodeSocket):
     def draw(self, context, layout, node, text):
         layout.label(text=text)
 
+class SSMTSocketPostProcess(NodeSocket):
+    '''Custom Socket for Post Process Path'''
+    bl_idname = 'SSMTSocketPostProcess'
+    bl_label = 'Post Process Socket'
+
+    def draw_color(self, context, node):
+        return (1.0, 0.5, 0.0, 1.0) # Orange
+
+    def draw(self, context, layout, node, text):
+        layout.label(text=text)
+
 # 1. 定义自定义节点树类型
 class SSMTBlueprintTree(NodeTree):
     '''SSMT Mod Logic Blueprint'''
@@ -116,10 +127,12 @@ class THEHERTA3_OT_OpenPersistentBlueprint(bpy.types.Operator):
 def register():
     bpy.utils.register_class(SSMTBlueprintTree)
     bpy.utils.register_class(SSMTSocketObject)
+    bpy.utils.register_class(SSMTSocketPostProcess)
     bpy.utils.register_class(THEHERTA3_OT_OpenPersistentBlueprint)
 
 
 def unregister():
+    bpy.utils.unregister_class(SSMTSocketPostProcess)
     bpy.utils.unregister_class(SSMTSocketObject)
     bpy.utils.unregister_class(THEHERTA3_OT_OpenPersistentBlueprint)
     bpy.utils.unregister_class(SSMTBlueprintTree)

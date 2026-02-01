@@ -182,6 +182,12 @@ class SSMTGenerateModBlueprint(bpy.types.Operator):
             
             self.report({'INFO'},TR.translate("Generate Mod Success!"))
             TimerUtils.End("GenerateMod Mod")
+            
+            mod_export_path = GlobalConfig.path_generate_mod_folder()
+            print(f"Mod导出路径: {mod_export_path}")
+            
+            BlueprintExportHelper.execute_postprocess_nodes(mod_export_path)
+            
             CommandUtils.OpenGeneratedModFolder()
         finally:
             # Clean up override

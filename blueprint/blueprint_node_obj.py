@@ -296,6 +296,7 @@ class SSMTNode_Result_Output(SSMTNodeBase):
 
     def init(self, context):
         self.inputs.new('SSMTSocketObject', "Group 1")
+        self.outputs.new('SSMTSocketPostProcess', "Post Process")
         self.width = 400
 
     def draw_buttons(self, context, layout):

@@ -228,6 +228,10 @@ class SSMT_ImportTexture_WM_OT_ApplyImageToMaterial(Operator):
             else:
                 # 使用第一个材质槽
                 mat = obj.data.materials[0]
+                # 如果第一个槽位是空的(None)，创建一个新材质并填入
+                if mat is None:
+                    mat = bpy.data.materials.new(name=f"Mat_{selected_image.name}")
+                    obj.data.materials[0] = mat
             
             # 确保材质使用节点
             mat.use_nodes = True

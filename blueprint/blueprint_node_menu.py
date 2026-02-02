@@ -247,32 +247,42 @@ class SSMT_OT_BatchConnectNodes(bpy.types.Operator):
         nodes_b = [node for node in selected_nodes if node.bl_idname == type_b]
 
         # 判断哪个是源节点（有输出端口），哪个是目标节点（有输入端口）
-        if len(nodes_a[0].outputs) > 0 and len(nodes_a[0].inputs) > 0:
-            # 类型A既有输入又有输出，需要判断类型B
-            if len(nodes_b[0].outputs) > 0:
-                # 类型B也有输出，无法确定连接方向
-                self.report({'ERROR'}, "无法确定连接方向，请手动连接")
-                return {'CANCELLED'}
-            else:
-                # 类型B只有输入，A->B
-                source_nodes, target_nodes = nodes_a, nodes_b
-        elif len(nodes_b[0].outputs) > 0 and len(nodes_b[0].inputs) > 0:
-            # 类型B既有输入又有输出，类型A只有输出
-            if len(nodes_a[0].inputs) > 0:
-                # 类型A也有输入，无法确定
-                self.report({'ERROR'}, "无法确定连接方向，请手动连接")
-                return {'CANCELLED'}
-            else:
-                # 类型A只有输出，B->A
-                source_nodes, target_nodes = nodes_b, nodes_a
-        elif len(nodes_a[0].outputs) > 0:
-            # 类型A只有输出
+        # 优先根据端口特性判断，只有输出的作为源，有输入的作为目标
+        a_has_output = len(nodes_a[0].outputs) > 0
+        a_has_input = len(nodes_a[0].inputs) > 0
+        b_has_output = len(nodes_b[0].outputs) > 0
+        b_has_input = len(nodes_b[0].inputs) > 0
+
+        if a_has_output and not a_has_input and b_has_input:
+            # A只有输出，B有输入，A->B
             source_nodes, target_nodes = nodes_a, nodes_b
-        elif len(nodes_b[0].outputs) > 0:
-            # 类型B只有输出
+        elif b_has_output and not b_has_input and a_has_input:
+            # B只有输出，A有输入，B->A
+            source_nodes, target_nodes = nodes_b, nodes_a
+        elif a_has_output and a_has_input and b_has_output and b_has_input:
+            # 两种都有输入输出，根据位置判断（左边的连接到右边）
+            avg_x_a = sum(node.location.x for node in nodes_a) / len(nodes_a)
+            avg_x_b = sum(node.location.x for node in nodes_b) / len(nodes_b)
+            if avg_x_a < avg_x_b:
+                # A在左边，A->B
+                source_nodes, target_nodes = nodes_a, nodes_b
+            else:
+                # B在左边，B->A
+                source_nodes, target_nodes = nodes_b, nodes_a
+        elif a_has_output and not a_has_input and not b_has_output:
+            # A只有输出，B没有输出，A->B
+            source_nodes, target_nodes = nodes_a, nodes_b
+        elif b_has_output and not b_has_input and not a_has_output:
+            # B只有输出，A没有输出，B->A
+            source_nodes, target_nodes = nodes_b, nodes_a
+        elif a_has_output and not b_has_input:
+            # A有输出，B没有输入，A->B
+            source_nodes, target_nodes = nodes_a, nodes_b
+        elif b_has_output and not a_has_input:
+            # B有输出，A没有输入，B->A
             source_nodes, target_nodes = nodes_b, nodes_a
         else:
-            self.report({'ERROR'}, "所选节点都没有输出端口，无法连接")
+            self.report({'ERROR'}, "无法确定连接方向，请检查节点端口配置")
             return {'CANCELLED'}
 
         # 检查目标节点是否有输入端口

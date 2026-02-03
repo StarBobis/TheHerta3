@@ -375,6 +375,10 @@ class SSMT_OT_BatchConnectNodes(bpy.types.Operator):
                     if link.to_node in minority_nodes:
                         node_tree.links.remove(link)
 
+        # 按从上到下的顺序排序节点（y坐标降序）
+        majority_nodes.sort(key=lambda n: -n.location.y)
+        minority_nodes.sort(key=lambda n: -n.location.y)
+
         # 分配连接：将多数节点平均分配到各个少数节点
         nodes_per_target = majority_count // minority_count
         remainder = majority_count % minority_count

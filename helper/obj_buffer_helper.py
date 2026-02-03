@@ -213,7 +213,7 @@ class ObjBufferHelper:
             result[2::3] = tangents[2::3]  # z 分量
 
             result = result.reshape(-1, 3)
-
+        
         # 燕云十六声格式
         elif d3d11_element.Format == 'R16G16B16A16_SNORM':
             result = FormatUtils.convert_4x_float32_to_r16g16b16a16_snorm(result)
@@ -850,7 +850,8 @@ class ObjBufferHelper:
     def calc_index_vertex_buffer_girlsfrontline2(
         mesh:bpy.types.Mesh, 
         element_vertex_ndarray:numpy.ndarray, 
-        d3d11_game_type:D3D11GameType):
+        d3d11_game_type:D3D11GameType,
+        dtype:numpy.dtype):
         '''
         [特殊模式：少前2专用] 强制索引对齐模式
         --------------------------------------------------

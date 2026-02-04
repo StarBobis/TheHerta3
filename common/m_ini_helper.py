@@ -188,6 +188,11 @@ class M_IniHelper:
 
         ib_number = 1
         for drawib, drawib_model in drawib_drawibmodel_dict.items():
+
+            # 如果当前DrawIB没有生成形态键数据，则跳过不处理
+            if not drawib_model.shapekey_name_bytelist_dict:
+                continue
+
             original_position_buffer_resource_name ="Resource" + drawib + "Position"     
             duplicated_position_buffer_resource_name = "Resource" + drawib + "Position.1"
 
@@ -201,6 +206,10 @@ class M_IniHelper:
 
         ib_number = 1
         for drawib, drawib_model in drawib_drawibmodel_dict.items():
+            # 如果当前DrawIB没有生成形态键数据，则跳过不处理
+            if not drawib_model.shapekey_name_bytelist_dict:
+                continue
+
             present_section.append("  run = CustomShaderComputeShapes" + str(ib_number))
             ib_number += 1
 
@@ -211,7 +220,10 @@ class M_IniHelper:
 
         ib_number = 1
         for drawib, drawib_model in drawib_drawibmodel_dict.items():
-            
+            # 如果当前DrawIB没有生成形态键数据，则跳过不处理
+            if not drawib_model.shapekey_name_bytelist_dict:
+                continue
+
             customshader_section.append("[CustomShaderComputeShapes" + str(ib_number) + "]")
             customshader_section.append("cs = ./res/Shapes.hlsl")
             customshader_section.append("cs-u5 = copy " + "Resource" + drawib + "Position.1")
@@ -242,6 +254,11 @@ class M_IniHelper:
 
         ib_number = 1
         for drawib, drawib_model in drawib_drawibmodel_dict.items():
+
+            # 如果当前DrawIB没有生成形态键数据，则跳过不处理
+            if not drawib_model.shapekey_name_bytelist_dict:
+                continue
+
             # 原本的Buffer
             resource_section.append("[Resource" + drawib + "Position.1]")
             resource_section.append("type = buffer")

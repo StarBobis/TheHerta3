@@ -231,6 +231,12 @@ class M_IniHelper:
 
             # 对于每个形态键buffer都进行计算
             for shapekey_name, m_key in shapekeyname_mkey_dict.items():
+                # 这里很显然有问题，如果一个DrawIB有这个形态键，另一个DrawIB没有这个形态键呢？
+                # 那这里就会导致游戏内没有这个形态键的模型出现异常
+                # 所以如果这个DrawIB内没有这个形态键的话，就不需要生成它的计算代码
+                if drawib_model.shapekey_name_bytelist_dict.get(shapekey_name,None) is None:
+                    continue
+
                 shapekey_name_less = shapekey_name.replace("Shape.","")
 
                 customshader_section.append("x88 = " + m_key.key_name)
@@ -268,6 +274,12 @@ class M_IniHelper:
 
             # 各个形态键的Buffer
             for shapekey_name, m_key in shapekeyname_mkey_dict.items():
+                # 这里很显然有问题，如果一个DrawIB有这个形态键，另一个DrawIB没有这个形态键呢？
+                # 那这里就会导致游戏内没有这个形态键的模型出现异常
+                # 所以如果这个DrawIB内没有这个形态键的话，就不需要生成它的计算代码
+                if drawib_model.shapekey_name_bytelist_dict.get(shapekey_name,None) is None:
+                    continue
+                
                 shapekey_name_less = shapekey_name.replace("Shape.","")
                 resource_section.append("[Resource" + drawib + "Position." + shapekey_name_less + "]")
                 resource_section.append("type = buffer")

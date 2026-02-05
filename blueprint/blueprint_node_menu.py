@@ -20,7 +20,8 @@ class SSMT_OT_CreateGroupFromSelection(bpy.types.Operator):
             return {'CANCELLED'}
 
         # 获取或创建与当前 Workspace 同名的 SSMT Blueprint 节点树
-        workspace_name = "Mod_" + GlobalConfig.workspacename
+        GlobalConfig.read_from_main_json()
+        workspace_name = f"Mod_{GlobalConfig.workspacename}" if GlobalConfig.workspacename else "SSMT_Mod_Logic"
         node_tree = bpy.data.node_groups.get(workspace_name)
         
         if not node_tree or node_tree.bl_idname != 'SSMTBlueprintTreeType':
@@ -40,14 +41,20 @@ class SSMT_OT_CreateGroupFromSelection(bpy.types.Operator):
              # 如果已有节点，往右下角找个空地，或者直接往右
              pass
 
+        # 取消所有节点的选中状态
+        for node in node_tree.nodes:
+            node.select = False
+
         # 创建 Group 节点
         group_node = node_tree.nodes.new(type='SSMTNode_Object_Group')
         group_node.location = (base_x + 400, base_y)
+        group_node.select = True
         
         # 创建 Object Nodes 并连接
         for i, obj in enumerate(selected_objects):
             obj_node = node_tree.nodes.new(type='SSMTNode_Object_Info')
             obj_node.location = (base_x, base_y - i * 150)
+            obj_node.select = True
             
             # 设置物体
             obj_node.object_name = obj.name
@@ -116,7 +123,8 @@ class SSMT_OT_AddCommonKeySwitches(bpy.types.Operator):
 
     def execute(self, context):
         # 1. Get/Create Node Tree
-        workspace_name = "Mod_" + GlobalConfig.workspacename
+        GlobalConfig.read_from_main_json()
+        workspace_name = f"Mod_{GlobalConfig.workspacename}" if GlobalConfig.workspacename else "SSMT_Mod_Logic"
         node_tree = bpy.data.node_groups.get(workspace_name)
         if not node_tree or node_tree.bl_idname != 'SSMTBlueprintTreeType':
             node_tree = bpy.data.node_groups.new(name=workspace_name, type='SSMTBlueprintTreeType')
@@ -178,6 +186,183 @@ class SSMT_OT_AddCommonKeySwitches(bpy.types.Operator):
                     group_node.update()
 
         return {'FINISHED'}
+
+
+class SSMT_OT_AlignNodes(bpy.types.Operator):
+    '''将选中的节点按照矩阵对齐'''
+    bl_idname = "ssmt.align_nodes"
+    bl_label = "矩阵对齐节点"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        # 获取当前节点树
+        space_data = getattr(context, "space_data", None)
+        if not space_data or space_data.type != 'NODE_EDITOR':
+            self.report({'ERROR'}, "请在节点编辑器中使用此功能")
+            return {'CANCELLED'}
+
+        node_tree = getattr(space_data, "edit_tree", None) or getattr(space_data, "node_tree", None)
+        if not node_tree:
+            self.report({'ERROR'}, "未找到节点树")
+            return {'CANCELLED'}
+
+        # 获取选中的节点
+        selected_nodes = [node for node in node_tree.nodes if node.select]
+        if len(selected_nodes) < 2:
+            self.report({'WARNING'}, "请至少选择2个节点")
+            return {'CANCELLED'}
+
+        # 第一步：将节点按列分组（基于X坐标）
+        columns = self.group_nodes_by_columns(selected_nodes)
+        
+        # 第二步：对每列内的节点进行垂直对齐
+        for column in columns:
+            self.align_column_vertically(column)
+        
+        # 第三步：对列之间进行横向对齐
+        self.align_columns_horizontally(columns)
+        
+        # 第四步：调整节点顺序以匹配连接关系
+        self.adjust_node_order_by_connections(selected_nodes, node_tree)
+
+        self.report({'INFO'}, f"已将 {len(selected_nodes)} 个节点结构化对齐，分为 {len(columns)} 列")
+        return {'FINISHED'}
+    
+    def group_nodes_by_columns(self, nodes):
+        """将节点按X坐标分组成列"""
+        if not nodes:
+            return []
+        
+        # 计算节点平均宽度作为列间距阈值
+        avg_width = sum(node.width for node in nodes) / len(nodes)
+        column_threshold = avg_width * 1.1  # 检测范围为节点大小的1.1倍
+        
+        # 按X坐标排序节点
+        sorted_nodes = sorted(nodes, key=lambda n: n.location.x)
+        
+        columns = []
+        current_column = [sorted_nodes[0]]
+        current_x = sorted_nodes[0].location.x
+        
+        for node in sorted_nodes[1:]:
+            # 如果节点的X坐标与当前列的X坐标相差超过阈值，则开始新列
+            if abs(node.location.x - current_x) > column_threshold:
+                columns.append(current_column)
+                current_column = [node]
+                current_x = node.location.x
+            else:
+                current_column.append(node)
+        
+        # 添加最后一列
+        if current_column:
+            columns.append(current_column)
+        
+        return columns
+    
+    def align_column_vertically(self, column):
+        """对单列内的节点进行垂直对齐"""
+        if len(column) <= 1:
+            return
+        
+        # 按Y坐标从上到下排序
+        column.sort(key=lambda n: -n.location.y)
+        
+        # 计算起始位置（使用最上方的节点位置）
+        start_x = column[0].location.x
+        start_y = column[0].location.y
+        
+        # 固定的垂直间距
+        vertical_spacing = 80.0
+        
+        # 对齐节点
+        current_y = start_y
+        for node in column:
+            # 确保节点位置不重叠
+            node.location = (start_x, current_y)
+            # 使用固定的垂直间距
+            current_y -= (node.height + vertical_spacing)
+    
+    def align_columns_horizontally(self, columns):
+        """对列之间进行横向对齐"""
+        if len(columns) <= 1:
+            return
+        
+        # 计算所有节点的平均宽度，用于确定列间距
+        all_nodes = [node for column in columns for node in column]
+        avg_width = sum(node.width for node in all_nodes) / len(all_nodes)
+        # 列间距保持为平均宽度的0.3倍，这是用户想要的间距
+        column_spacing = avg_width * 0.3
+        
+        # 计算每列的边界
+        column_bounds = []
+        for i, column in enumerate(columns):
+            if not column:
+                continue
+            
+            # 计算列的边界，使用节点的实际位置
+            x_min = min(node.location.x for node in column)
+            x_max = max(node.location.x + node.width for node in column)
+            
+            # 计算列的中心X坐标
+            center_x = (x_min + x_max) / 2
+            
+            # 计算列的宽度（包括边距）
+            width = x_max - x_min + 10  # 添加10像素边距
+            
+            column_bounds.append({
+                'index': i,
+                'column': column,
+                'center_x': center_x,
+                'width': width,
+                'x_min': x_min,
+                'x_max': x_max
+            })
+        
+        # 按中心X坐标排序列
+        column_bounds.sort(key=lambda b: b['center_x'])
+        
+        # 对齐列，保持原有列间距
+        current_x = column_bounds[0]['x_min']
+        for bound in column_bounds:
+            # 将列移动到当前X位置
+            offset_x = current_x - bound['x_min']
+            for node in bound['column']:
+                node.location.x += offset_x
+            
+            # 更新当前X位置，为下一列预留空间
+            # 使用基于节点大小的间距，确保大于检测范围（avg_width * 1.1）
+            current_x += bound['width'] + column_spacing
+    
+    def adjust_node_order_by_connections(self, nodes, node_tree):
+        """根据连接关系调整节点顺序，避免连接线交错"""
+        if len(nodes) < 2:
+            return
+        
+        # 构建节点连接图
+        connection_graph = {}
+        for node in nodes:
+            connection_graph[node] = {'inputs': [], 'outputs': []}
+        
+        # 遍历所有连接
+        for link in node_tree.links:
+            from_node = link.from_node
+            to_node = link.to_node
+            
+            if from_node in connection_graph and to_node in connection_graph:
+                connection_graph[from_node]['outputs'].append(to_node)
+                connection_graph[to_node]['inputs'].append(from_node)
+        
+        # 对每列中的节点进行排序
+        for column in self.group_nodes_by_columns(nodes):
+            if len(column) <= 1:
+                continue
+            
+            # 按连接关系排序节点
+            # 优先将没有输入的节点放在前面（源节点）
+            column.sort(key=lambda n: (
+                len(connection_graph[n]['inputs']),  # 输入数量少的在前
+                -n.location.y  # 保持原有的垂直顺序
+            ))
 
 
 class SSMT_OT_BatchConnectNodes(bpy.types.Operator):
@@ -498,18 +683,16 @@ def draw_node_context_menu(self, context):
     if context.space_data.tree_type != 'SSMTBlueprintTreeType':
         return
     
-    # 检查是否有选中的节点
-    selected_nodes = [node for node in context.space_data.edit_tree.nodes if node.select] if context.space_data.edit_tree else []
-    
-    if len(selected_nodes) >= 2:
-        layout = self.layout
-        layout.separator()
-        layout.operator("ssmt.batch_connect_nodes", text="批量连接节点", icon='LINKED')
+    layout = self.layout
+    layout.separator()
+    layout.operator("ssmt.align_nodes", text="矩阵对齐节点", icon='GRID')
+    layout.operator("ssmt.batch_connect_nodes", text="批量连接节点", icon='LINKED')
 
 
 def register():
     bpy.utils.register_class(SSMT_OT_CreateGroupFromSelection)
     bpy.utils.register_class(SSMT_OT_AddCommonKeySwitches)
+    bpy.utils.register_class(SSMT_OT_AlignNodes)
     bpy.utils.register_class(SSMT_OT_BatchConnectNodes)
     bpy.utils.register_class(SSMT_MT_ObjectContextMenuSub)
     bpy.utils.register_class(SSMT_MT_NodeMenu_Advanced)
@@ -536,5 +719,6 @@ def unregister():
     bpy.utils.unregister_class(SSMT_MT_NodeMenu_Advanced)
     bpy.utils.unregister_class(SSMT_MT_ObjectContextMenuSub)
     bpy.utils.unregister_class(SSMT_OT_BatchConnectNodes)
+    bpy.utils.unregister_class(SSMT_OT_AlignNodes)
     bpy.utils.unregister_class(SSMT_OT_AddCommonKeySwitches)
     bpy.utils.unregister_class(SSMT_OT_CreateGroupFromSelection)

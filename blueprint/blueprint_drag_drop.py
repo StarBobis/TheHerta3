@@ -7,6 +7,9 @@ _workspace_objects_cache = set()
 _object_to_node_mapping = {}
 _node_to_object_id_mapping = {}
 _is_importing = False
+_syncing_selection = False
+_node_selection_timer = None
+_last_node_selection_state = {}
 
 
 @bpy.app.handlers.persistent
@@ -21,6 +24,30 @@ def object_visibility_handler(scene):
                         obj = bpy.data.objects.get(obj_name)
                         if obj:
                             node.mute = obj.hide_viewport
+
+
+@bpy.app.handlers.persistent
+def object_selection_handler(scene):
+    """处理物体选中状态变化事件，同步更新对应节点的选中状态"""
+    global _syncing_selection, _object_to_node_mapping
+    
+    if _syncing_selection:
+        return
+    
+    _syncing_selection = True
+    
+    try:
+        for tree in bpy.data.node_groups:
+            if tree.bl_idname == 'SSMTBlueprintTreeType':
+                for node in tree.nodes:
+                    if node.bl_idname == 'SSMTNode_Object_Info':
+                        obj_name = getattr(node, 'object_name', '')
+                        if obj_name:
+                            obj = bpy.data.objects.get(obj_name)
+                            if obj:
+                                node.select = obj.select_get()
+    finally:
+        _syncing_selection = False
 
 
 @bpy.app.handlers.persistent
@@ -248,23 +275,102 @@ def refresh_workspace_cache():
     _initialize_workspace_cache()
 
 
+def sync_node_selection_to_objects():
+    """同步节点选中状态到物体，当节点选中状态变化时调用"""
+    global _syncing_selection
+    
+    if _syncing_selection:
+        return
+    
+    _syncing_selection = True
+    
+    try:
+        for tree in bpy.data.node_groups:
+            if tree.bl_idname == 'SSMTBlueprintTreeType':
+                for node in tree.nodes:
+                    if node.bl_idname == 'SSMTNode_Object_Info':
+                        obj_name = getattr(node, 'object_name', '')
+                        if obj_name:
+                            obj = bpy.data.objects.get(obj_name)
+                            if obj:
+                                obj.select_set(node.select)
+    finally:
+        _syncing_selection = False
+
+
+def check_node_selection_changes():
+    """定时检查节点选中状态变化，并同步到物体"""
+    global _last_node_selection_state, _syncing_selection
+    
+    if _syncing_selection:
+        return 0.1
+    
+    current_selection_state = {}
+    has_changes = False
+    
+    for tree in bpy.data.node_groups:
+        if tree.bl_idname == 'SSMTBlueprintTreeType':
+            for node in tree.nodes:
+                if node.bl_idname == 'SSMTNode_Object_Info':
+                    node_key = (tree.name, node.name)
+                    current_selection_state[node_key] = node.select
+                    
+                    if node_key in _last_node_selection_state:
+                        if _last_node_selection_state[node_key] != node.select:
+                            has_changes = True
+    
+    if has_changes:
+        _syncing_selection = True
+        try:
+            for tree in bpy.data.node_groups:
+                if tree.bl_idname == 'SSMTBlueprintTreeType':
+                    for node in tree.nodes:
+                        if node.bl_idname == 'SSMTNode_Object_Info':
+                            obj_name = getattr(node, 'object_name', '')
+                            if obj_name:
+                                obj = bpy.data.objects.get(obj_name)
+                                if obj:
+                                    obj.select_set(node.select)
+        finally:
+            _syncing_selection = False
+    
+    _last_node_selection_state = current_selection_state
+    return 0.1
+
+
 def register():
+    global _node_selection_timer
     _initialize_workspace_cache()
     bpy.app.handlers.depsgraph_update_post.append(object_visibility_handler)
+    bpy.app.handlers.depsgraph_update_post.append(object_selection_handler)
     bpy.app.handlers.depsgraph_update_post.append(object_rename_handler)
     bpy.app.handlers.depsgraph_update_post.append(workspace_object_added_handler)
+    
+    _node_selection_timer = bpy.app.timers.register(check_node_selection_changes, persistent=True)
 
 
 def unregister():
+    global _node_selection_timer
+    if _node_selection_timer:
+        try:
+            bpy.app.timers.unregister(_node_selection_timer)
+        except:
+            pass
+        _node_selection_timer = None
+    
     if object_visibility_handler in bpy.app.handlers.depsgraph_update_post:
         bpy.app.handlers.depsgraph_update_post.remove(object_visibility_handler)
+    if object_selection_handler in bpy.app.handlers.depsgraph_update_post:
+        bpy.app.handlers.depsgraph_update_post.remove(object_selection_handler)
     if object_rename_handler in bpy.app.handlers.depsgraph_update_post:
         bpy.app.handlers.depsgraph_update_post.remove(object_rename_handler)
     if workspace_object_added_handler in bpy.app.handlers.depsgraph_update_post:
         bpy.app.handlers.depsgraph_update_post.remove(workspace_object_added_handler)
     
-    global _workspace_objects_cache, _object_to_node_mapping, _node_to_object_id_mapping, _is_importing
+    global _workspace_objects_cache, _object_to_node_mapping, _node_to_object_id_mapping, _is_importing, _syncing_selection, _last_node_selection_state
     _workspace_objects_cache = set()
     _object_to_node_mapping = {}
     _node_to_object_id_mapping = {}
     _is_importing = False
+    _syncing_selection = False
+    _last_node_selection_state = {}

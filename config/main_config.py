@@ -21,6 +21,8 @@ class LogicName:
     SRMI = "SRMI"
     ZZMI = "ZZMI"
     WWMI = "WWMI"
+    EFMI = "EFMI"
+
     WuWa = "WuWa"
 
     CTXMC = "CTXMC"

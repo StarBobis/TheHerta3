@@ -689,6 +689,7 @@ def draw_node_context_menu(self, context):
     layout.operator("ssmt.batch_connect_nodes", text="批量连接节点", icon='LINKED')
     layout.separator()
     layout.operator("ssmt.refresh_node_object_ids", text="刷新物体ID关联", icon='FILE_REFRESH')
+    layout.operator("ssmt.check_object_name_changes", text="检查物体名称变化", icon='FILE_REFRESH')
 
 
 def register():

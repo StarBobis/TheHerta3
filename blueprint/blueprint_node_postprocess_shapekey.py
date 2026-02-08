@@ -274,11 +274,8 @@ class SSMTNode_PostProcess_ShapeKey(SSMTNode_PostProcess_Base):
             with open(ini_file_path, 'r', encoding='utf-8') as f:
                 for line in f:
                     stripped_line = line.strip()
-                    if not stripped_line or stripped_line.startswith(';'):
-                        continue
-                    section_match = re.match(r'\[([^\]]+)\]', stripped_line)
-                    if section_match:
-                        current_section = section_match.group(0)
+                    if stripped_line.startswith('[') and stripped_line.endswith(']'):
+                        current_section = stripped_line
                         if current_section not in sections:
                             sections[current_section] = []
                         continue
@@ -374,12 +371,69 @@ class SSMTNode_PostProcess_ShapeKey(SSMTNode_PostProcess_Base):
             if vertex_struct:
                 content = re.sub(r"struct VertexAttributes\s*\{[^}]*\};", vertex_struct, content, flags=re.DOTALL)
             
+            name_to_freq_def = {name: f"FREQ{i+1}" for i, name in enumerate(unique_names)}
+            obj_to_range_defs = {obj: (f"START{i+1}", f"END{i+1}") for i, obj in enumerate(unique_objects)}
+            
+            define_lines = [f"// --- Shared Animation Intensity (per Shape Key Name) ---\n// From index {self.INTENSITY_START_INDEX} onwards"]
+            for i, name in enumerate(unique_names):
+                define_lines.append(f"#define FREQ{i+1} IniParams[{self.INTENSITY_START_INDEX + i}].x // {name}")
+            
+            define_lines.extend([f"\n// --- Per-Object Vertex Ranges ---\n// From index {self.VERTEX_RANGE_START_INDEX} onwards"])
+            for i, obj_name in enumerate(unique_objects):
+                start_idx = self.VERTEX_RANGE_START_INDEX + i * 2
+                define_lines.append(f"#define START{i+1} (uint)IniParams[{start_idx}].x // {obj_name}")
+                define_lines.append(f"#define END{i+1}   (uint)IniParams[{start_idx + 1}].x")
+            
+            logic_lines = []
+            
+            for slot_num, names_data in sorted(hash_slot_data.items()):
+                slot_index = slot_num - 1
+                is_first_if = True
+                
+                logic_lines.extend([f"    // --- Slot {slot_index} (t{51+slot_index}) ---", f"    float anim_weight_slot{slot_index} = 0.0;"])
+                for name, objects in names_data.items():
+                    for obj in objects:
+                        start_def, end_def = obj_to_range_defs[obj]
+                        if_cmd = "if" if is_first_if else "else if"
+                        logic_lines.append(f"    {if_cmd} (i >= {start_def} && i <= {end_def}) {{ anim_weight_slot{slot_index} = {name_to_freq_def[name]}; }} // Name: {name}")
+                        is_first_if = False
+                
+                logic_lines.extend([f"    if (anim_weight_slot{slot_index} > 1e-5)", "    {"])
+                
+                indent = "        "
+                read_idx = "i"
+                if use_packed:
+                    logic_lines.extend([f"        int packed_index = shapekey_maps[{slot_index}][i];", "        if (packed_index != -1)", "        {"])
+                    read_idx = "packed_index"
+                    indent = "            "
+                
+                if use_delta:
+                    calc_line = f"total_diff_position += shapekey_pos_deltas[{slot_index}][{read_idx}] * anim_weight_slot{slot_index};"
+                else: 
+                    calc_line = f"total_diff_position += (shapekeys[{slot_index}][{read_idx}].position - base[i].position) * anim_weight_slot{slot_index};"
+
+                logic_lines.append(indent + calc_line)
+
+                if use_packed: logic_lines.extend(["        }", "    }\n"])
+                else: logic_lines.extend(["    }\n"])
+
+            content = re.sub(r"// --- \[PYTHON-MANAGED BLOCK START\] ---.*?// --- \[PYTHON-MANAGED BLOCK END\] ---",
+                             f"// --- [PYTHON-MANAGED BLOCK START] ---\n{chr(10).join(define_lines)}\n// --- [PYTHON-MANAGED BLOCK END] ---",
+                             content, flags=re.DOTALL)
+            content = re.sub(r"// --- \[PYTHON-MANAGED LOGIC START\] ---.*?// --- \[PYTHON-MANAGED LOGIC END\] ---",
+                             f"// --- [PYTHON-MANAGED LOGIC START] ---\n{chr(10).join(logic_lines)}    // --- [PYTHON-MANAGED LOGIC END] ---",
+                             content, flags=re.DOTALL)
+            
             with open(shader_path, 'w', encoding='utf-8') as f:
                 f.write(content)
             
+            mode_str = f"紧凑:{'是' if use_packed else '否'}, 增量(仅位置):{'是' if use_delta else '否'}"
+            print(f"成功更新着色器 ({mode_str})，支持 {len(hash_slot_data)} 个槽位。")
             return True
         except Exception as e:
             print(f"更新着色器文件失败: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def execute_postprocess(self, mod_export_path):

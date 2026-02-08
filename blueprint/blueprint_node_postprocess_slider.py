@@ -2,6 +2,7 @@ import bpy
 import os
 import glob
 import re
+import shutil
 from collections import OrderedDict
 
 from .blueprint_node_postprocess_base import SSMTNode_PostProcess_Base

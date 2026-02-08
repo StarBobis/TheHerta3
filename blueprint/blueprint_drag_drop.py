@@ -346,7 +346,6 @@ def check_object_name_changes():
         return 2.0
     
     object_id_to_name = {str(obj.as_pointer()): obj.name for obj in bpy.data.objects}
-    has_changes = False
     
     for tree in bpy.data.node_groups:
         if tree.bl_idname == 'SSMTBlueprintTreeType':
@@ -368,13 +367,59 @@ def check_object_name_changes():
                         new_name = object_id_to_name[obj_id]
                         if node.object_name != new_name:
                             node.object_name = new_name
-                            has_changes = True
     
-    return 0.1 if has_changes else 2.0
+    return 2.0
+
+
+class SSMT_OT_CheckObjectNameChanges(bpy.types.Operator):
+    '''手动检查物体名称变化，并更新对应节点的物体引用'''
+    bl_idname = "ssmt.check_object_name_changes"
+    bl_label = "检查物体名称变化"
+    bl_options = {'REGISTER'}
+    
+    def execute(self, context):
+        global _node_to_object_id_mapping
+        
+        if not _node_to_object_id_mapping:
+            self.report({'INFO'}, "没有需要检查的节点")
+            return {'CANCELLED'}
+        
+        object_id_to_name = {str(obj.as_pointer()): obj.name for obj in bpy.data.objects}
+        updated_count = 0
+        
+        for tree in bpy.data.node_groups:
+            if tree.bl_idname == 'SSMTBlueprintTreeType':
+                for node in tree.nodes:
+                    if node.bl_idname == 'SSMTNode_Object_Info':
+                        obj_id = getattr(node, 'object_id', '')
+                        if not obj_id:
+                            continue
+                        
+                        obj_name = getattr(node, 'object_name', '')
+                        if not obj_name:
+                            continue
+                        
+                        current_obj = bpy.data.objects.get(obj_name)
+                        if current_obj and str(current_obj.as_pointer()) == obj_id:
+                            continue
+                        
+                        if obj_id in object_id_to_name:
+                            new_name = object_id_to_name[obj_id]
+                            if node.object_name != new_name:
+                                node.object_name = new_name
+                                updated_count += 1
+        
+        if updated_count > 0:
+            self.report({'INFO'}, f"已更新 {updated_count} 个节点的物体引用")
+        else:
+            self.report({'INFO'}, "所有节点的物体引用都是最新的")
+        
+        return {'FINISHED'}
 
 
 def register():
     global _node_selection_timer, _object_name_check_timer
+    bpy.utils.register_class(SSMT_OT_CheckObjectNameChanges)
     _initialize_workspace_cache()
     bpy.app.handlers.depsgraph_update_post.append(object_visibility_handler)
     bpy.app.handlers.depsgraph_update_post.append(object_selection_handler)
@@ -406,6 +451,8 @@ def unregister():
         bpy.app.handlers.depsgraph_update_post.remove(object_selection_handler)
     if workspace_object_added_handler in bpy.app.handlers.depsgraph_update_post:
         bpy.app.handlers.depsgraph_update_post.remove(workspace_object_added_handler)
+    
+    bpy.utils.unregister_class(SSMT_OT_CheckObjectNameChanges)
     
     global _workspace_objects_cache, _object_to_node_mapping, _node_to_object_id_mapping, _is_importing, _syncing_selection, _last_node_selection_state, _cleanup_counter
     _workspace_objects_cache = set()

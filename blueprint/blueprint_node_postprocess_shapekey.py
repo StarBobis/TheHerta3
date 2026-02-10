@@ -133,28 +133,90 @@ class SSMTNode_PostProcess_ShapeKey(SSMTNode_PostProcess_Base):
                     if obj_name not in hash_to_objects[obj_hash]: hash_to_objects[obj_hash].append(obj_name)
         return slot_to_name_to_objects, list(hash_to_objects.keys()), hash_to_objects, all_objects
 
-    def _detect_vertex_format(self, base_bytes, shapekey_bytes):
+    @staticmethod
+    def parse_vertex_struct(struct_definition):
+        """解析顶点属性结构体定义，计算总字节数和float数量"""
+        if not struct_definition or not struct_definition.strip():
+            return None
+        
+        TYPE_SIZES = {
+            'float': 4,
+            'float2': 8,
+            'float3': 12,
+            'float4': 16,
+            'int': 4,
+            'int2': 8,
+            'int3': 12,
+            'int4': 16,
+            'uint': 4,
+            'uint2': 8,
+            'uint3': 12,
+            'uint4': 16,
+            'half': 2,
+            'half2': 4,
+            'half3': 6,
+            'half4': 8,
+            'double': 8,
+            'double2': 16,
+            'double3': 24,
+            'double4': 32,
+        }
+        
+        total_bytes = 0
+        total_floats = 0
+        attributes = []
+        unrecognized_types = set()
+        
+        lines = struct_definition.split('\n')
+        for line in lines:
+            line = line.strip()
+            if not line or line.startswith('//') or line.startswith('/*') or line.startswith('*'):
+                continue
+            
+            line = line.rstrip(';').strip()
+            
+            parts = line.split()
+            if len(parts) >= 2:
+                type_name = parts[0]
+                var_name = parts[1].rstrip(';')
+                
+                if type_name in TYPE_SIZES:
+                    byte_size = TYPE_SIZES[type_name]
+                    total_bytes += byte_size
+                    total_floats += byte_size // 4
+                    attributes.append({'type': type_name, 'name': var_name, 'size': byte_size})
+                elif type_name.lower() != 'struct' and not line.endswith('{') and not line.endswith('}'):
+                    unrecognized_types.add(type_name)
+        
+        if unrecognized_types:
+            print(f"警告: 发现未识别的顶点属性类型: {', '.join(unrecognized_types)}")
+        
+        if total_bytes == 0:
+            print(f"警告: 无法解析顶点结构体定义，total_bytes为0")
+            return None
+        
+        if not attributes:
+            print(f"警告: 未找到有效的顶点属性")
+            return None
+        
+        return (total_bytes, total_floats, attributes)
+
+
+    def _detect_vertex_format(self, base_bytes, shapekey_bytes, struct_definition=None):
         VERTEX_STRIDE, NUM_FLOATS_PER_VERTEX = 40, 10
         num_vertices = len(base_bytes) // VERTEX_STRIDE
 
-        possible_strides = [12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 56, 60, 64]
-        valid_formats = []
-
-        for stride in possible_strides:
-            if len(base_bytes) % stride != 0 or len(shapekey_bytes) % stride != 0:
-                continue
-
-            num_v = len(base_bytes) // stride
-            if num_v < 100 or num_v > 1000000:
-                continue
-
-            num_floats = stride // 4
-            valid_formats.append((stride, num_floats, num_v))
-
-        if valid_formats:
-            valid_formats.sort(key=lambda x: x[2], reverse=True)
-            return valid_formats[0]
-
+        if struct_definition and struct_definition.strip():
+            parsed = self.parse_vertex_struct(struct_definition)
+            if parsed:
+                VERTEX_STRIDE, NUM_FLOATS_PER_VERTEX, attributes = parsed
+                num_vertices = len(base_bytes) // VERTEX_STRIDE
+                print(f"使用结构体定义: 步长={VERTEX_STRIDE}字节, 每顶点{NUM_FLOATS_PER_VERTEX}个float, 顶点数={num_vertices}")
+                return (VERTEX_STRIDE, NUM_FLOATS_PER_VERTEX, num_vertices)
+            else:
+                print(f"警告: 结构体定义解析失败，使用默认值")
+        
+        print(f"使用默认值: 步长={VERTEX_STRIDE}字节, 每顶点{NUM_FLOATS_PER_VERTEX}个float, 顶点数={num_vertices}")
         return (VERTEX_STRIDE, NUM_FLOATS_PER_VERTEX, num_vertices)
 
     def _process_shapekey_buffers(self, mod_export_path, slot_to_name_to_objects, hash_to_stride):
@@ -193,7 +255,8 @@ class SSMTNode_PostProcess_ShapeKey(SSMTNode_PostProcess_Base):
                     print(f"    -> 跳过：文件大小不匹配 for hash {h}, slot {slot}")
                     continue
 
-                VERTEX_STRIDE, NUM_FLOATS_PER_VERTEX, num_vertices = self._detect_vertex_format(base_bytes, shapekey_bytes)
+                struct_definition = self._get_vertex_struct_definition()
+                VERTEX_STRIDE, NUM_FLOATS_PER_VERTEX, num_vertices = self._detect_vertex_format(base_bytes, shapekey_bytes, struct_definition)
                 print(f"    -> 检测到格式: 步长={VERTEX_STRIDE}字节, 每顶点{NUM_FLOATS_PER_VERTEX}个float, 顶点数={num_vertices}")
 
                 if h not in hash_to_stride:
@@ -359,7 +422,8 @@ class SSMTNode_PostProcess_ShapeKey(SSMTNode_PostProcess_Base):
         vertex_attrs_node = self._get_vertex_attrs_node()
         if vertex_attrs_node:
             return vertex_attrs_node.get_vertex_struct_definition()
-        return None
+        
+        return "struct VertexAttributes {\n    float3 position;\n    float3 normal;\n    float4 tangent;\n};"
 
     def _update_shader_file(self, shader_path, hash_slot_data, use_packed, use_delta, unique_names, unique_objects):
         """更新着色器文件"""

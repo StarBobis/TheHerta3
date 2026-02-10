@@ -5,6 +5,7 @@ from ..config.main_config import GlobalConfig, LogicName
 from ..config.properties_generate_mod import Properties_GenerateMod
 from .blueprint_node_base import SSMTBlueprintTree, SSMTNodeBase
 
+BLENDER_VERSION = bpy.app.version[:2]
 
 _picking_node_name = None
 _picking_tree_name = None
@@ -105,10 +106,6 @@ class SSMT_OT_PickObjectModal(bpy.types.Operator):
     bl_label = "Pick Object"
     bl_options = {'REGISTER', 'INTERNAL'}
     
-    def __init__(self):
-        self._initial_selected_objs = set()
-        self._last_selected_obj = None
-    
     def invoke(self, context, event):
         global _picking_node_name
         
@@ -118,6 +115,8 @@ class SSMT_OT_PickObjectModal(bpy.types.Operator):
         self._initial_selected_objs = set(context.selected_objects)
         if context.selected_objects:
             self._last_selected_obj = context.selected_objects[0]
+        else:
+            self._last_selected_obj = None
         
         context.window_manager.modal_handler_add(self)
         return {'RUNNING_MODAL'}

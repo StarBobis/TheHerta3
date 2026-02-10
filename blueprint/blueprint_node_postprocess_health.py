@@ -16,25 +16,29 @@ class SSMTNode_PostProcess_HealthDetection(SSMTNode_PostProcess_Base):
         name="角色哈希",
         description="目标角色的Body Blend Hash",
         default="2d519056",
-        maxlen=256
+        maxlen=256,
+        update=lambda self, context: self.update_node_width([self.health_character_hash, self.health_combat_ui_hash, self.health_bar_hash, self.health_param_name])
     )
     health_combat_ui_hash: bpy.props.StringProperty(
         name="战斗UI哈希",
         description="战斗UI的Hash值",
         default="0086a8159f4d9a00",
-        maxlen=256
+        maxlen=256,
+        update=lambda self, context: self.update_node_width([self.health_character_hash, self.health_combat_ui_hash, self.health_bar_hash, self.health_param_name])
     )
     health_bar_hash: bpy.props.StringProperty(
         name="血条绘制哈希",
         description="血条绘制Shader的Hash值",
         default="dce9c76d7f184caf",
-        maxlen=256
+        maxlen=256,
+        update=lambda self, context: self.update_node_width([self.health_character_hash, self.health_combat_ui_hash, self.health_bar_hash, self.health_param_name])
     )
     health_param_name: bpy.props.StringProperty(
         name="参数名称",
         description="血量映射的参数名称",
         default="$HealthLevel",
-        maxlen=256
+        maxlen=256,
+        update=lambda self, context: self.update_node_width([self.health_character_hash, self.health_combat_ui_hash, self.health_bar_hash, self.health_param_name])
     )
     health_levels: bpy.props.IntProperty(
         name="级数",

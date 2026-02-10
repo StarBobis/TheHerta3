@@ -183,6 +183,8 @@ class SSMTNode_Object_Info(SSMTNodeBase):
         else:
             self.label = "Object Info"
             self.object_id = ""
+        
+        self.update_node_width([self.object_name, self.draw_ib, self.component, self.alias_name])
     object_name: bpy.props.StringProperty(name="Object Name", default="", update=update_object_name)
     object_id: bpy.props.StringProperty(name="Object ID", default="")
 
@@ -239,9 +241,16 @@ class SSMTNode_ToggleKey(SSMTNodeBase):
     bl_label = 'Toggle Key'
     bl_icon = 'GROUP'
 
-    key_name: bpy.props.StringProperty(name="Key Name", default="") # type: ignore
+    def update_key_name(self, context):
+        self.update_node_width([self.key_name, self.comment])
+    
+    def update_comment(self, context):
+        self.update_node_width([self.key_name, self.comment])
+    
+    key_name: bpy.props.StringProperty(name="Key Name", default="", update=update_key_name) # type: ignore
     default_on: bpy.props.BoolProperty(name="Default On", default=False) # type: ignore
-
+    comment: bpy.props.StringProperty(name="备注", description="备注信息，会以注释形式生成到配置表中", default="", update=update_comment) # type: ignore
+    
     def init(self, context):
         self.label = "按键开关"
         self.inputs.new('SSMTSocketObject', "Input 1")
@@ -256,6 +265,7 @@ class SSMTNode_ToggleKey(SSMTNodeBase):
         row.operator("wm.url_open", text="", icon='HELP').url = "https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes"
         
         layout.prop(self, "default_on", text="默认开启")
+        layout.prop(self, "comment", text="备注")
 
     def update(self):
         if self.inputs and self.inputs[-1].is_linked:
@@ -305,8 +315,15 @@ class SSMTNode_SwitchKey(SSMTNodeBase):
     bl_label = 'Switch Key'
     bl_icon = 'GROUP'
 
-    key_name: bpy.props.StringProperty(name="Key Name", default="") # type: ignore
-
+    def update_key_name(self, context):
+        self.update_node_width([self.key_name, self.comment])
+    
+    def update_comment(self, context):
+        self.update_node_width([self.key_name, self.comment])
+    
+    key_name: bpy.props.StringProperty(name="Key Name", default="", update=update_key_name) # type: ignore
+    comment: bpy.props.StringProperty(name="备注", description="备注信息，会以注释形式生成到配置表中", default="", update=update_comment) # type: ignore
+    
     def init(self, context):
         self.label = "按键切换"
         self.inputs.new('SSMTSocketObject', "Status 0")
@@ -319,6 +336,8 @@ class SSMTNode_SwitchKey(SSMTNodeBase):
         row = layout.row(align=True)
         row.prop(self, "key_name", text="按键")
         row.operator("wm.url_open", text="", icon='HELP').url = "https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes"
+        
+        layout.prop(self, "comment", text="备注")
         
         row = layout.row(align=True)
         op_add = row.operator("ssmt.switch_add_socket", text="Add", icon='ADD')

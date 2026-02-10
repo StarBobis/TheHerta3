@@ -95,6 +95,9 @@ class BluePrintModel:
             else:
                 m_key.initialize_value = 0
             
+            # 设置备注信息
+            m_key.comment = getattr(unknown_node, 'comment', '')
+            
             # 创建的key加入全局key列表
             self.keyname_mkey_dict[m_key.key_name] = m_key
 
@@ -153,6 +156,9 @@ class BluePrintModel:
 
                 m_key.initialize_vk_str = unknown_node.key_name
                 m_key.initialize_value = 0  # 默认选择第一个分支
+
+                # 设置备注信息
+                m_key.comment = getattr(unknown_node, 'comment', '')
 
                 # 创建的key加入全局key列表
                 self.keyname_mkey_dict[m_key.key_name] = m_key

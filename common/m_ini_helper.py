@@ -294,6 +294,11 @@ class M_IniHelper:
         for shapekey_name, m_key in shapekeyname_mkey_dict.items():
             if m_key.initialize_vk_str != "":
                 key_section.append("[Key_ShapeKey_" +shapekey_name + "]")
+                
+                # 添加备注信息
+                if m_key.comment:
+                    key_section.append("; " + m_key.comment)
+                
                 key_section.append("key = " + m_key.initialize_vk_str)
                 key_section.append("type = cycle")
                 key_section.append(m_key.key_name + " = 0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1")
@@ -334,6 +339,11 @@ class M_IniHelper:
             for mkey in key_name_mkey_dict.values():
                 key_section = M_IniSection(M_SectionType.Key)
                 key_section.append("[KeySwap_" + str(key_number) + "]")
+                
+                # 添加备注信息
+                if mkey.comment:
+                    key_section.append("; " + mkey.comment)
+                
                 # key_section.append("condition = $active" + str(key_number) + " == 1")
 
                 # XXX 这里由于有BUG，我们固定用$active0来检测激活，不搞那么复杂了。

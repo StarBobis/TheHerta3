@@ -131,11 +131,13 @@ class BlueprintExportHelper:
 
             shapekey_name = shapekey_node.shapekey_name
             key = shapekey_node.key
+            comment = getattr(shapekey_node, 'comment', '')
 
             m_key = M_Key()
             m_key.key_name = "$shapekey" + str(key_index)
             m_key.initialize_value = 0
             m_key.initialize_vk_str = key
+            m_key.comment = comment
 
             shapekey_name_mkey_dict[shapekey_name] = m_key
 

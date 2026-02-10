@@ -22,7 +22,8 @@ class SSMTNode_PostProcess_Material(SSMTNode_PostProcess_Base):
     material_switch_var: bpy.props.StringProperty(
         name="材质切换变量",
         description="用于材质切换的起始变量名(会自动递增)",
-        default="$swapkey150"
+        default="$swapkey150",
+        update=lambda self, context: self.update_node_width([self.material_switch_var])
     )
 
     def draw_buttons(self, context, layout):

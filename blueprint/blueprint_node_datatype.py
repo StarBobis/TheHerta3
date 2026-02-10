@@ -21,7 +21,8 @@ class SSMTNode_DataType(SSMTNodeBase):
     draw_ib_match: bpy.props.StringProperty(
         name="匹配 DrawIB",
         description="输入要匹配的DrawIB（支持多个，用逗号分隔）",
-        default=""
+        default="",
+        update=lambda self, context: self.update_node_width([self.draw_ib_match, self.tmp_json_path, self.loaded_data])
     ) # type: ignore
 
     # tmp.json 文件路径

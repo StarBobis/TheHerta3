@@ -32,7 +32,7 @@ class VertexAttributeItem(bpy.types.PropertyGroup):
         ],
         default='float3'
     )
-    attr_name: bpy.props.StringProperty(name="属性名称", description="顶点属性的名称", default="position", maxlen=256)
+    attr_name: bpy.props.StringProperty(name="属性名称", description="顶点属性的名称", default="position", maxlen=256, update=lambda self, context: self.id_data.update_node_width([item.attr_name for item in self.id_data.vertex_attributes]))
 
 
 class SSMTNode_PostProcess_VertexAttrs(SSMTNode_PostProcess_Base):

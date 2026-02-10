@@ -23,17 +23,26 @@ class SSMTNode_PostProcess_MultiFile(SSMTNode_PostProcess_Base):
     hash_values: bpy.props.StringProperty(
         name="哈希值",
         description="需要处理的哈希值，多个用逗号分隔（如：4816de84,5c0240db）",
-        default=""
+        default="",
+        update=lambda self, context: self.update_node_width([self.hash_values, self.animation_swapkey, self.active_swapkey, self.comment])
     )
     animation_swapkey: bpy.props.StringProperty(
         name="循环参数名",
         description="用于动画帧切换的参数名称",
-        default="$swapkey100"
+        default="$swapkey100",
+        update=lambda self, context: self.update_node_width([self.hash_values, self.animation_swapkey, self.active_swapkey, self.comment])
     )
     active_swapkey: bpy.props.StringProperty(
         name="激活参数名",
         description="用于控制动画执行的参数名称",
-        default="$active0"
+        default="$active0",
+        update=lambda self, context: self.update_node_width([self.hash_values, self.animation_swapkey, self.active_swapkey, self.comment])
+    )
+    comment: bpy.props.StringProperty(
+        name="备注",
+        description="备注信息，会以注释形式生成到配置表中",
+        default="",
+        update=lambda self, context: self.update_node_width([self.hash_values, self.animation_swapkey, self.active_swapkey, self.comment])
     )
     active_value: bpy.props.IntProperty(
         name="激活参数值",
@@ -48,6 +57,7 @@ class SSMTNode_PostProcess_MultiFile(SSMTNode_PostProcess_Base):
         layout.prop(self, "animation_swapkey")
         layout.prop(self, "active_swapkey")
         layout.prop(self, "active_value")
+        layout.prop(self, "comment", text="备注")
 
         if not NUMPY_AVAILABLE:
             layout.label(text="警告: 未安装numpy库，功能不可用", icon='ERROR')
@@ -300,7 +310,12 @@ class SSMTNode_PostProcess_MultiFile(SSMTNode_PostProcess_Base):
 
                                 shader_section = f'[CustomShader_{hash_value}_1Anim]'
                                 shader_lines = []
-
+                                
+                                # 添加备注信息
+                                if self.comment:
+                                    shader_lines.append("; " + self.comment)
+                                    shader_lines.append("")
+                                
                                 for i, buffer_folder in enumerate(buffer_folders, 2):
                                     state_index = i - 2
                                     shader_lines.append(f"if {self.animation_swapkey} == {state_index}")

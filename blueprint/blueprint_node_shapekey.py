@@ -11,9 +11,19 @@ class SSMTNode_ShapeKey(SSMTNodeBase):
     bl_label = 'Shape Key'
     bl_icon = 'SHAPEKEY_DATA'
 
-    shapekey_name: bpy.props.StringProperty(name="ShapeKey Name", default="") # type: ignore
-    key: bpy.props.StringProperty(name="Key", default="") # type: ignore
-
+    def update_shapekey_name(self, context):
+        self.update_node_width([self.shapekey_name, self.key, self.comment])
+    
+    def update_key(self, context):
+        self.update_node_width([self.shapekey_name, self.key, self.comment])
+    
+    def update_comment(self, context):
+        self.update_node_width([self.shapekey_name, self.key, self.comment])
+    
+    shapekey_name: bpy.props.StringProperty(name="ShapeKey Name", default="", update=update_shapekey_name) # type: ignore
+    key: bpy.props.StringProperty(name="Key", default="", update=update_key) # type: ignore
+    comment: bpy.props.StringProperty(name="备注", description="备注信息，会以注释形式生成到配置表中", default="", update=update_comment) # type: ignore
+    
     def init(self, context):
         self.outputs.new('SSMTSocketObject', "Output")
         self.width = 200
@@ -24,6 +34,8 @@ class SSMTNode_ShapeKey(SSMTNodeBase):
         row = layout.row(align=True)
         row.prop(self, "key", text="Key")
         row.operator("wm.url_open", text="", icon='HELP').url = "https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes"
+        
+        layout.prop(self, "comment", text="备注")
 
 
 # 结果输出节点

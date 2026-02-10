@@ -223,11 +223,14 @@ class SSMTNode_MultiFile_Export(SSMTNodeBase):
                 item.component = parts[1]
                 if len(parts) >= 3:
                     item.alias_name = "-".join(parts[2:])
+        
+        self.update_node_width([item.object_name for item in self.object_list])
     
     def remove_object_from_list(self, index):
         """从列表中移除物体"""
         if index >= 0 and index < len(self.object_list):
             self.object_list.remove(index)
+            self.update_node_width([item.object_name for item in self.object_list])
     
     def move_object_in_list(self, from_index, to_index):
         """移动物体在列表中的位置"""
@@ -280,8 +283,14 @@ class SSMTNode_MultiFile_Export(SSMTNodeBase):
         
         return count
     
-    temp_object_name: bpy.props.StringProperty(name="临时物体名称", default="") # type: ignore
-    temp_collection_name: bpy.props.StringProperty(name="临时合集名称", default="") # type: ignore
+    def update_temp_object_name(self, context):
+        self.update_node_width([self.temp_object_name, self.temp_collection_name])
+    
+    def update_temp_collection_name(self, context):
+        self.update_node_width([self.temp_object_name, self.temp_collection_name])
+    
+    temp_object_name: bpy.props.StringProperty(name="临时物体名称", default="", update=update_temp_object_name) # type: ignore
+    temp_collection_name: bpy.props.StringProperty(name="临时合集名称", default="", update=update_temp_collection_name) # type: ignore
 
 
 classes = (

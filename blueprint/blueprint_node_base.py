@@ -48,6 +48,38 @@ class SSMTNodeBase(Node):
     def poll(cls, ntree):
         return ntree.bl_idname == 'SSMTBlueprintTreeType'
     
+    def calculate_text_width(self, text, padding=40):
+        """计算文本所需的宽度（估算值）"""
+        if not text:
+            return 200
+        
+        # 中文字符宽度约为英文字符的2倍
+        char_count = 0
+        for char in text:
+            if '\u4e00' <= char <= '\u9fff':
+                char_count += 2
+            else:
+                char_count += 1
+        
+        # 每个字符约占用8像素宽度（估算值）
+        width = char_count * 8 + padding
+        
+        # 确保最小宽度为200
+        return max(200, width)
+    
+    def update_node_width(self, texts):
+        """根据文本内容更新节点宽度"""
+        if not texts:
+            return
+        
+        max_width = 200
+        for text in texts:
+            width = self.calculate_text_width(text)
+            if width > max_width:
+                max_width = width
+        
+        self.width = max_width
+    
 
 class THEHERTA3_OT_OpenPersistentBlueprint(bpy.types.Operator):
     bl_idname = "theherta3.open_persistent_blueprint"

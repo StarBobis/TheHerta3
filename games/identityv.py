@@ -111,7 +111,7 @@ class ModModelIdentityV:
             ib_resource_name = draw_ib_model.PartName_IBResourceName_Dict.get(part_name,None)
             
             # 第五必须用槽位恢复技术，绕过顶点限制
-            texture_override_ib_section.append("[Resource_IB_Bak_" + str(count_i) + "]")
+            texture_override_ib_section.append("[Resource_IB_" + draw_ib + "_Bak_" + str(count_i) + "]")
             texture_override_ib_section.append("[TextureOverride_" + texture_override_name_suffix + "]")
             texture_override_ib_section.append("hash = " + draw_ib)
             texture_override_ib_section.append("match_first_index = " + match_first_index)
@@ -134,7 +134,7 @@ class ModModelIdentityV:
             if GlobalConfig.logic_name == LogicName.ZZMI:
                 texture_override_ib_section.append(self.vlr_filter_index_indent + "run = CommandListSkinTexture")
 
-            texture_override_ib_section.append("Resource_IB_Bak_" + str(count_i) + " = ref ib")
+            texture_override_ib_section.append("Resource_IB_" + draw_ib + "_Bak_" + str(count_i) + " = ref ib")
             # 第五人格特有的check vb0 配合VSCheck使用
             texture_override_ib_section.append("checktextureoverride = vb0")
 
@@ -179,7 +179,7 @@ class ModModelIdentityV:
                 texture_override_ib_section.append(drawindexed_str)
             
             # Draw之后恢复IB
-            texture_override_ib_section.append("ib = Resource_IB_Bak_" + str(count_i))
+            texture_override_ib_section.append("ib = Resource_IB_" + draw_ib + "_Bak_" + str(count_i))
 
 
             # 补全endif

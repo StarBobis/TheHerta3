@@ -341,8 +341,9 @@ class M_IniHelper:
                 key_section.append("[KeySwap_" + str(key_number) + "]")
                 
                 # 添加备注信息
-                if mkey.comment:
-                    key_section.append("; " + mkey.comment)
+                comment = getattr(mkey, 'comment', '')
+                if comment:
+                    key_section.append("; " + comment)
                 
                 # key_section.append("condition = $active" + str(key_number) + " == 1")
 

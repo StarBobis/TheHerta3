@@ -12,6 +12,22 @@ _picking_tree_name = None
 _is_viewing_group_objects = False
 
 
+def _update_node_to_object_id_mapping():
+    """更新节点到物体ID的映射关系"""
+    from .blueprint_drag_drop import _node_to_object_id_mapping
+    
+    _node_to_object_id_mapping.clear()
+    
+    for tree in bpy.data.node_groups:
+        if tree.bl_idname == 'SSMTBlueprintTreeType':
+            for node in tree.nodes:
+                if node.bl_idname == 'SSMTNode_Object_Info':
+                    obj_id = getattr(node, 'object_id', '')
+                    if obj_id:
+                        node_key = (tree.name, node.name)
+                        _node_to_object_id_mapping[node_key] = obj_id
+
+
 class SSMT_OT_RefreshNodeObjectIDs(bpy.types.Operator):
     '''刷新节点树中所有节点的物体ID关联'''
     bl_idname = "ssmt.refresh_node_object_ids"
@@ -19,27 +35,24 @@ class SSMT_OT_RefreshNodeObjectIDs(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
     
     def execute(self, context):
-        tree = getattr(context.space_data, "edit_tree", None) or getattr(context.space_data, "node_tree", None)
-        
-        if not tree:
-            self.report({'WARNING'}, "无法获取节点树上下文")
-            return {'CANCELLED'}
-        
         updated_count = 0
         
-        for node in tree.nodes:
-            if node.bl_idname == 'SSMTNode_Object_Info':
-                obj_name = getattr(node, 'object_name', '')
-                obj_id = getattr(node, 'object_id', '')
-                
-                if obj_name and not obj_id:
-                    obj = bpy.data.objects.get(obj_name)
-                    if obj:
-                        node.object_id = str(obj.as_pointer())
-                        updated_count += 1
+        for tree in bpy.data.node_groups:
+            if tree.bl_idname == 'SSMTBlueprintTreeType':
+                for node in tree.nodes:
+                    if node.bl_idname == 'SSMTNode_Object_Info':
+                        obj_name = getattr(node, 'object_name', '')
+                        obj_id = getattr(node, 'object_id', '')
+                        
+                        if obj_name and not obj_id:
+                            obj = bpy.data.objects.get(obj_name)
+                            if obj:
+                                node.object_id = str(obj.as_pointer())
+                                updated_count += 1
         
         if updated_count > 0:
             self.report({'INFO'}, f"已更新 {updated_count} 个节点的物体ID关联")
+            _update_node_to_object_id_mapping()
         else:
             self.report({'INFO'}, "所有节点都已建立物体ID关联")
         

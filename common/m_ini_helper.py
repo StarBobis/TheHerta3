@@ -296,8 +296,9 @@ class M_IniHelper:
                 key_section.append("[Key_ShapeKey_" +shapekey_name + "]")
                 
                 # 添加备注信息
-                if m_key.comment:
-                    key_section.append("; " + m_key.comment)
+                comment = getattr(m_key, 'comment', '')
+                if comment:
+                    key_section.append("; " + comment)
                 
                 key_section.append("key = " + m_key.initialize_vk_str)
                 key_section.append("type = cycle")

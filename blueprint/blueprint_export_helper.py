@@ -126,6 +126,8 @@ class BlueprintExportHelper:
 
         key_index = 0
         for shapekey_node in shapekey_nodes:
+            if shapekey_node.mute:
+                continue
             if shapekey_node.bl_idname != 'SSMTNode_ShapeKey':
                 continue
 
@@ -183,6 +185,9 @@ class BlueprintExportHelper:
         if node.name in visited:
             return []
         
+        if node.mute:
+            return []
+        
         visited.add(node.name)
         datatype_nodes = []
         
@@ -206,6 +211,8 @@ class BlueprintExportHelper:
         
         multifile_nodes = []
         for node in tree.nodes:
+            if node.mute:
+                continue
             if node.bl_idname == 'SSMTNode_MultiFile_Export':
                 multifile_nodes.append(node)
         
@@ -312,6 +319,9 @@ class BlueprintExportHelper:
                     for link in output.links:
                         target_node = link.to_node
                         
+                        if target_node.mute:
+                            continue
+                        
                         if target_node.bl_idname.startswith('SSMTNode_PostProcess'):
                             postprocess_nodes.append(target_node)
                             collect_postprocess_nodes(target_node, visited)
@@ -332,6 +342,10 @@ class BlueprintExportHelper:
         print(f"找到 {len(postprocess_nodes)} 个后处理节点，开始执行...")
         
         for index, node in enumerate(postprocess_nodes):
+            if node.mute:
+                print(f"跳过已禁用的节点: {node.name}")
+                continue
+            
             print(f"执行第 {index + 1}/{len(postprocess_nodes)} 个后处理节点: {node.name}")
             
             try:

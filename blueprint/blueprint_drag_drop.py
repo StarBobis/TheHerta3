@@ -5,6 +5,7 @@ from .blueprint_node_obj import _is_viewing_group_objects
 
 
 _workspace_objects_cache = set()
+_workspace_object_ids_cache = set()
 _object_to_node_mapping = {}
 _node_to_object_id_mapping = {}
 _is_importing = False
@@ -72,7 +73,7 @@ def object_selection_handler(scene):
 @bpy.app.handlers.persistent
 def workspace_object_added_handler(scene):
     """处理工作合集中添加新物体的事件，确保工作合集中所有物体都有对应的物体信息节点"""
-    global _workspace_objects_cache, _object_to_node_mapping, _is_importing
+    global _workspace_objects_cache, _workspace_object_ids_cache, _object_to_node_mapping, _is_importing
     
     if _is_importing:
         return
@@ -85,15 +86,17 @@ def workspace_object_added_handler(scene):
         return
     
     current_objects = _get_objects_in_workspace(workspace_collection)
+    current_object_ids = _get_object_ids_in_workspace(workspace_collection)
     
-    new_objects = current_objects - _workspace_objects_cache
+    new_object_ids = current_object_ids - _workspace_object_ids_cache
     
-    if new_objects:
+    if new_object_ids:
         for tree in bpy.data.node_groups:
             if tree.bl_idname == 'SSMTBlueprintTreeType':
                 _ensure_all_objects_have_nodes(tree, current_objects)
     
     _workspace_objects_cache = current_objects
+    _workspace_object_ids_cache = current_object_ids
 
 
 def _ensure_all_objects_have_nodes(tree, workspace_objects):
@@ -113,10 +116,14 @@ def _ensure_all_objects_have_nodes(tree, workspace_objects):
         node = _create_object_info_node(tree, obj_name)
         if node:
             _object_to_node_mapping[obj_name] = node
+            obj_id = getattr(node, 'object_id', '')
+            if obj_id:
+                node_key = (tree.name, node.name)
+                _node_to_object_id_mapping[node_key] = obj_id
 
 
 def _get_objects_in_workspace(workspace_collection):
-    """获取工作合集中所有物体"""
+    """获取工作合集中所有物体，返回物体名称和ID的集合"""
     objects_in_workspace = set()
     
     def collect_objects(collection):
@@ -128,6 +135,21 @@ def _get_objects_in_workspace(workspace_collection):
     
     collect_objects(workspace_collection)
     return objects_in_workspace
+
+
+def _get_object_ids_in_workspace(workspace_collection):
+    """获取工作合集中所有物体的ID，用于检测重命名"""
+    object_ids_in_workspace = set()
+    
+    def collect_object_ids(collection):
+        for obj in collection.objects:
+            if obj.type == 'MESH':
+                object_ids_in_workspace.add(str(obj.as_pointer()))
+        for child in collection.children:
+            collect_object_ids(child)
+    
+    collect_object_ids(workspace_collection)
+    return object_ids_in_workspace
 
 
 def _create_object_info_node(tree, obj_name):
@@ -151,6 +173,10 @@ def _create_object_info_node(tree, obj_name):
     
     _position_new_node(tree, node, object_info_count - 1)
     
+    obj = bpy.data.objects.get(obj_name)
+    if obj:
+        node.object_id = str(obj.as_pointer())
+    
     return node
 
 
@@ -167,10 +193,11 @@ def _position_new_node(tree, new_node, index):
 
 def _initialize_workspace_cache():
     """初始化工作合集中物体的缓存"""
-    global _workspace_objects_cache, _object_to_node_mapping, _node_to_object_id_mapping, _is_importing
+    global _workspace_objects_cache, _workspace_object_ids_cache, _object_to_node_mapping, _node_to_object_id_mapping, _is_importing
     
     if not GlobalConfig.workspacename:
         _workspace_objects_cache = set()
+        _workspace_object_ids_cache = set()
         _object_to_node_mapping = {}
         _node_to_object_id_mapping = {}
         _is_importing = False
@@ -179,8 +206,10 @@ def _initialize_workspace_cache():
     workspace_collection = bpy.data.collections.get(GlobalConfig.workspacename)
     if workspace_collection:
         _workspace_objects_cache = _get_objects_in_workspace(workspace_collection)
+        _workspace_object_ids_cache = _get_object_ids_in_workspace(workspace_collection)
     else:
         _workspace_objects_cache = set()
+        _workspace_object_ids_cache = set()
     
     _initialize_node_object_ids()
     _build_object_to_node_mapping()
@@ -340,7 +369,7 @@ def check_node_selection_changes():
 
 def check_object_name_changes():
     """定时检查物体名称变化，并更新对应节点的物体引用"""
-    global _node_to_object_id_mapping
+    global _node_to_object_id_mapping, _object_to_node_mapping
     
     if not _node_to_object_id_mapping:
         return 2.0
@@ -366,7 +395,12 @@ def check_object_name_changes():
                     if obj_id in object_id_to_name:
                         new_name = object_id_to_name[obj_id]
                         if node.object_name != new_name:
+                            old_name = node.object_name
                             node.object_name = new_name
+                            
+                            if old_name in _object_to_node_mapping:
+                                del _object_to_node_mapping[old_name]
+                            _object_to_node_mapping[new_name] = node
     
     return 2.0
 
@@ -454,8 +488,9 @@ def unregister():
     
     bpy.utils.unregister_class(SSMT_OT_CheckObjectNameChanges)
     
-    global _workspace_objects_cache, _object_to_node_mapping, _node_to_object_id_mapping, _is_importing, _syncing_selection, _last_node_selection_state, _cleanup_counter
+    global _workspace_objects_cache, _workspace_object_ids_cache, _object_to_node_mapping, _node_to_object_id_mapping, _is_importing, _syncing_selection, _last_node_selection_state, _cleanup_counter
     _workspace_objects_cache = set()
+    _workspace_object_ids_cache = set()
     _object_to_node_mapping = {}
     _node_to_object_id_mapping = {}
     _is_importing = False

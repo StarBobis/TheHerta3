@@ -242,119 +242,121 @@ class SSMTNode_PostProcess_MultiFile(SSMTNode_PostProcess_Base):
                     continue
 
                 for hash_value in hash_values:
+                    buffer_folders = []
+                    for i in range(1, 100):
+                        buffer_folder = os.path.join(mod_export_path, f"Buffer{i:02d}")
+                        if os.path.exists(buffer_folder):
+                            buffer_folders.append(f"Buffer{i:02d}")
+                        else:
+                            break
+
+                    if len(buffer_folders) < 2:
+                        print(f"至少需要 Buffer01 和 Buffer02 两个文件夹才能进行多文件配置")
+                        continue
+
+                    base_buffer_path = os.path.join("Buffer01", f"{hash_value}-Position.buf")
+                    base_buffer_full_path = os.path.join(mod_export_path, base_buffer_path)
+                    if not os.path.exists(base_buffer_full_path):
+                        print(f"基准帧文件不存在: {base_buffer_full_path}")
+                        continue
+
+                    base_buffer = self._read_buffer_file(base_buffer_full_path)
+                    if base_buffer is None:
+                        continue
+
                     resource_section = f'[Resource{hash_value}Position]'
                     if resource_section in sections:
                         original_lines = sections[resource_section]
                         new_section_lines = [f'[Resource{hash_value}Position_1]'] + original_lines
                         sections[resource_section] = new_section_lines
 
-                        base_buffer_path = None
-                        for line in original_lines:
-                            if line.strip().startswith('filename ='):
-                                base_buffer_path = line.split('=', 1)[1].strip()
-                                break
+                    processed_frames = []
+                    for buffer_folder in buffer_folders[1:]:
+                        target_filename = os.path.join(buffer_folder, f"{hash_value}-Position.buf")
+                        target_buffer_full_path = os.path.join(mod_export_path, target_filename)
 
-                        if base_buffer_path:
-                            base_dir = os.path.dirname(base_buffer_path)
-                            base_filename = os.path.basename(base_buffer_path)
+                        if os.path.exists(target_buffer_full_path):
+                            target_buffer = self._read_buffer_file(target_buffer_full_path)
+                            if target_buffer is None:
+                                continue
 
-                            buffer_folders = []
-                            for i in range(2, 100):
-                                buffer_folder = os.path.join(mod_export_path, f"Buffer{i:02d}")
-                                if os.path.exists(buffer_folder):
-                                    buffer_folders.append(f"Buffer{i:02d}")
-                                else:
-                                    break
+                            map_array, pos_deltas_array = self._create_packed_buffers(
+                                base_buffer, target_buffer, True
+                            )
 
-                            if buffer_folders:
-                                base_buffer_full_path = os.path.join(mod_export_path, base_buffer_path)
-                                base_buffer = self._read_buffer_file(base_buffer_full_path)
-                                if base_buffer is None:
-                                    continue
+                            pos_output_path = os.path.join(mod_export_path, buffer_folder, f"{hash_value}-Position_pos.buf")
+                            self._write_buffer_file(pos_deltas_array, pos_output_path)
 
-                                for i, buffer_folder in enumerate(buffer_folders, 2):
-                                    target_filename = os.path.join(buffer_folder, f"{hash_value}-Position.buf")
-                                    target_buffer_full_path = os.path.join(mod_export_path, target_filename)
+                            map_output_path = os.path.join(mod_export_path, buffer_folder, f"{hash_value}-Position_map.buf")
+                            self._write_buffer_file(map_array, map_output_path)
 
-                                    if os.path.exists(target_buffer_full_path):
-                                        target_buffer = self._read_buffer_file(target_buffer_full_path)
-                                        if target_buffer is None:
-                                            continue
+                            folder_num = int(buffer_folder[-2:])
+                            pos_resource_section = f'[Resource{hash_value}Position{folder_num:02d}_pos]'
+                            stride = 12
 
-                                        map_array, pos_deltas_array = self._create_packed_buffers(
-                                            base_buffer, target_buffer, True
-                                        )
+                            sections[pos_resource_section] = [
+                                'type = Buffer',
+                                f'stride = {stride}',
+                                f'filename = {buffer_folder}/{hash_value}-Position_pos.buf'
+                            ]
 
-                                        pos_output_path = os.path.join(mod_export_path, buffer_folder, f"{hash_value}-Position_pos.buf")
+                            map_resource_section = f'[Resource{hash_value}Position{folder_num:02d}_Map]'
+                            sections[map_resource_section] = [
+                                'type = Buffer',
+                                'stride = 4',
+                                f'filename = {buffer_folder}/{hash_value}-Position_map.buf'
+                            ]
+                            
+                            processed_frames.append((folder_num, buffer_folder))
 
-                                        self._write_buffer_file(pos_deltas_array, pos_output_path)
+                    if not processed_frames:
+                        print(f"没有找到有效的目标帧文件，跳过哈希值: {hash_value}")
+                        continue
 
-                                        map_output_path = os.path.join(mod_export_path, buffer_folder, f"{hash_value}-Position_map.buf")
-                                        self._write_buffer_file(map_array, map_output_path)
+                    shader_section = f'[CustomShader_{hash_value}_1Anim]'
+                    shader_lines = []
+                    
+                    if self.comment:
+                        shader_lines.append("; " + self.comment)
+                        shader_lines.append("")
+                    
+                    for state_index, (folder_num, buffer_folder) in enumerate(processed_frames):
+                        shader_lines.append(f"if {self.animation_swapkey} == {state_index}")
+                        shader_lines.append(f"      cs-t51 = copy Resource{hash_value}Position{folder_num:02d}_pos")
+                        shader_lines.append(f"endif")
 
-                                        pos_resource_section = f'[Resource{hash_value}Position{i:02d}_pos]'
-                                        stride = 12
+                    shader_lines.append("")
 
-                                        sections[pos_resource_section] = [
-                                            'type = Buffer',
-                                            f'stride = {stride}',
-                                            f'filename = {buffer_folder}/{hash_value}-Position_pos.buf'
-                                        ]
+                    for state_index, (folder_num, buffer_folder) in enumerate(processed_frames):
+                        shader_lines.append(f"if {self.animation_swapkey} == {state_index}")
+                        shader_lines.append(f"      cs-t75 = copy Resource{hash_value}Position{folder_num:02d}_Map")
+                        shader_lines.append(f"endif")
 
-                                        map_resource_section = f'[Resource{hash_value}Position{i:02d}_Map]'
-                                        sections[map_resource_section] = [
-                                            'type = Buffer',
-                                            'stride = 4',
-                                            f'filename = {buffer_folder}/{hash_value}-Position_map.buf'
-                                        ]
+                    shader_lines.append("")
+                    shader_lines.append("    cs = ./res/合并anim_packed_delta.hlsl")
+                    shader_lines.append(f"    cs-u5 = copy Resource{hash_value}Position_1")
+                    shader_lines.append(f"    Resource{hash_value}Position = ref cs-u5")
 
-                                shader_section = f'[CustomShader_{hash_value}_1Anim]'
-                                shader_lines = []
-                                
-                                # 添加备注信息
-                                if self.comment:
-                                    shader_lines.append("; " + self.comment)
-                                    shader_lines.append("")
-                                
-                                for i, buffer_folder in enumerate(buffer_folders, 2):
-                                    state_index = i - 2
-                                    shader_lines.append(f"if {self.animation_swapkey} == {state_index}")
-                                    shader_lines.append(f"      cs-t51 = copy Resource{hash_value}Position{i:02d}_pos")
-                                    shader_lines.append(f"endif")
+                    shader_source_path = self._get_shader_source_path()
+                    if shader_source_path and os.path.exists(shader_source_path):
+                        dest_res_dir = os.path.join(mod_export_path, "res")
+                        os.makedirs(dest_res_dir, exist_ok=True)
+                        shader_dest_path = os.path.join(dest_res_dir, "合并anim_packed_delta.hlsl")
+                        shutil.copy2(shader_source_path, shader_dest_path)
+                        self._update_shader_file(shader_dest_path)
+                        print(f"已复制并更新着色器文件: 合并anim_packed_delta.hlsl")
 
-                                shader_lines.append("")
+                    vertex_count = self._get_vertex_count(sections, hash_value)
+                    if vertex_count:
+                        shader_lines.append(f"    Dispatch = {vertex_count}, 1, 1")
+                    else:
+                        shader_lines.append("    Dispatch = 10000, 1, 1")
 
-                                for i, buffer_folder in enumerate(buffer_folders, 2):
-                                    state_index = i - 2
-                                    shader_lines.append(f"if {self.animation_swapkey} == {state_index}")
-                                    shader_lines.append(f"      cs-t75 = copy Resource{hash_value}Position{i:02d}_Map")
-                                    shader_lines.append(f"endif")
+                    shader_lines.append("    cs-u5 = null")
+                    shader_lines.append("    cs-t51 = null")
+                    shader_lines.append("    cs-t75 = null")
 
-                                shader_lines.append("")
-                                shader_lines.append("    cs = ./res/合并anim_packed_delta.hlsl")
-                                shader_lines.append(f"    cs-u5 = copy Resource{hash_value}Position_1")
-                                shader_lines.append(f"    Resource{hash_value}Position = ref cs-u5")
-
-                                shader_source_path = self._get_shader_source_path()
-                                if shader_source_path and os.path.exists(shader_source_path):
-                                    dest_res_dir = os.path.join(mod_export_path, "res")
-                                    os.makedirs(dest_res_dir, exist_ok=True)
-                                    shader_dest_path = os.path.join(dest_res_dir, "合并anim_packed_delta.hlsl")
-                                    shutil.copy2(shader_source_path, shader_dest_path)
-                                    self._update_shader_file(shader_dest_path)
-                                    print(f"已复制并更新着色器文件: 合并anim_packed_delta.hlsl")
-
-                                vertex_count = self._get_vertex_count(sections, hash_value)
-                                if vertex_count:
-                                    shader_lines.append(f"    Dispatch = {vertex_count}, 1, 1")
-                                else:
-                                    shader_lines.append("    Dispatch = 10000, 1, 1")
-
-                                shader_lines.append("    cs-u5 = null")
-                                shader_lines.append("    cs-t51 = null")
-                                shader_lines.append("    cs-t75 = null")
-
-                                sections[shader_section] = shader_lines
+                    sections[shader_section] = shader_lines
 
                 constants_section = '[Constants]'
                 constants_lines = sections.get(constants_section, [])

@@ -200,6 +200,10 @@ class BluePrintModel:
             obj_model.draw_ib = unknown_node.draw_ib
             obj_model.component_count = int(unknown_node.component) 
             obj_model.obj_alias_name = unknown_node.alias_name
+            
+            # 使用原始名称作为 INI 注释中的显示名称
+            if hasattr(unknown_node, 'original_object_name') and unknown_node.original_object_name:
+                obj_model.display_name = unknown_node.original_object_name
 
             obj_model.condition = M_Condition(work_key_list=copy.deepcopy(chain_key_list))
             
@@ -216,6 +220,11 @@ class BluePrintModel:
                 obj_model.draw_ib = first_item.draw_ib
                 obj_model.component_count = int(first_item.component) if first_item.component else 0
                 obj_model.obj_alias_name = first_item.alias_name
+                
+                # 使用原始名称作为 INI 注释中的显示名称
+                if hasattr(first_item, 'original_object_name') and first_item.original_object_name:
+                    obj_model.display_name = first_item.original_object_name
+                
                 obj_model.condition = M_Condition(work_key_list=copy.deepcopy(chain_key_list))
                 obj_model.is_multifile_export = True
                 obj_model.multifile_node_name = unknown_node.name
@@ -297,6 +306,11 @@ class BluePrintModel:
                     obj_model.draw_ib = multifile_object_info["draw_ib"]
                     obj_model.component_count = int(multifile_object_info["component"]) if multifile_object_info["component"] else 0
                     obj_model.obj_alias_name = multifile_object_info["alias_name"]
+                    
+                    # 使用原始名称作为 INI 注释中的显示名称
+                    original_name = multifile_object_info.get("original_object_name", obj_name)
+                    if original_name:
+                        obj_model.display_name = original_name
                     
                     LOG.info(f"多文件导出节点更新物体: {obj_name} (第{export_index + 1}次导出)")
                 else:

@@ -54,10 +54,8 @@ class ObjElementModel:
         ShapeKeyUtils.reset_shapekey_values(self.obj)
 
         # 这里获取应用了形态键之后的mesh数据
+        # 注意：物体在导出前已经被 BEAUTY 三角化，所以这里不需要再次三角化
         mesh = ObjUtils.get_mesh_evaluate_from_obj(obj=self.obj)
-
-        # 三角化mesh，因为游戏引擎里的mesh都是三角形
-        ObjUtils.mesh_triangulate(mesh)
 
         # 前提是有UVMap，前面的步骤应该保证了模型至少有一个TEXCOORD.xy
         mesh.calc_tangents()

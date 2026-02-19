@@ -235,6 +235,54 @@ def mesh_triangulate(me):
     bm.free()
 
 
+def mesh_triangulate_beauty(obj):
+    '''
+    使用 Blender 内置的 BEAUTY 算法进行三角化
+    使用 bpy.ops.mesh.quads_convert_to_tris 确保一致的三角化结果
+    '''
+    if obj.type != 'MESH':
+        return
+    
+    original_active = bpy.context.view_layer.objects.active
+    original_selected = list(bpy.context.selected_objects)
+    original_mode = obj.mode
+    
+    try:
+        bpy.ops.object.select_all(action='DESELECT')
+        obj.select_set(True)
+        bpy.context.view_layer.objects.active = obj
+        
+        if original_mode != 'EDIT':
+            bpy.ops.object.mode_set(mode='EDIT')
+        
+        bpy.ops.mesh.select_all(action='SELECT')
+        bpy.ops.mesh.quads_convert_to_tris(quad_method='BEAUTY', ngon_method='BEAUTY')
+        bpy.ops.object.mode_set(mode='OBJECT')
+        
+    finally:
+        if original_mode == 'EDIT':
+            try:
+                bpy.ops.object.select_all(action='DESELECT')
+                obj.select_set(True)
+                bpy.context.view_layer.objects.active = obj
+                bpy.ops.object.mode_set(mode='EDIT')
+            except:
+                pass
+        
+        bpy.ops.object.select_all(action='DESELECT')
+        for sel_obj in original_selected:
+            if sel_obj:
+                try:
+                    sel_obj.select_set(True)
+                except:
+                    pass
+        if original_active:
+            try:
+                bpy.context.view_layer.objects.active = original_active
+            except:
+                pass
+
+
 def get_vertex_groups_from_bmesh(bm: bmesh.types.BMesh):
     layer_deform = bm.verts.layers.deform.active
     return [sorted(vert[layer_deform].items(), key=itemgetter(1), reverse=True) for vert in bm.verts]
@@ -688,3 +736,195 @@ class ObjUtils:
             obj.location[0] = 0.0  # X轴
             obj.location[1] = 0.0  # Y轴
             obj.location[2] = 0.0  # Z轴
+
+    @classmethod
+    def apply_mirror_transform(cls, obj):
+        '''
+        应用镜像变换：将 Scale X 设为 -1 并应用缩放变换
+        使用 Blender 内置的变换应用功能
+        '''
+        if obj.type != 'MESH':
+            return
+        
+        original_active = bpy.context.view_layer.objects.active
+        original_selected = list(bpy.context.selected_objects)
+        original_mode = obj.mode
+        
+        try:
+            if original_mode == 'EDIT':
+                bpy.ops.object.mode_set(mode='OBJECT')
+            
+            bpy.ops.object.select_all(action='DESELECT')
+            obj.select_set(True)
+            bpy.context.view_layer.objects.active = obj
+            
+            obj.scale[0] = -obj.scale[0]
+            
+            bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+            
+        finally:
+            if original_mode == 'EDIT':
+                try:
+                    bpy.ops.object.select_all(action='DESELECT')
+                    obj.select_set(True)
+                    bpy.context.view_layer.objects.active = obj
+                    bpy.ops.object.mode_set(mode='EDIT')
+                except:
+                    pass
+            
+            bpy.ops.object.select_all(action='DESELECT')
+            for sel_obj in original_selected:
+                if sel_obj:
+                    try:
+                        sel_obj.select_set(True)
+                    except:
+                        pass
+            if original_active:
+                try:
+                    bpy.context.view_layer.objects.active = original_active
+                except:
+                    pass
+
+    @classmethod
+    def flip_face_normals(cls, obj):
+        '''
+        翻转面朝向：使用 Blender 内置的翻转法线功能
+        '''
+        if obj.type != 'MESH':
+            return
+        
+        original_active = bpy.context.view_layer.objects.active
+        original_selected = list(bpy.context.selected_objects)
+        original_mode = obj.mode
+        
+        try:
+            bpy.ops.object.select_all(action='DESELECT')
+            obj.select_set(True)
+            bpy.context.view_layer.objects.active = obj
+            
+            bpy.ops.object.mode_set(mode='EDIT')
+            
+            bpy.ops.mesh.select_all(action='SELECT')
+            bpy.ops.mesh.flip_normals()
+            bpy.ops.object.mode_set(mode='OBJECT')
+            
+        finally:
+            if original_mode == 'EDIT':
+                try:
+                    bpy.ops.object.select_all(action='DESELECT')
+                    obj.select_set(True)
+                    bpy.context.view_layer.objects.active = obj
+                    bpy.ops.object.mode_set(mode='EDIT')
+                except:
+                    pass
+            
+            bpy.ops.object.select_all(action='DESELECT')
+            for sel_obj in original_selected:
+                if sel_obj:
+                    try:
+                        sel_obj.select_set(True)
+                    except:
+                        pass
+            if original_active:
+                try:
+                    bpy.context.view_layer.objects.active = original_active
+                except:
+                    pass
+
+    @classmethod
+    def apply_mirror_workflow(cls, obj):
+        '''
+        应用非镜像工作流：Scale X = -1 + 翻转面朝向
+        '''
+        cls.apply_mirror_transform(obj)
+        cls.flip_face_normals(obj)
+
+    @classmethod
+    def apply_mirror_workflow_to_objects(cls, obj_list):
+        '''
+        对多个物体应用非镜像工作流
+        '''
+        for obj in obj_list:
+            if obj and obj.type == 'MESH':
+                cls.apply_mirror_workflow(obj)
+
+    @classmethod
+    def create_backup_object(cls, obj):
+        '''
+        创建物体的完整备份（包括网格数据）
+        返回备份物体
+        '''
+        if obj.type != 'MESH':
+            return None
+        
+        backup_obj = obj.copy()
+        backup_obj.data = obj.data.copy()
+        backup_obj.name = f"__backup_{obj.name}"
+        
+        backup_collection = bpy.data.collections.get("__export_backup__")
+        if not backup_collection:
+            backup_collection = bpy.data.collections.new("__export_backup__")
+            bpy.context.scene.collection.children.link(backup_collection)
+        
+        backup_collection.objects.link(backup_obj)
+        
+        return backup_obj
+
+    @classmethod
+    def restore_from_backup(cls, original_obj, backup_obj):
+        '''
+        从备份物体恢复原始物体的网格数据
+        '''
+        if not original_obj or not backup_obj:
+            return
+        
+        if original_obj.type != 'MESH' or backup_obj.type != 'MESH':
+            return
+        
+        original_obj.data = backup_obj.data.copy()
+
+    @classmethod
+    def delete_backup_object(cls, backup_obj):
+        '''
+        删除备份物体
+        '''
+        if not backup_obj:
+            return
+        
+        mesh_data = backup_obj.data
+        
+        if backup_obj.name in bpy.data.objects:
+            bpy.data.objects.remove(backup_obj, do_unlink=True)
+        
+        if mesh_data and mesh_data.name in bpy.data.meshes:
+            bpy.data.meshes.remove(mesh_data, do_unlink=True)
+
+    @classmethod
+    def create_backup_objects(cls, obj_list):
+        '''
+        为多个物体创建备份
+        返回 {原始物体: 备份物体} 的字典
+        '''
+        backup_dict = {}
+        for obj in obj_list:
+            if obj and obj.type == 'MESH':
+                backup_obj = cls.create_backup_object(obj)
+                if backup_obj:
+                    backup_dict[obj] = backup_obj
+        return backup_dict
+
+    @classmethod
+    def restore_and_cleanup_backups(cls, backup_dict):
+        '''
+        从备份恢复所有物体并清理备份数据
+        '''
+        for original_obj, backup_obj in backup_dict.items():
+            cls.restore_from_backup(original_obj, backup_obj)
+            cls.delete_backup_object(backup_obj)
+        
+        backup_collection = bpy.data.collections.get("__export_backup__")
+        if backup_collection:
+            try:
+                bpy.data.collections.remove(backup_collection)
+            except:
+                pass

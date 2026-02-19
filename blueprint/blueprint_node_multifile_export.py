@@ -122,6 +122,7 @@ class SSMT_OT_MultiFileExport_MoveDown(bpy.types.Operator):
 
 class MultiFileExportObjectItem(bpy.types.PropertyGroup):
     object_name: bpy.props.StringProperty(name="物体名称", default="") # type: ignore
+    original_object_name: bpy.props.StringProperty(name="原始物体名称", default="") # type: ignore
     draw_ib: bpy.props.StringProperty(name="DrawIB", default="") # type: ignore
     component: bpy.props.StringProperty(name="Component", default="") # type: ignore
     alias_name: bpy.props.StringProperty(name="别名", default="") # type: ignore
@@ -199,6 +200,7 @@ class SSMTNode_MultiFile_Export(SSMTNodeBase):
         item = self.object_list[export_index]
         return {
             "object_name": item.object_name,
+            "original_object_name": getattr(item, 'original_object_name', item.object_name),
             "draw_ib": item.draw_ib,
             "component": item.component,
             "alias_name": item.alias_name

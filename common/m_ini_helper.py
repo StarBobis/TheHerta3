@@ -31,12 +31,14 @@ class M_IniHelper:
             if condition_str != "":
                 drawindexed_str_list.append("if " + condition_str)
                 for obj_model in obj_model_list:
-                    drawindexed_str_list.append("  ; [mesh:" + obj_model.obj_name + "] [vertex_count:" + str(obj_model.drawindexed_obj.UniqueVertexCount) + "]" )
+                    display_name = getattr(obj_model, 'display_name', obj_model.obj_name)
+                    drawindexed_str_list.append("  ; [mesh:" + display_name + "] [vertex_count:" + str(obj_model.drawindexed_obj.UniqueVertexCount) + "]" )
                     drawindexed_str_list.append("  " + obj_model.drawindexed_obj.get_draw_str())
                 drawindexed_str_list.append("endif")
             else:
                 for obj_model in obj_model_list:
-                    drawindexed_str_list.append("; [mesh:" + obj_model.obj_name + "] [vertex_count:" + str(obj_model.drawindexed_obj.UniqueVertexCount) + "]" )
+                    display_name = getattr(obj_model, 'display_name', obj_model.obj_name)
+                    drawindexed_str_list.append("; [mesh:" + display_name + "] [vertex_count:" + str(obj_model.drawindexed_obj.UniqueVertexCount) + "]" )
                     drawindexed_str_list.append(obj_model.drawindexed_obj.get_draw_str())
             drawindexed_str_list.append("")
 

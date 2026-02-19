@@ -4,11 +4,13 @@ from ..utils.timer_utils import TimerUtils
 from ..utils.translate_utils import TR
 from ..utils.command_utils import CommandUtils
 from ..utils.collection_utils import CollectionUtils
+from ..utils.obj_utils import ObjUtils
 
 from ..config.main_config import GlobalConfig, LogicName
 from ..base.m_global_key_counter import M_GlobalKeyCounter
 
 from ..config.properties_generate_mod import Properties_GenerateMod
+from ..config.properties_import_model import Properties_ImportModel
 
 from .blueprint_model import BluePrintModel
 from .blueprint_export_helper import BlueprintExportHelper
@@ -85,6 +87,49 @@ class SSMTGenerateModBlueprint(bpy.types.Operator):
             print("Warning: No Node Tree specified for Mod Generation. Using default workspace name logic.")
             BlueprintExportHelper.forced_target_tree_name = None
 
+        # 获取所有要导出的物体及其对应的节点/项目
+        obj_node_mapping = self._get_export_objects_with_nodes()
+        
+        # 创建三角化副本并更新节点引用
+        # original_obj_name -> (copy_obj, node_or_item) 的映射
+        copy_mapping = {}
+        print(f"开始创建三角化副本...")
+        for original_obj, node_or_item in obj_node_mapping:
+            if original_obj and original_obj.type == 'MESH':
+                # 创建副本
+                copy_obj = original_obj.copy()
+                copy_obj.data = original_obj.data.copy()
+                
+                # 命名规范：0b9bd38f-1-Original -> 0b9bd38f-1-copy_Original
+                original_name = original_obj.name
+                if original_name.endswith("-Original"):
+                    copy_obj.name = original_name.replace("-Original", "-copy_Original")
+                else:
+                    copy_obj.name = f"{original_name}_copy"
+                
+                # 将副本链接到场景
+                bpy.context.scene.collection.objects.link(copy_obj)
+                
+                # 对副本进行 BEAUTY 三角化
+                from ..utils.obj_utils import mesh_triangulate_beauty
+                mesh_triangulate_beauty(copy_obj)
+                
+                # 非镜像工作流：对副本应用镜像变换
+                mirror_workflow_enabled = Properties_ImportModel.use_mirror_workflow()
+                if mirror_workflow_enabled:
+                    print(f"非镜像工作流：对副本 {copy_obj.name} 应用镜像变换")
+                    ObjUtils.apply_mirror_workflow(copy_obj)
+                
+                # 保存原始名称到节点/项目（用于 INI 注释）
+                node_or_item.original_object_name = original_name
+                
+                # 保存原始名称和映射关系
+                copy_mapping[original_name] = (copy_obj, node_or_item)
+                
+                # 更新节点/项目引用到副本
+                node_or_item.object_name = copy_obj.name
+                print(f"创建副本: {original_name} -> {copy_obj.name}")
+        
         try:
             # 计算最大导出次数
             max_export_count = BlueprintExportHelper.calculate_max_export_count()
@@ -201,7 +246,69 @@ class SSMTGenerateModBlueprint(bpy.types.Operator):
             # 恢复原始导出路径
             BlueprintExportHelper.restore_export_path()
             
+            # 恢复节点引用并删除副本
+            if copy_mapping:
+                print("恢复节点引用并删除三角化副本...")
+                for original_name, (copy_obj, node_or_item) in copy_mapping.items():
+                    # 恢复节点/项目引用到原始物体
+                    node_or_item.object_name = original_name
+                    
+                    # 删除副本
+                    if copy_obj:
+                        mesh_data = copy_obj.data
+                        bpy.data.objects.remove(copy_obj, do_unlink=True)
+                        if mesh_data:
+                            bpy.data.meshes.remove(mesh_data, do_unlink=True)
+                        
+                print(f"已清理 {len(copy_mapping)} 个三角化副本")
+            
         return {'FINISHED'}
+    
+    def _get_export_objects_with_nodes(self):
+        """获取当前蓝图中所有要导出的物体及其对应的节点"""
+        result = []
+        tree = BlueprintExportHelper.get_current_blueprint_tree()
+        if not tree:
+            return result
+        
+        for node in tree.nodes:
+            if node.mute:
+                continue
+            if node.bl_idname == 'SSMTNode_Object_Info':
+                obj_name = getattr(node, 'object_name', '')
+                if obj_name:
+                    obj = bpy.data.objects.get(obj_name)
+                    if obj and obj.type == 'MESH':
+                        result.append((obj, node))
+            elif node.bl_idname == 'SSMTNode_MultiFile_Export':
+                # 处理多文件导出节点中的所有物体
+                for item in node.object_list:
+                    obj_name = getattr(item, 'object_name', '')
+                    if obj_name:
+                        obj = bpy.data.objects.get(obj_name)
+                        if obj and obj.type == 'MESH':
+                            result.append((obj, item))
+        
+        return result
+    
+    def _get_export_objects(self):
+        """获取当前蓝图中所有要导出的物体"""
+        objects = []
+        tree = BlueprintExportHelper.get_current_blueprint_tree()
+        if not tree:
+            return objects
+        
+        for node in tree.nodes:
+            if node.mute:
+                continue
+            if node.bl_idname == 'SSMTNode_Object_Info':
+                obj_name = getattr(node, 'object_name', '')
+                if obj_name:
+                    obj = bpy.data.objects.get(obj_name)
+                    if obj and obj.type == 'MESH':
+                        objects.append(obj)
+        
+        return objects
     
 
 def register():

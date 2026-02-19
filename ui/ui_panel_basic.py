@@ -36,7 +36,7 @@ class PanelBasicInformation(bpy.types.Panel):
         if PluginConfig.get_min_ssmt_version() > GlobalConfig.ssmt_version_number:
             layout.label(text=TR.translate("当前SSMT版本过低无法适配"),icon='ERROR')
 
-        # layout.prop(context.scene.properties_import_model,"use_mirror_workflow",text="使用非镜像工作流")
+        layout.prop(context.scene.properties_import_model,"use_mirror_workflow",text="使用非镜像工作流")
         
         context = bpy.context  # 直接使用 bpy.context 获取完整上下文
         if len(context.selected_objects) != 0:

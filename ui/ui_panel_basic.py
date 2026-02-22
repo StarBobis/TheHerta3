@@ -36,7 +36,19 @@ class PanelBasicInformation(bpy.types.Panel):
         if PluginConfig.get_min_ssmt_version() > GlobalConfig.ssmt_version_number:
             layout.label(text=TR.translate("当前SSMT版本过低无法适配"),icon='ERROR')
 
-        # layout.prop(context.scene.properties_import_model,"use_mirror_workflow",text="使用非镜像工作流")
+        layout.prop(context.scene.properties_import_model,"use_mirror_workflow",text="使用非镜像工作流")
+        
+        layout.prop(context.scene.properties_import_model,"use_parallel_export",text="启用并行导出")
+        if context.scene.properties_import_model.use_parallel_export:
+            from ..config.properties_import_model import Properties_ImportModel
+            max_workers = Properties_ImportModel.get_max_parallel_worker_count()
+            row = layout.row()
+            row.prop(context.scene.properties_import_model,"parallel_worker_count",text=f"进程数(最大{max_workers})")
+            layout.prop(context.scene.properties_import_model,"blender_executable_path",text="Blender路径")
+            if not bpy.data.is_saved:
+                layout.label(text="项目未保存，请先保存",icon='ERROR')
+            elif bpy.data.is_dirty:
+                layout.label(text="项目有未保存的修改",icon='ERROR')
         
         context = bpy.context  # 直接使用 bpy.context 获取完整上下文
         if len(context.selected_objects) != 0:

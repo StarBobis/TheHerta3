@@ -270,6 +270,11 @@ class MeshImporter:
         # 应用旋转和缩放
         bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
 
+        # 非镜像工作流：导入后应用 Scale X = -1 + 翻转面朝向
+        if Properties_ImportModel.use_mirror_workflow():
+            print(f"非镜像工作流：对 {obj.name} 应用镜像变换和面朝向翻转")
+            ObjUtils.apply_mirror_workflow(obj)
+
         # 刷新视图以得到流畅的导入逐渐增多的视觉效果
         bpy.context.view_layer.update()
 

@@ -105,16 +105,14 @@ class ObjBufferModelUnity:
                     sk.value = 1.0
                     
                     # 2. 获取应用了形态键后的 Mesh 数据
-                    # 注意：get_mesh_evaluate_from_obj 生成了一个新的 Mesh 数据块，使用完需要移除
+                    # 注意：get_mesh_evaluate_from_obj 生成了一个新的 Mesh 数据块
+                    # 物体在导出前已经被 BEAUTY 三角化，所以这里不需要再次三角化
                     mesh_eval = ObjUtils.get_mesh_evaluate_from_obj(obj=self.obj)
-                    
-                    # 3. 必须进行三角化，确保几何结构一致
-                    ObjUtils.mesh_triangulate(mesh_eval)
 
                     # 计算TANGENT，不然导出丢失部分TANGENT数据导致光影效果错误
                     mesh_eval.calc_tangents()
                     
-                    # 4. 构建 ShapeKeyBufferModel (它会自动在 __post_init__ 中计算数据)
+                    # 3. 构建 ShapeKeyBufferModel (它会自动在 __post_init__ 中计算数据)
                     sb_model = ShapeKeyBufferModel(
                         name=sk_name,
                         base_element_vertex_ndarray=base_shape_vertex_ndarray,

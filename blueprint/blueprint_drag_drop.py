@@ -13,8 +13,6 @@ _syncing_selection = False
 _node_selection_timer = None
 _object_name_check_timer = None
 _last_node_selection_state = {}
-_syncing_from_node = False
-_syncing_from_node_cooldown = 0
 _last_synced_object = None
 _cleanup_counter = 0
 
@@ -38,16 +36,12 @@ def object_visibility_handler(scene):
 @bpy.app.handlers.persistent
 def object_selection_handler(scene):
     """处理物体选中状态变化事件，同步更新对应节点的选中状态"""
-    global _syncing_selection, _syncing_from_node_cooldown, _last_synced_object
+    global _syncing_selection, _last_synced_object
     
     if _syncing_selection:
         return
     
     if _is_viewing_group_objects:
-        return
-    
-    if _syncing_from_node_cooldown > 0:
-        _syncing_from_node_cooldown -= 1
         return
     
     _syncing_selection = True
@@ -314,7 +308,7 @@ def sync_node_selection_to_objects():
 
 def check_node_selection_changes():
     """定时检查节点选中状态变化，并同步到物体"""
-    global _last_node_selection_state, _syncing_selection, _syncing_from_node_cooldown, _last_synced_object, _cleanup_counter
+    global _last_node_selection_state, _syncing_selection, _last_synced_object, _cleanup_counter
     
     if _syncing_selection:
         return 0.1
@@ -351,7 +345,6 @@ def check_node_selection_changes():
     
     if changed_nodes:
         _syncing_selection = True
-        _syncing_from_node_cooldown = 5
         _last_synced_object = None
         try:
             for node in changed_nodes:

@@ -200,6 +200,7 @@ class SSMTNode_Object_Info(SSMTNodeBase):
         self.update_node_width([self.object_name, self.draw_ib, self.component, self.alias_name])
     object_name: bpy.props.StringProperty(name="Object Name", default="", update=update_object_name)
     object_id: bpy.props.StringProperty(name="Object ID", default="")
+    original_object_name: bpy.props.StringProperty(name="Original Object Name", default="")
 
 
     draw_ib: bpy.props.StringProperty(name="DrawIB", default="") # type: ignore

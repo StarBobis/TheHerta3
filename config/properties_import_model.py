@@ -1,4 +1,5 @@
 import bpy
+import os
 
 class Properties_ImportModel(bpy.types.PropertyGroup):
 
@@ -23,6 +24,71 @@ class Properties_ImportModel(bpy.types.PropertyGroup):
         bpy.context.scene.properties_import_model.use_mirror_workflow
         '''
         return bpy.context.scene.properties_import_model.use_mirror_workflow
+
+    use_parallel_export: bpy.props.BoolProperty(
+        name="启用并行导出",
+        description="启用多进程并行导出，可显著提升大量物体时的导出速度。需要保存项目文件后才能使用。",
+        default=False,
+    ) # type: ignore
+
+    parallel_worker_count: bpy.props.IntProperty(
+        name="并行进程数",
+        description="并行导出时使用的工作进程数量，默认为 CPU 核心数 - 1",
+        default=0,
+        min=1,
+        max=32,
+    ) # type: ignore
+
+    blender_executable_path: bpy.props.StringProperty(
+        name="Blender路径",
+        description="Blender可执行文件路径，用于并行预处理。留空则自动检测",
+        default="",
+        subtype='FILE_PATH',
+    ) # type: ignore
+
+    @classmethod
+    def use_parallel_export(cls):
+        '''
+        bpy.context.scene.properties_import_model.use_parallel_export
+        '''
+        return bpy.context.scene.properties_import_model.use_parallel_export
+
+    @classmethod
+    def get_parallel_worker_count(cls):
+        '''
+        获取并行工作进程数量
+        最大限制为 CPU 核心数的一半，防止系统卡顿
+        '''
+        import multiprocessing
+        cpu_count = multiprocessing.cpu_count()
+        max_allowed = max(1, cpu_count // 2)
+        
+        count = bpy.context.scene.properties_import_model.parallel_worker_count
+        if count <= 0:
+            count = max_allowed
+        else:
+            count = min(count, max_allowed)
+        
+        return count
+    
+    @classmethod
+    def get_max_parallel_worker_count(cls):
+        '''
+        获取允许的最大并行工作进程数量（CPU核心数的一半）
+        '''
+        import multiprocessing
+        cpu_count = multiprocessing.cpu_count()
+        return max(1, cpu_count // 2)
+
+    @classmethod
+    def get_blender_executable_path(cls):
+        '''
+        获取 Blender 可执行文件路径
+        '''
+        path = bpy.context.scene.properties_import_model.blender_executable_path
+        if path and os.path.exists(path):
+            return path
+        return None
 
     use_normal_map: bpy.props.BoolProperty(
         name="自动上贴图时使用法线贴图",

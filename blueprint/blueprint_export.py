@@ -63,6 +63,7 @@ class SSMTGenerateModBlueprint(bpy.types.Operator):
 
     def execute(self, context):
         TimerUtils.Start("GenerateMod Mod")
+        wm = context.window_manager
 
         target_tree_name = self.node_tree_name
 
@@ -89,46 +90,39 @@ class SSMTGenerateModBlueprint(bpy.types.Operator):
 
         # 获取所有要导出的物体及其对应的节点/项目
         obj_node_mapping = self._get_export_objects_with_nodes()
+        total_objects = len(obj_node_mapping)
         
-        # 创建三角化副本并更新节点引用
-        # original_obj_name -> (copy_obj, node_or_item) 的映射
+        if total_objects == 0:
+            self.report({'WARNING'}, "没有找到要导出的物体")
+            return {'CANCELLED'}
+        
+        use_parallel = Properties_ImportModel.use_parallel_export()
+        blend_file_saved = bpy.data.is_saved
+        blend_file_dirty = bpy.data.is_dirty
+        mirror_workflow_enabled = Properties_ImportModel.use_mirror_workflow()
+        
+        if use_parallel:
+            if not blend_file_saved:
+                self.report({'ERROR'}, "并行导出需要先保存项目文件")
+                return {'CANCELLED'}
+            if blend_file_dirty:
+                self.report({'ERROR'}, "项目有未保存的修改，请先保存后再进行并行导出")
+                return {'CANCELLED'}
+        
+        wm.progress_begin(0, 100)
+        wm.progress_update(0)
+        print(f"开始处理 {total_objects} 个物体...")
+        
         copy_mapping = {}
-        print(f"开始创建三角化副本...")
-        for original_obj, node_or_item in obj_node_mapping:
-            if original_obj and original_obj.type == 'MESH':
-                # 创建副本
-                copy_obj = original_obj.copy()
-                copy_obj.data = original_obj.data.copy()
-                
-                # 命名规范：0b9bd38f-1-Original -> 0b9bd38f-1-copy_Original
-                original_name = original_obj.name
-                if original_name.endswith("-Original"):
-                    copy_obj.name = original_name.replace("-Original", "-copy_Original")
-                else:
-                    copy_obj.name = f"{original_name}_copy"
-                
-                # 将副本链接到场景
-                bpy.context.scene.collection.objects.link(copy_obj)
-                
-                # 对副本进行 BEAUTY 三角化
-                from ..utils.obj_utils import mesh_triangulate_beauty
-                mesh_triangulate_beauty(copy_obj)
-                
-                # 非镜像工作流：对副本应用镜像变换
-                mirror_workflow_enabled = Properties_ImportModel.use_mirror_workflow()
-                if mirror_workflow_enabled:
-                    print(f"非镜像工作流：对副本 {copy_obj.name} 应用镜像变换")
-                    ObjUtils.apply_mirror_workflow(copy_obj)
-                
-                # 保存原始名称到节点/项目（用于 INI 注释）
-                node_or_item.original_object_name = original_name
-                
-                # 保存原始名称和映射关系
-                copy_mapping[original_name] = (copy_obj, node_or_item)
-                
-                # 更新节点/项目引用到副本
-                node_or_item.object_name = copy_obj.name
-                print(f"创建副本: {original_name} -> {copy_obj.name}")
+        
+        if use_parallel and blend_file_saved and not blend_file_dirty and total_objects >= 4:
+            print(f"[ParallelPreprocess] 启用并行预处理，物体数量: {total_objects}")
+            copy_mapping = self._parallel_preprocess(context, obj_node_mapping, mirror_workflow_enabled)
+            if not copy_mapping:
+                print("[ParallelPreprocess] 并行预处理失败，回退到单进程模式")
+                copy_mapping = self._sequential_preprocess(obj_node_mapping, mirror_workflow_enabled, wm, total_objects)
+        else:
+            copy_mapping = self._sequential_preprocess(obj_node_mapping, mirror_workflow_enabled, wm, total_objects)
         
         try:
             # 计算最大导出次数
@@ -142,6 +136,10 @@ class SSMTGenerateModBlueprint(bpy.types.Operator):
             for export_index in range(1, max_export_count + 1):
                 BlueprintExportHelper.current_export_index = export_index
                 print(f"开始第 {export_index}/{max_export_count} 次导出")
+                
+                # 更新进度 (50-90%)
+                progress = 50 + int(export_index / max_export_count * 40)
+                wm.progress_update(progress)
                 
                 # 更新多文件导出节点的当前物体
                 BlueprintExportHelper.update_multifile_export_nodes(export_index)
@@ -231,6 +229,9 @@ class SSMTGenerateModBlueprint(bpy.types.Operator):
 
                 print(f"第 {export_index}/{max_export_count} 次导出完成")
             
+            # 更新进度到 90%
+            wm.progress_update(90)
+            
             self.report({'INFO'},TR.translate("Generate Mod Success!"))
             TimerUtils.End("GenerateMod Mod")
             
@@ -238,6 +239,10 @@ class SSMTGenerateModBlueprint(bpy.types.Operator):
             print(f"Mod导出路径: {mod_export_path}")
             
             BlueprintExportHelper.execute_postprocess_nodes(mod_export_path)
+            
+            # 完成进度
+            wm.progress_update(100)
+            wm.progress_end()
             
             CommandUtils.OpenGeneratedModFolder()
         finally:
@@ -290,6 +295,142 @@ class SSMTGenerateModBlueprint(bpy.types.Operator):
                             result.append((obj, item))
         
         return result
+    
+    def _sequential_preprocess(self, obj_node_mapping, mirror_workflow_enabled, wm, total_objects):
+        """
+        顺序预处理（单进程模式）
+        
+        Args:
+            obj_node_mapping: 物体-节点映射列表
+            mirror_workflow_enabled: 是否启用非镜像工作流
+            wm: window_manager
+            total_objects: 物体总数
+        
+        Returns:
+            copy_mapping: {原始物体名: (副本物体, 节点/项目)}
+        """
+        from ..utils.obj_utils import mesh_triangulate_beauty
+        
+        copy_mapping = {}
+        print(f"开始创建三角化副本...")
+        
+        for i, (original_obj, node_or_item) in enumerate(obj_node_mapping):
+            progress = int((i + 1) / total_objects * 50)
+            wm.progress_update(progress)
+            
+            if original_obj and original_obj.type == 'MESH':
+                copy_obj = original_obj.copy()
+                copy_obj.data = original_obj.data.copy()
+                
+                original_name = original_obj.name
+                if original_name.endswith("-Original"):
+                    copy_obj.name = original_name.replace("-Original", "-copy_Original")
+                else:
+                    copy_obj.name = f"{original_name}_copy"
+                
+                bpy.context.scene.collection.objects.link(copy_obj)
+                
+                if mirror_workflow_enabled:
+                    print(f"非镜像工作流：对副本 {copy_obj.name} 进行前处理")
+                    ObjUtils.prepare_copy_for_mirror_workflow(copy_obj)
+                
+                mesh_triangulate_beauty(copy_obj)
+                
+                if mirror_workflow_enabled:
+                    print(f"非镜像工作流：对副本 {copy_obj.name} 应用镜像变换")
+                    ObjUtils.apply_mirror_transform(copy_obj)
+                    ObjUtils.flip_face_normals(copy_obj)
+                
+                node_or_item.original_object_name = original_name
+                copy_mapping[original_name] = (copy_obj, node_or_item)
+                node_or_item.object_name = copy_obj.name
+                print(f"创建副本: {original_name} -> {copy_obj.name}")
+        
+        return copy_mapping
+    
+    def _parallel_preprocess(self, context, obj_node_mapping, mirror_workflow_enabled):
+        """
+        并行预处理（多进程模式）
+        
+        仅处理第3步：模型预处理
+        预处理完成后将结果加载回当前场景继续后续流程
+        
+        Args:
+            context: Blender 上下文
+            obj_node_mapping: 物体-节点映射列表
+            mirror_workflow_enabled: 是否启用非镜像工作流
+        
+        Returns:
+            copy_mapping: {原始物体名: (副本物体, 节点/项目)}
+        """
+        from ..utils.parallel_preprocess import ParallelPreprocessManager, load_preprocessed_objects
+        
+        wm = context.window_manager
+        blend_file = bpy.data.filepath
+        
+        object_names = [obj.name for obj, _ in obj_node_mapping if obj]
+        node_mapping = {obj.name: (obj, node) for obj, node in obj_node_mapping if obj}
+        
+        num_workers = Properties_ImportModel.get_parallel_worker_count()
+        manager = ParallelPreprocessManager(num_workers=num_workers)
+        
+        def progress_callback(progress):
+            wm.progress_update(int(progress * 0.5))
+        
+        print(f"[ParallelPreprocess] 开始并行预处理...")
+        print(f"[ParallelPreprocess] 工作进程数: {num_workers}")
+        
+        object_blend_map = manager.preprocess_parallel(
+            blend_file=blend_file,
+            object_names=object_names,
+            mirror_workflow=mirror_workflow_enabled,
+            progress_callback=progress_callback
+        )
+        
+        if not object_blend_map:
+            manager.cleanup()
+            return None
+        
+        wm.progress_update(50)
+        print(f"[ParallelPreprocess] 加载预处理结果...")
+        print(f"[ParallelPreprocess] object_blend_map: {object_blend_map}")
+        
+        try:
+            loaded_objects = load_preprocessed_objects(object_blend_map)
+            print(f"[ParallelPreprocess] loaded_objects: {list(loaded_objects.keys()) if loaded_objects else 'None'}")
+        except Exception as e:
+            print(f"[ParallelPreprocess] 加载失败: {e}")
+            import traceback
+            traceback.print_exc()
+            manager.cleanup()
+            return None
+        
+        copy_mapping = {}
+        for original_name, (original_obj, node_or_item) in node_mapping.items():
+            if original_name.endswith("-Original"):
+                copy_name = original_name.replace("-Original", "-copy_Original")
+            else:
+                copy_name = f"{original_name}_copy"
+            
+            if copy_name in loaded_objects:
+                copy_obj = loaded_objects[copy_name]
+                
+                node_or_item.original_object_name = original_name
+                copy_mapping[original_name] = (copy_obj, node_or_item)
+                node_or_item.object_name = copy_obj.name
+                print(f"[ParallelPreprocess] 加载预处理结果: {original_name} -> {copy_obj.name}")
+            else:
+                print(f"[ParallelPreprocess] 警告: 副本 {copy_name} 未在预处理结果中找到")
+        
+        if not copy_mapping:
+            print(f"[ParallelPreprocess] copy_mapping 为空，加载失败")
+            manager.cleanup()
+            return None
+        
+        manager.cleanup()
+        wm.progress_update(50)
+        
+        return copy_mapping
     
     def _get_export_objects(self):
         """获取当前蓝图中所有要导出的物体"""

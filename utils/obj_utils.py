@@ -832,12 +832,155 @@ class ObjUtils:
                     pass
 
     @classmethod
+    def prepare_copy_for_mirror_workflow(cls, copy_obj):
+        '''
+        为非镜像工作流准备副本
+        在三角化之前执行
+        
+        情况一：物体包含绑定但无形态键
+          - 应用所有修改器
+        
+        情况二：物体同时包含绑定和形态键
+          - 归零形态键获取基态
+          - 应用修改器
+          - 重新应用形态键（保留原始参数值）
+        '''
+        if copy_obj.type != 'MESH':
+            return
+        
+        has_armature = any(mod.type == 'ARMATURE' for mod in copy_obj.modifiers)
+        has_shape_keys = copy_obj.data.shape_keys is not None
+        
+        if not has_armature:
+            print(f"物体 {copy_obj.name} 无骨骼绑定，无需前处理")
+            return
+        
+        if has_shape_keys:
+            print(f"物体 {copy_obj.name} 有骨骼绑定和形态键，执行特殊前处理")
+            cls._prepare_with_shape_keys(copy_obj)
+        else:
+            print(f"物体 {copy_obj.name} 有骨骼绑定无形态键，应用修改器")
+            cls._apply_all_modifiers(copy_obj)
+    
+    @classmethod
+    def _prepare_with_shape_keys(cls, obj):
+        '''
+        处理有形态键的绑定物体
+        1. 保存形态键参数
+        2. 归零形态键
+        3. 应用修改器
+        4. 重新应用形态键（保留原始参数值）
+        '''
+        if obj.type != 'MESH':
+            return
+        
+        if obj.data.shape_keys is None:
+            return
+        
+        shape_key_values = {}
+        for kb in obj.data.shape_keys.key_blocks:
+            shape_key_values[kb.name] = kb.value
+        
+        from .shapekey_utils import ShapeKeyUtils
+        ShapeKeyUtils.reset_shapekey_values(obj)
+        
+        modifier_names = [mod.name for mod in obj.modifiers]
+        if modifier_names:
+            ShapeKeyUtils.apply_modifiers_for_object_with_shape_keys(
+                bpy.context,
+                modifier_names,
+                disable_armatures=False
+            )
+        
+        if obj.data.shape_keys:
+            for kb in obj.data.shape_keys.key_blocks:
+                if kb.name in shape_key_values:
+                    kb.value = shape_key_values[kb.name]
+    
+    @classmethod
     def apply_mirror_workflow(cls, obj):
         '''
         应用非镜像工作流：Scale X = -1 + 翻转面朝向
+        注意：如果物体有骨骼绑定，会先应用修改器将骨骼变形烘焙到网格上
         '''
+        if obj.type != 'MESH':
+            return
+        
+        has_armature = any(mod.type == 'ARMATURE' for mod in obj.modifiers)
+        
+        if has_armature:
+            cls._apply_all_modifiers(obj)
+        
         cls.apply_mirror_transform(obj)
         cls.flip_face_normals(obj)
+    
+    @classmethod
+    def _apply_all_modifiers(cls, obj):
+        '''
+        应用物体上的所有修改器
+        将修改器效果烘焙到网格数据中
+        如果物体有形态键，使用特殊方式处理
+        '''
+        if obj.type != 'MESH':
+            return
+        
+        if not obj.modifiers:
+            return
+        
+        original_active = bpy.context.view_layer.objects.active
+        original_selected = list(bpy.context.selected_objects)
+        original_mode = obj.mode
+        
+        try:
+            if original_mode == 'EDIT':
+                bpy.ops.object.mode_set(mode='OBJECT')
+            
+            bpy.ops.object.select_all(action='DESELECT')
+            obj.select_set(True)
+            bpy.context.view_layer.objects.active = obj
+            
+            from .shapekey_utils import ShapeKeyUtils
+            
+            has_shape_keys = obj.data.shape_keys is not None
+            
+            if has_shape_keys:
+                print(f"物体 {obj.name} 有形态键，使用特殊方式应用修改器")
+                modifier_names = [mod.name for mod in obj.modifiers]
+                ShapeKeyUtils.apply_modifiers_for_object_with_shape_keys(
+                    bpy.context, 
+                    modifier_names, 
+                    disable_armatures=False
+                )
+            else:
+                print(f"物体 {obj.name} 无形态键，直接应用修改器")
+                for modifier in obj.modifiers[:]:
+                    try:
+                        bpy.ops.object.modifier_apply(modifier=modifier.name)
+                    except Exception as e:
+                        print(f"Warning: Could not apply modifier {modifier.name}: {e}")
+            
+        finally:
+            if original_mode == 'EDIT':
+                try:
+                    bpy.ops.object.select_all(action='DESELECT')
+                    obj.select_set(True)
+                    bpy.context.view_layer.objects.active = obj
+                    bpy.ops.object.mode_set(mode='EDIT')
+                except:
+                    pass
+            
+            bpy.ops.object.select_all(action='DESELECT')
+            for sel_obj in original_selected:
+                if sel_obj:
+                    try:
+                        sel_obj.select_set(True)
+                    except:
+                        pass
+            if original_active:
+                try:
+                    bpy.context.view_layer.objects.active = original_active
+                except:
+                    pass
 
     @classmethod
     def apply_mirror_workflow_to_objects(cls, obj_list):

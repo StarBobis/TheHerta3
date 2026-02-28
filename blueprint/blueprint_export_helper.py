@@ -18,8 +18,15 @@ class BlueprintExportHelper:
     @staticmethod
     def get_current_blueprint_tree():
         """获取当前工作空间对应的蓝图树"""
+        tree_name = None
+        
         if BlueprintExportHelper.forced_target_tree_name:
-           tree_name = BlueprintExportHelper.forced_target_tree_name
+            tree_name = BlueprintExportHelper.forced_target_tree_name
+        elif GlobalConfig.workspacename:
+            tree_name = GlobalConfig.workspacename
+        
+        if not tree_name:
+            return None
         
         tree = bpy.data.node_groups.get(tree_name)
         return tree
@@ -115,56 +122,103 @@ class BlueprintExportHelper:
 
     @staticmethod
     def get_current_shapekeyname_mkey_dict():
-        """获取当前蓝图中所有 ShapeKey 节点的形态键名称和按键列表"""
+        """获取当前蓝图及所有嵌套蓝图中所有 ShapeKey 节点的形态键名称和按键列表"""
         tree = BlueprintExportHelper.get_current_blueprint_tree()
-        shapekey_output_node = BlueprintExportHelper.get_node_from_bl_idname(tree, 'SSMTNode_ShapeKey_Output')
-
-        # 获取连接到shapekey_output_node的所有shapekey节点
-        shapekey_nodes = BlueprintExportHelper.get_connected_nodes(shapekey_output_node)
-
-        shapekey_name_mkey_dict = {}
-
-        key_index = 0
-        for shapekey_node in shapekey_nodes:
-            if shapekey_node.mute:
-                continue
-            if shapekey_node.bl_idname != 'SSMTNode_ShapeKey':
-                continue
-
-            shapekey_name = shapekey_node.shapekey_name
-            key = shapekey_node.key
-            comment = getattr(shapekey_node, 'comment', '')
-
-            m_key = M_Key()
-            m_key.key_name = "$shapekey" + str(key_index)
-            m_key.initialize_value = 0
-            m_key.initialize_vk_str = key
-            m_key.comment = comment
-
-            shapekey_name_mkey_dict[shapekey_name] = m_key
-
-            key_index += 1
+        if not tree:
+            return {}
         
+        shapekey_name_mkey_dict = {}
+        visited_blueprints = set()
+        key_index = 0
+        
+        def collect_shapekey_nodes(current_tree):
+            """递归收集形态键节点"""
+            nonlocal key_index
+            
+            if current_tree.name in visited_blueprints:
+                return
+            visited_blueprints.add(current_tree.name)
+            
+            shapekey_output_node = None
+            for node in current_tree.nodes:
+                if node.bl_idname == 'SSMTNode_ShapeKey_Output':
+                    shapekey_output_node = node
+                    break
+            
+            if not shapekey_output_node:
+                return
+            
+            shapekey_nodes = BlueprintExportHelper.get_connected_nodes(shapekey_output_node)
+            
+            for shapekey_node in shapekey_nodes:
+                if shapekey_node.mute:
+                    continue
+                if shapekey_node.bl_idname != 'SSMTNode_ShapeKey':
+                    continue
+                
+                shapekey_name = shapekey_node.shapekey_name
+                key = shapekey_node.key
+                comment = getattr(shapekey_node, 'comment', '')
+
+                m_key = M_Key()
+                m_key.key_name = "$shapekey" + str(key_index)
+                m_key.initialize_value = 0
+                m_key.initialize_vk_str = key
+                m_key.comment = comment
+
+                shapekey_name_mkey_dict[shapekey_name] = m_key
+                key_index += 1
+            
+            for node in current_tree.nodes:
+                if node.bl_idname == 'SSMTNode_Blueprint_Nest':
+                    blueprint_name = getattr(node, 'blueprint_name', '')
+                    if blueprint_name and blueprint_name != 'NONE':
+                        nested_tree = bpy.data.node_groups.get(blueprint_name)
+                        if nested_tree and nested_tree.bl_idname == 'SSMTBlueprintTreeType':
+                            collect_shapekey_nodes(nested_tree)
+        
+        collect_shapekey_nodes(tree)
         return shapekey_name_mkey_dict
 
     @staticmethod
     def get_datatype_node_info():
-        """获取当前蓝图中连接到输出节点的数据类型节点信息"""
+        """获取当前蓝图及所有嵌套蓝图中连接到输出节点的数据类型节点信息"""
         tree = BlueprintExportHelper.get_current_blueprint_tree()
         if not tree:
             return None
         
-        # 获取输出节点
-        output_node = BlueprintExportHelper.get_node_from_bl_idname(tree, 'SSMTNode_Result_Output')
-        if not output_node:
-            return None
+        visited_blueprints = set()
+        datatype_nodes = []
         
-        # 递归查找所有连接到输出节点的数据类型节点
-        datatype_nodes = BlueprintExportHelper._find_datatype_nodes_connected_to_output(output_node)
+        def collect_datatype_nodes(current_tree):
+            """递归收集数据类型节点"""
+            if current_tree.name in visited_blueprints:
+                return
+            visited_blueprints.add(current_tree.name)
+            
+            output_node = None
+            for node in current_tree.nodes:
+                if node.bl_idname == 'SSMTNode_Result_Output':
+                    output_node = node
+                    break
+            
+            if output_node:
+                nodes = BlueprintExportHelper._find_datatype_nodes_connected_to_output(output_node)
+                datatype_nodes.extend(nodes)
+            
+            for node in current_tree.nodes:
+                if node.bl_idname == 'SSMTNode_Blueprint_Nest':
+                    blueprint_name = getattr(node, 'blueprint_name', '')
+                    if blueprint_name and blueprint_name != 'NONE':
+                        nested_tree = bpy.data.node_groups.get(blueprint_name)
+                        if nested_tree and nested_tree.bl_idname == 'SSMTBlueprintTreeType':
+                            collect_datatype_nodes(nested_tree)
+        
+        collect_datatype_nodes(tree)
+        
         if not datatype_nodes:
             return None
         
-        # 返回所有数据类型节点的信息
         node_info_list = []
         for node in datatype_nodes:
             node_info_list.append({
@@ -204,18 +258,33 @@ class BlueprintExportHelper:
     
     @staticmethod
     def get_multifile_export_nodes():
-        """获取当前蓝图中所有多文件导出节点"""
+        """获取当前蓝图及所有嵌套蓝图中的多文件导出节点"""
         tree = BlueprintExportHelper.get_current_blueprint_tree()
         if not tree:
             return []
         
         multifile_nodes = []
-        for node in tree.nodes:
-            if node.mute:
-                continue
-            if node.bl_idname == 'SSMTNode_MultiFile_Export':
-                multifile_nodes.append(node)
+        visited_blueprints = set()
         
+        def collect_multifile_nodes(current_tree):
+            """递归收集多文件导出节点"""
+            if current_tree.name in visited_blueprints:
+                return
+            visited_blueprints.add(current_tree.name)
+            
+            for node in current_tree.nodes:
+                if node.mute:
+                    continue
+                if node.bl_idname == 'SSMTNode_MultiFile_Export':
+                    multifile_nodes.append(node)
+                elif node.bl_idname == 'SSMTNode_Blueprint_Nest':
+                    blueprint_name = getattr(node, 'blueprint_name', '')
+                    if blueprint_name and blueprint_name != 'NONE':
+                        nested_tree = bpy.data.node_groups.get(blueprint_name)
+                        if nested_tree and nested_tree.bl_idname == 'SSMTBlueprintTreeType':
+                            collect_multifile_nodes(nested_tree)
+        
+        collect_multifile_nodes(tree)
         return multifile_nodes
     
     @staticmethod

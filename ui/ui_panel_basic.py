@@ -65,6 +65,9 @@ class PanelBasicInformation(bpy.types.Panel):
             
         # SSMT蓝图
         layout.operator("theherta3.open_persistent_blueprint", icon='NODETREE')
+        
+        # 快速局部导出
+        layout.operator("ssmt.quick_partial_export", icon='EXPORT')
 
         # 导入 ib vb fmt格式文件
         layout.operator("import_mesh.migoto_raw_buffers_mmt",icon='IMPORT')

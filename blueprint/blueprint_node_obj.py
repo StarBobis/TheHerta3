@@ -4,6 +4,7 @@ from bpy.types import NodeTree, Node, NodeSocket
 from ..config.main_config import GlobalConfig, LogicName
 from ..config.properties_generate_mod import Properties_GenerateMod
 from .blueprint_node_base import SSMTBlueprintTree, SSMTNodeBase
+from .blueprint_nest_navigate import SSMT_OT_BlueprintNestNavigate, SSMT_OT_CreateBlueprintFromNest
 
 BLENDER_VERSION = bpy.app.version[:2]
 
@@ -44,17 +45,38 @@ class SSMT_OT_RefreshNodeObjectIDs(bpy.types.Operator):
                         obj_name = getattr(node, 'object_name', '')
                         obj_id = getattr(node, 'object_id', '')
                         
-                        if obj_name and not obj_id:
+                        if obj_name:
                             obj = bpy.data.objects.get(obj_name)
                             if obj:
-                                node.object_id = str(obj.as_pointer())
+                                new_obj_id = str(obj.as_pointer())
+                                if node.object_id != new_obj_id:
+                                    node.object_id = new_obj_id
+                                    updated_count += 1
+                            elif obj_id:
+                                node.object_id = ""
                                 updated_count += 1
+                    
+                    elif node.bl_idname == 'SSMTNode_MultiFile_Export':
+                        for item in node.object_list:
+                            obj_name = getattr(item, 'object_name', '')
+                            if obj_name:
+                                obj = bpy.data.objects.get(obj_name)
+                                if obj:
+                                    new_name = obj.name
+                                    if item.object_name != new_name:
+                                        item.object_name = new_name
+                                        updated_count += 1
+                                elif getattr(item, 'original_object_name', ''):
+                                    orig_obj = bpy.data.objects.get(item.original_object_name)
+                                    if orig_obj:
+                                        item.object_name = item.original_object_name
+                                        updated_count += 1
         
         if updated_count > 0:
-            self.report({'INFO'}, f"已更新 {updated_count} 个节点的物体ID关联")
+            self.report({'INFO'}, f"已更新 {updated_count} 个节点的物体引用")
             _update_node_to_object_id_mapping()
         else:
-            self.report({'INFO'}, "所有节点都已建立物体ID关联")
+            self.report({'INFO'}, "所有节点都已建立物体引用关联")
         
         return {'FINISHED'}
 
@@ -297,7 +319,7 @@ class SSMT_OT_SwitchKey_AddSocket(bpy.types.Operator):
     node_name: bpy.props.StringProperty() # type: ignore
 
     def execute(self, context):
-        tree = getattr(context.space_data, "edit_tree", None) or context.space_data.node_tree
+        tree = getattr(context.space_data, "edit_tree", None) or getattr(context.space_data, "node_tree", None)
         if not tree:
              return {'CANCELLED'}
         node = tree.nodes.get(self.node_name)
@@ -314,7 +336,7 @@ class SSMT_OT_SwitchKey_RemoveSocket(bpy.types.Operator):
     node_name: bpy.props.StringProperty() # type: ignore
 
     def execute(self, context):
-        tree = getattr(context.space_data, "edit_tree", None) or context.space_data.node_tree
+        tree = getattr(context.space_data, "edit_tree", None) or getattr(context.space_data, "node_tree", None)
         if not tree:
              return {'CANCELLED'}
         node = tree.nodes.get(self.node_name)
@@ -405,12 +427,19 @@ class SSMTNode_Result_Output(SSMTNodeBase):
 
         layout.prop(context.scene.properties_generate_mod, "use_specific_generate_mod_folder_path")
 
+        layout.prop(context.scene.properties_generate_mod, "enable_performance_stats",text="启用性能统计")
+
         if Properties_GenerateMod.use_specific_generate_mod_folder_path():
             box = layout.box()
             box.label(text="当前生成Mod位置文件夹:")
             box.label(text=context.scene.properties_generate_mod.generate_mod_folder_path)
 
             layout.operator("ssmt.select_generate_mod_folder", icon='FILE_FOLDER')
+        
+        # 添加返回上一层级按钮
+        layout.separator()
+        row = layout.row(align=True)
+        row.operator("ssmt.blueprint_nest_navigate", text="返回上一层级", icon='BACK')
 
     def update(self):
         if self.inputs and self.inputs[-1].is_linked:
@@ -430,7 +459,7 @@ class SSMT_OT_View_Group_Objects(bpy.types.Operator):
     def execute(self, context):
         global _is_viewing_group_objects
         
-        tree = getattr(context.space_data, "edit_tree", None) or context.space_data.node_tree
+        tree = getattr(context.space_data, "edit_tree", None) or getattr(context.space_data, "node_tree", None)
         if not tree:
              return {'CANCELLED'}
         node = tree.nodes.get(self.node_name)
@@ -516,6 +545,8 @@ classes = (
     SSMTNode_SwitchKey,
     SSMT_OT_SwitchKey_AddSocket,
     SSMT_OT_SwitchKey_RemoveSocket,
+    SSMT_OT_BlueprintNestNavigate,
+    SSMT_OT_CreateBlueprintFromNest,
 )
 
 def register():

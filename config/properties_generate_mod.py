@@ -88,6 +88,19 @@ class Properties_GenerateMod(bpy.types.PropertyGroup):
         default=False
     ) # type: ignore
 
+    enable_performance_stats: bpy.props.BoolProperty(
+        name="启用性能统计",
+        description="启用性能统计功能，记录各个操作的耗时并生成报告。关闭后可提升少量性能",
+        default=True
+    ) # type: ignore
+
+    @classmethod
+    def enable_performance_stats(cls):
+        '''
+        bpy.context.scene.properties_generate_mod.enable_performance_stats
+        '''
+        return bpy.context.scene.properties_generate_mod.enable_performance_stats
+
 
 
     # use_specific_generate_mod_folder_path

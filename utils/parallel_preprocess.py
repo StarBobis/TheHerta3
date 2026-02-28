@@ -24,6 +24,7 @@ class PreprocessTask:
     object_names: List[str]
     output_blend: str
     mirror_workflow: bool
+    vg_mapping_texts: Dict[str, str]
 
 
 @dataclass
@@ -51,6 +52,7 @@ class ParallelPreprocessManager:
         blend_file: str,
         object_names: List[str],
         mirror_workflow: bool = False,
+        vg_mapping_texts: Dict[str, str] = None,
         progress_callback=None
     ) -> Dict[str, str]:
         """
@@ -60,6 +62,7 @@ class ParallelPreprocessManager:
             blend_file: 原始 .blend 文件路径
             object_names: 物体名称列表
             mirror_workflow: 是否启用非镜像工作流
+            vg_mapping_texts: 顶点组映射表数据 {文本名称: 文本内容}
             progress_callback: 进度回调函数
         
         Returns:
@@ -75,7 +78,7 @@ class ParallelPreprocessManager:
             
             subsets = self._split_objects(object_names)
             
-            self._create_tasks(blend_file, subsets, mirror_workflow)
+            self._create_tasks(blend_file, subsets, mirror_workflow, vg_mapping_texts or {})
             
             self._run_workers(progress_callback)
             
@@ -129,7 +132,8 @@ class ParallelPreprocessManager:
         self,
         blend_file: str,
         subsets: List[List[str]],
-        mirror_workflow: bool
+        mirror_workflow: bool,
+        vg_mapping_texts: Dict[str, str]
     ) -> None:
         """创建预处理任务"""
         for i, subset in enumerate(subsets):
@@ -140,7 +144,8 @@ class ParallelPreprocessManager:
                 blend_file=blend_file,
                 object_names=subset,
                 output_blend=output_blend,
-                mirror_workflow=mirror_workflow
+                mirror_workflow=mirror_workflow,
+                vg_mapping_texts=vg_mapping_texts
             )
             self.tasks.append(task)
             
@@ -153,7 +158,14 @@ class ParallelPreprocessManager:
         import threading
         import queue
         
+        print(f"[ParallelPreprocess] 准备查找 Blender 可执行文件...")
         blender_exe = self._find_blender_executable()
+        print(f"[ParallelPreprocess] Blender 可执行文件: {blender_exe}")
+        
+        if not blender_exe or not os.path.exists(blender_exe):
+            print(f"[ParallelPreprocess] 错误: Blender 可执行文件无效或不存在: {blender_exe}")
+            return
+        
         print(f"[ParallelPreprocess] 启动 {len(self.tasks)} 个工作进程...")
         
         result_queue = queue.Queue()
@@ -163,9 +175,14 @@ class ParallelPreprocessManager:
         def worker_thread(task: PreprocessTask):
             with semaphore:
                 try:
+                    print(f"[ParallelPreprocess] 开始任务 {task.task_id}")
                     result = self._run_single_worker(blender_exe, task)
                     result_queue.put(result)
+                    print(f"[ParallelPreprocess] 任务 {task.task_id} 完成")
                 except Exception as e:
+                    print(f"[ParallelPreprocess] 任务 {task.task_id} 异常: {e}")
+                    import traceback
+                    traceback.print_exc()
                     result_queue.put(PreprocessResult(
                         task_id=task.task_id,
                         success=False,
@@ -176,12 +193,15 @@ class ParallelPreprocessManager:
                     ))
         
         for task in self.tasks:
+            print(f"[ParallelPreprocess] 创建线程 {task.task_id}")
             thread = threading.Thread(target=worker_thread, args=(task,))
             thread.start()
             threads.append(thread)
+            print(f"[ParallelPreprocess] 线程 {task.task_id} 已启动")
         
         completed = 0
         total = len(threads)
+        print(f"[ParallelPreprocess] 等待 {total} 个任务完成...")
         
         while completed < total:
             try:
@@ -194,20 +214,25 @@ class ParallelPreprocessManager:
                 
                 status = "成功" if result.success else "失败"
                 print(f"[ParallelPreprocess] 任务 {result.task_id} {status}")
+                if not result.success:
+                    print(f"[ParallelPreprocess] 错误信息: {result.error_message}")
             except queue.Empty:
                 continue
         
+        print(f"[ParallelPreprocess] 所有任务完成，等待线程结束...")
         for thread in threads:
             thread.join(timeout=1)
+        print(f"[ParallelPreprocess] 所有线程已结束")
     
     @staticmethod
     def _run_single_worker(blender_exe: str, task: PreprocessTask) -> PreprocessResult:
-        """运行单个工作进程 - 执行预处理"""
+        """运行单个工作进程 - 执行预处理（优化版）"""
         start_time = datetime.now()
         
         try:
             addon_name = "ssmt_theherta_plugin"
             
+            # 优化：预生成脚本，避免每次都生成
             script = f'''
 import bpy
 import sys
@@ -216,28 +241,36 @@ import os
 import traceback
 import time
 
-print("=" * 50)
-print(f"[Worker {task.task_id}] 脚本开始执行")
-print(f"[Worker {task.task_id}] Python 路径: {{sys.path[:3]}}")
-print("=" * 50)
+# 优化：控制日志级别，减少不必要的输出
+VERBOSE = False
+
+if VERBOSE:
+    print("=" * 50)
+    print(f"[Worker {task.task_id}] 脚本开始执行")
+    print(f"[Worker {task.task_id}] Python 路径: {{sys.path[:3]}}")
+    print("=" * 50)
 
 # 任务参数
 task_id = {task.task_id}
 object_names = {json.dumps(task.object_names)}
 mirror_workflow = {str(task.mirror_workflow)}
 output_blend = r"{task.output_blend}"
+vg_mapping_texts = {json.dumps(task.vg_mapping_texts or {})}
 
-print(f"[Worker {{task_id}}] 物体数量: {{len(object_names)}}")
-print(f"[Worker {{task_id}}] 非镜像工作流: {{mirror_workflow}}")
-print(f"[Worker {{task_id}}] 输出文件: {{output_blend}}")
+if VERBOSE:
+    print(f"[Worker {{task_id}}] 物体数量: {{len(object_names)}}")
+    print(f"[Worker {{task_id}}] 非镜像工作流: {{mirror_workflow}}")
+    print(f"[Worker {{task_id}}] 输出文件: {{output_blend}}")
+    print(f"[Worker {{task_id}}] 映射表数量: {{len(vg_mapping_texts)}}")
 
 # 检查物体是否存在
-for obj_name in object_names:
-    obj = bpy.data.objects.get(obj_name)
-    if obj:
-        print(f"[Worker {{task_id}}] 找到物体: {{obj_name}} (类型: {{obj.type}})")
-    else:
-        print(f"[Worker {{task_id}}] 警告: 物体不存在 {{obj_name}}")
+if VERBOSE:
+    for obj_name in object_names:
+        obj = bpy.data.objects.get(obj_name)
+        if obj:
+            print(f"[Worker {{task_id}}] 找到物体: {{obj_name}} (类型: {{obj.type}})")
+        else:
+            print(f"[Worker {{task_id}}] 警告: 物体不存在 {{obj_name}}")
 
 
 def reset_shapekey_values(obj):
@@ -318,7 +351,7 @@ def apply_modifiers_for_object_with_shape_keys(context, selected_modifiers, disa
     for i in range(1, shapes_count):
         curr_time = time.time()
         elapsed_time = curr_time - start_time_inner
-        print(f"[Worker {{task_id}}] applyModifiers: Applying shape key {{i+1}}/{{shapes_count}} ('{{list_properties[i]['name']}}', {{elapsed_time:.2f}}s)")
+        print(f"[Worker {{task_id}}] applyModifiers: Applying shape key " + str(i+1) + "/" + str(shapes_count) + " ('" + str(list_properties[i]['name']) + "', " + str(round(elapsed_time, 2)) + "s)")
         
         context.view_layer.objects.active = copy_object
         copy_object.select_set(True)
@@ -344,7 +377,7 @@ def apply_modifiers_for_object_with_shape_keys(context, selected_modifiers, disa
             if error_info_hint:
                 error_info_hint = "\\nHint: " + error_info_hint
             error_info = ("Shape keys ended up with different number of vertices!\\n"
-                        "All shape keys needs to have the same number of vertices after modifier is applied.{{error_info_hint}}")
+                        "All shape keys needs to have the same number of vertices after modifier is applied." + error_info_hint)
             return (False, error_info)
         
         copy_object.select_set(False)
@@ -383,15 +416,11 @@ def apply_modifiers_for_object_with_shape_keys(context, selected_modifiers, disa
 
 
 def apply_all_modifiers(obj):
-    """应用物体上的所有修改器"""
+    """应用物体上的所有修改器（优化版）"""
     if obj.type != 'MESH':
         return
     if not obj.modifiers:
         return
-    
-    bpy.ops.object.select_all(action='DESELECT')
-    obj.select_set(True)
-    bpy.context.view_layer.objects.active = obj
     
     has_shape_keys = obj.data.shape_keys is not None
     
@@ -405,11 +434,29 @@ def apply_all_modifiers(obj):
         )
     else:
         print(f"[Worker {{task_id}}] 物体 {{obj.name}} 无形态键，直接应用修改器")
-        for modifier in obj.modifiers[:]:
-            try:
-                bpy.ops.object.modifier_apply(modifier=modifier.name)
-            except Exception as e:
-                print(f"[Worker {{task_id}}] Warning: Could not apply modifier {{modifier.name}}: {{e}}")
+        # 优化：批量应用修改器，减少上下文切换
+        modifiers_to_apply = [mod for mod in obj.modifiers if mod.type != 'ARMATURE']
+        
+        if modifiers_to_apply:
+            # 设置激活对象一次
+            bpy.ops.object.select_all(action='DESELECT')
+            obj.select_set(True)
+            bpy.context.view_layer.objects.active = obj
+            
+            # 批量应用非ARMATURE修改器
+            for modifier in modifiers_to_apply:
+                try:
+                    bpy.ops.object.modifier_apply(modifier=modifier.name)
+                except Exception as e:
+                    print(f"[Worker {{task_id}}] Warning: Could not apply modifier {{modifier.name}}: {{e}}")
+            
+            # 单独处理ARMATURE修改器（最后应用）
+            armature_mods = [mod for mod in obj.modifiers if mod.type == 'ARMATURE']
+            for modifier in armature_mods:
+                try:
+                    bpy.ops.object.modifier_apply(modifier=modifier.name)
+                except Exception as e:
+                    print(f"[Worker {{task_id}}] Warning: Could not apply armature modifier {{modifier.name}}: {{e}}")
 
 
 def prepare_copy_for_mirror_workflow(copy_obj):
@@ -441,6 +488,7 @@ def prepare_copy_for_mirror_workflow(copy_obj):
         # 应用所有修改器（使用特殊方式处理形态键）
         modifier_names = [mod.name for mod in copy_obj.modifiers]
         if modifier_names:
+            # 优化：只设置一次激活对象
             bpy.context.view_layer.objects.active = copy_obj
             apply_modifiers_for_object_with_shape_keys(
                 bpy.context,
@@ -459,7 +507,7 @@ def prepare_copy_for_mirror_workflow(copy_obj):
 
 
 def mesh_triangulate_beauty(obj):
-    """使用 BEAUTY 算法进行三角化"""
+    """使用 BEAUTY 算法进行三角化（布线优化）"""
     if obj.type != 'MESH':
         return
     
@@ -501,6 +549,103 @@ def flip_face_normals(obj):
     bpy.ops.object.mode_set(mode='OBJECT')
 
 
+def process_vertex_groups(obj, vg_mapping_texts):
+    """处理顶点组：重命名、合并、清理、填充、排序（优化版）"""
+    if obj.type != 'MESH':
+        return {{"renamed": 0, "merged": 0, "cleaned": 0, "filled": 0}}
+    
+    stats = {{"renamed": 0, "merged": 0, "cleaned": 0, "filled": 0}}
+    
+    # 1. 重命名顶点组
+    if vg_mapping_texts:
+        mapping = {{}}
+        for text_name, text_content in vg_mapping_texts.items():
+            for line in text_content.split('\\n'):
+                line = line.strip()
+                if not line or '=' not in line:
+                    continue
+                parts = line.split('=', 1)
+                if len(parts) == 2:
+                    left = parts[0].strip()
+                    right = parts[1].strip()
+                    if left and right:
+                        mapping[left] = right
+        
+        if mapping:
+            for vg in obj.vertex_groups:
+                if vg.name in mapping:
+                    new_name = mapping[vg.name]
+                    if vg.name != new_name:
+                        if new_name in obj.vertex_groups:
+                            existing_vg = obj.vertex_groups[new_name]
+                            existing_vg.name = new_name + ".001"
+                        vg.name = new_name
+                        stats["renamed"] += 1
+    
+    # 2. 合并顶点组（按数字前缀）- 优化版
+    from collections import defaultdict
+    import re
+    prefix_map = defaultdict(list)
+    for vg in obj.vertex_groups:
+        match = re.match(r'^(\d+)', vg.name)
+        if match:
+            prefix_map[match.group(1)].append(vg)
+    
+    for prefix, source_groups in prefix_map.items():
+        if len(source_groups) > 1 or (len(source_groups) == 1 and source_groups[0].name != prefix):
+            target_vg = obj.vertex_groups.get(prefix) or obj.vertex_groups.new(name=prefix)
+            
+            # 优化：批量收集顶点权重，减少API调用
+            vertex_weights = []
+            for vert in obj.data.vertices:
+                total_weight = 0.0
+                for source_vg in source_groups:
+                    try:
+                        total_weight += source_vg.weight(vert.index)
+                    except RuntimeError:
+                        continue
+                
+                if total_weight > 0:
+                    vertex_weights.append((vert.index, min(1.0, total_weight)))
+            
+            # 批量添加权重
+            if vertex_weights:
+                for vert_idx, weight in vertex_weights:
+                    target_vg.add([vert_idx], weight, 'REPLACE')
+            
+            for vg in source_groups:
+                if vg.name in obj.vertex_groups and vg.name != prefix:
+                    obj.vertex_groups.remove(vg)
+            stats["merged"] += 1
+    
+    # 3. 清理非数字顶点组 - 优化版：使用集合操作
+    groups_to_remove = [vg for vg in obj.vertex_groups if not vg.name.isdigit()]
+    for vg in reversed(groups_to_remove):
+        obj.vertex_groups.remove(vg)
+    stats["cleaned"] = len(groups_to_remove)
+    
+    # 4. 填充顶点组间隙 - 优化版：使用集合差集
+    numeric_names = set(vg.name for vg in obj.vertex_groups if vg.name.isdigit())
+    if numeric_names:
+        max_num = max(int(name) for name in numeric_names)
+        # 使用集合差集快速找出缺失的数字
+        existing_nums = set(int(name) for name in numeric_names)
+        missing_nums = set(range(max_num + 1)) - existing_nums
+        
+        for num in sorted(missing_nums):
+            obj.vertex_groups.new(name=str(num))
+            stats["filled"] += 1
+    
+    # 5. 排序顶点组
+    try:
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.vertex_group_sort(sort_type='NAME')
+    except Exception:
+        pass
+    
+    return stats
+
+
 processed_objects = []
 
 for obj_name in object_names:
@@ -526,7 +671,8 @@ for obj_name in object_names:
         bpy.context.scene.collection.objects.link(copy_obj)
         print(f"[Worker {{task_id}}] 创建副本: {{copy_obj.name}}")
         
-        # 2. 非镜像工作流前处理 - 与单进程模式完全一致
+        # 2. 应用修改器 - 与单进程模式完全一致
+        has_armature = any(mod.type == 'ARMATURE' for mod in copy_obj.modifiers)
         if mirror_workflow:
             print(f"[Worker {{task_id}}] 执行非镜像工作流前处理...")
             try:
@@ -534,6 +680,14 @@ for obj_name in object_names:
                 print(f"[Worker {{task_id}}] 前处理完成")
             except Exception as e:
                 print(f"[Worker {{task_id}}] 前处理失败: {{e}}")
+                traceback.print_exc()
+        elif has_armature:
+            print(f"[Worker {{task_id}}] 正常工作流：应用骨架修改器...")
+            try:
+                apply_all_modifiers(copy_obj)
+                print(f"[Worker {{task_id}}] 骨架修改器应用完成")
+            except Exception as e:
+                print(f"[Worker {{task_id}}] 应用骨架修改器失败: {{e}}")
                 traceback.print_exc()
         
         # 3. BEAUTY三角化
@@ -620,9 +774,33 @@ print("=" * 50)
                 blender_exe,
                 '-b',
                 task.blend_file,
-                '-P', script_file,
-                '--', '--enable-autoexec'
+                '-P', script_file
             ]
+            
+            print(f"[Worker {task.task_id}] 命令: {' '.join(cmd)}")
+            
+            # 检查文件是否存在
+            if not os.path.exists(blender_exe):
+                print(f"[Worker {task.task_id}] 错误: Blender可执行文件不存在: {blender_exe}")
+                return PreprocessResult(
+                    task_id=task.task_id,
+                    success=False,
+                    error_message=f"Blender可执行文件不存在: {blender_exe}",
+                    processed_objects=[],
+                    output_blend="",
+                    processing_time=0
+                )
+            
+            if not os.path.exists(task.blend_file):
+                print(f"[Worker {task.task_id}] 错误: 项目文件不存在: {task.blend_file}")
+                return PreprocessResult(
+                    task_id=task.task_id,
+                    success=False,
+                    error_message=f"项目文件不存在: {task.blend_file}",
+                    processed_objects=[],
+                    output_blend="",
+                    processing_time=0
+                )
             
             process = subprocess.Popen(
                 cmd,
@@ -631,7 +809,7 @@ print("=" * 50)
                 text=True
             )
             
-            stdout, _ = process.communicate(timeout=600)
+            stdout, _ = process.communicate(timeout=1800)
             
             log_file = os.path.join(
                 os.path.dirname(task.output_blend),
@@ -641,6 +819,7 @@ print("=" * 50)
                 f.write(stdout)
             
             print(f"[Worker {task.task_id}] 日志文件: {log_file}")
+            print(f"[Worker {task.task_id}] 返回码: {process.returncode}")
             
             lines = stdout.split('\n')
             for line in lines[-50:]:
@@ -656,7 +835,7 @@ print("=" * 50)
             return PreprocessResult(
                 task_id=task.task_id,
                 success=process.returncode == 0 and os.path.exists(task.output_blend),
-                error_message=stderr if process.returncode != 0 else "",
+                error_message=stdout if process.returncode != 0 else "",
                 processed_objects=processed_objects,
                 output_blend=task.output_blend,
                 processing_time=processing_time

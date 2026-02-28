@@ -376,9 +376,6 @@ def check_object_name_changes():
     """定时检查物体名称变化，并更新对应节点的物体引用"""
     global _node_to_object_id_mapping, _object_to_node_mapping
     
-    if not _node_to_object_id_mapping:
-        return 2.0
-    
     object_id_to_name = {str(obj.as_pointer()): obj.name for obj in bpy.data.objects}
     
     for tree in bpy.data.node_groups:
@@ -406,6 +403,17 @@ def check_object_name_changes():
                             if old_name in _object_to_node_mapping:
                                 del _object_to_node_mapping[old_name]
                             _object_to_node_mapping[new_name] = node
+                elif node.bl_idname == 'SSMTNode_MultiFile_Export':
+                    for item in node.object_list:
+                        obj_name = getattr(item, 'object_name', '')
+                        if not obj_name:
+                            continue
+                        
+                        current_obj = bpy.data.objects.get(obj_name)
+                        if current_obj:
+                            new_name = current_obj.name
+                            if item.object_name != new_name:
+                                item.object_name = new_name
     
     return 2.0
 
@@ -418,10 +426,6 @@ class SSMT_OT_CheckObjectNameChanges(bpy.types.Operator):
     
     def execute(self, context):
         global _node_to_object_id_mapping
-        
-        if not _node_to_object_id_mapping:
-            self.report({'INFO'}, "没有需要检查的节点")
-            return {'CANCELLED'}
         
         object_id_to_name = {str(obj.as_pointer()): obj.name for obj in bpy.data.objects}
         updated_count = 0
@@ -447,6 +451,18 @@ class SSMT_OT_CheckObjectNameChanges(bpy.types.Operator):
                             if node.object_name != new_name:
                                 node.object_name = new_name
                                 updated_count += 1
+                    elif node.bl_idname == 'SSMTNode_MultiFile_Export':
+                        for item in node.object_list:
+                            obj_name = getattr(item, 'object_name', '')
+                            if not obj_name:
+                                continue
+                            
+                            current_obj = bpy.data.objects.get(obj_name)
+                            if current_obj:
+                                new_name = current_obj.name
+                                if item.object_name != new_name:
+                                    item.object_name = new_name
+                                    updated_count += 1
         
         if updated_count > 0:
             self.report({'INFO'}, f"已更新 {updated_count} 个节点的物体引用")

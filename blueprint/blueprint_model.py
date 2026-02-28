@@ -36,6 +36,9 @@ class BluePrintModel:
         # 多文件导出节点列表
         self.multifile_export_nodes:list = [] 
 
+        # 嵌套蓝图访问记录，防止循环引用
+        self.visited_blueprints:set[str] = set()
+
         # 从输出节点开始递归解析所有的节点
         tree = BlueprintExportHelper.get_current_blueprint_tree()
         output_node = BlueprintExportHelper.get_node_from_bl_idname(tree, 'SSMTNode_Result_Output')
@@ -76,6 +79,11 @@ class BluePrintModel:
 
         if unknown_node.bl_idname == "SSMTNode_Object_Group":
             # 如果是单纯的分组节点，则不进行任何处理直接传递下去
+            self.parse_current_node(unknown_node, chain_key_list)
+
+        elif unknown_node.bl_idname == "SSMTNode_VertexGroupProcess":
+            # 如果是顶点组处理节点，则不进行任何处理直接传递下去
+            # 顶点组处理在预处理阶段已经完成，这里只需要继续解析节点链
             self.parse_current_node(unknown_node, chain_key_list)
 
         elif unknown_node.bl_idname == "SSMTNode_ToggleKey":
@@ -243,6 +251,34 @@ class BluePrintModel:
             # 实际的哈希值覆盖会在生成 INI 时应用
             # 需要继续递归解析后面的节点
             self.parse_current_node(unknown_node, chain_key_list)
+
+        elif unknown_node.bl_idname == "SSMTNode_Blueprint_Nest":
+            # 蓝图嵌套节点：递归解析嵌套蓝图中的所有节点
+            blueprint_name = getattr(unknown_node, 'blueprint_name', '')
+            if not blueprint_name:
+                return
+            
+            # 检查是否已经访问过该蓝图，防止循环引用
+            if blueprint_name in self.visited_blueprints:
+                print(f"[Blueprint Nest] 警告: 检测到循环引用，跳过蓝图 {blueprint_name}")
+                return
+            
+            self.visited_blueprints.add(blueprint_name)
+            
+            nested_tree = bpy.data.node_groups.get(blueprint_name)
+            if not nested_tree or nested_tree.bl_idname != 'SSMTBlueprintTreeType':
+                print(f"[Blueprint Nest] 错误: 无法找到蓝图 {blueprint_name}")
+                return
+            
+            print(f"[Blueprint Nest] 解析嵌套蓝图: {blueprint_name}")
+            
+            # 获取嵌套蓝图的输出节点
+            nested_output_node = BlueprintExportHelper.get_node_from_bl_idname(nested_tree, 'SSMTNode_Result_Output')
+            if nested_output_node:
+                # 递归解析嵌套蓝图中的节点
+                self.parse_current_node(nested_output_node, chain_key_list)
+            else:
+                print(f"[Blueprint Nest] 警告: 嵌套蓝图 {blueprint_name} 没有输出节点")
 
 
 

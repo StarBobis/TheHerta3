@@ -230,7 +230,7 @@ def remove_mesh(mesh):
 def mesh_triangulate(me):
     bm = bmesh.new()
     bm.from_mesh(me)
-    bmesh.ops.triangulate(bm, faces=bm.faces)
+    bmesh.ops.triangulate(bm, faces=bm.faces, quad_method='BEAUTY', ngon_method='BEAUTY')
     bm.to_mesh(me)
     bm.free()
 
@@ -472,7 +472,7 @@ class ObjUtils:
             me = obj.data
             bm = bmesh.new()
             bm.from_mesh(me)
-            bmesh.ops.triangulate(bm, faces=bm.faces[:])
+            bmesh.ops.triangulate(bm, faces=bm.faces[:], quad_method='BEAUTY', ngon_method='BEAUTY')
             bm.to_mesh(me)
             bm.free()
 
@@ -636,7 +636,7 @@ class ObjUtils:
         '''
         bm = bmesh.new()
         bm.from_mesh(me)
-        bmesh.ops.triangulate(bm, faces=bm.faces)
+        bmesh.ops.triangulate(bm, faces=bm.faces, quad_method='BEAUTY', ngon_method='BEAUTY')
         bm.to_mesh(me)
         bm.free()
 

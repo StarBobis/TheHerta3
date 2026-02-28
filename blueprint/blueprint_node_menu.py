@@ -5,6 +5,7 @@ from bpy.types import NodeTree, Node, NodeSocket
 from ..config.main_config import GlobalConfig
 
 from .blueprint_node_base import SSMTBlueprintTree, SSMTNodeBase
+from .blueprint_node_nest import SSMTNode_Blueprint_Nest
 
 
 class SSMT_OT_CreateGroupFromSelection(bpy.types.Operator):
@@ -19,26 +20,44 @@ class SSMT_OT_CreateGroupFromSelection(bpy.types.Operator):
             self.report({'WARNING'}, "没有选择任何物体")
             return {'CANCELLED'}
 
-        # 获取或创建与当前 Workspace 同名的 SSMT Blueprint 节点树
-        GlobalConfig.read_from_main_json()
-        workspace_name = f"Mod_{GlobalConfig.workspacename}" if GlobalConfig.workspacename else "SSMT_Mod_Logic"
-        node_tree = bpy.data.node_groups.get(workspace_name)
+        # 获取当前活动的蓝图树
+        node_tree = None
+        
+        # 1. 尝试从当前上下文获取蓝图树
+        space_data = getattr(context, "space_data", None)
+        if space_data and space_data.type == 'NODE_EDITOR':
+            node_tree = getattr(space_data, "edit_tree", None) or getattr(space_data, "node_tree", None)
+        
+        # 2. 如果当前不是节点编辑器，尝试查找当前打开的节点编辑器窗口
+        if not node_tree:
+            for window in context.window_manager.windows:
+                for area in window.screen.areas:
+                    if area.type == 'NODE_EDITOR':
+                        for space in area.spaces:
+                            if space.type == 'NODE_EDITOR':
+                                tree = getattr(space, "edit_tree", None) or getattr(space, "node_tree", None)
+                                if tree and tree.bl_idname == 'SSMTBlueprintTreeType':
+                                    node_tree = tree
+                                    break
+                        if node_tree:
+                            break
+                if node_tree:
+                    break
+        
+        # 3. 如果仍然找不到，使用默认的workspace蓝图
+        if not node_tree:
+            GlobalConfig.read_from_main_json()
+            workspace_name = f"Mod_{GlobalConfig.workspacename}" if GlobalConfig.workspacename else "SSMT_Mod_Logic"
+            node_tree = bpy.data.node_groups.get(workspace_name)
         
         if not node_tree or node_tree.bl_idname != 'SSMTBlueprintTreeType':
-            node_tree = bpy.data.node_groups.new(name=workspace_name, type='SSMTBlueprintTreeType')
-
-        # 切换到节点编辑器并设置该节点树（可选，视需求而定，这里主要负责创建节点）
-        # 如果需要跳转可以使用 context.area.type etc. 但在 3D View 操作不一定需要跳转
+            self.report({'WARNING'}, "未找到有效的蓝图树，请先打开蓝图编辑器")
+            return {'CANCELLED'}
 
         # 计算节点位置偏移，防止重叠
-        # 简单策略：找到当前最右侧/最下方的节点，或者直接在原点附近偏移
-        # 这里使用一个简单的网格布局
-        
-        # 查找一个放置基准点
         base_x = 0
         base_y = 0
         if node_tree.nodes:
-             # 如果已有节点，往右下角找个空地，或者直接往右
              pass
 
         # 取消所有节点的选中状态
@@ -56,27 +75,14 @@ class SSMT_OT_CreateGroupFromSelection(bpy.types.Operator):
             obj_node.location = (base_x, base_y - i * 150)
             obj_node.select = True
             
-            # 设置物体
             obj_node.object_name = obj.name
-            # 手动触发 update 如果需要，但属性设置通常会自动 update 
-            # (注意: 这里 update_object_name 是 property update callback)
             
-            # 连接到 group_node
-            # Group Node 会自动根据连接增加 input socket (在 update() 中)
-            # 但首次连接时可能只有一个 input, 连接后 update 会增加新的
-            
-            # 获取当前可用的 input
-            # 因为 SSMTNode_Object_Group.update() 逻辑是：如果有连接到 inputs[-1]，则 new socket remove...
-            # 所以我们需要确保连接
-            
-            # 找到第一个未连接的 input，或者最后一个
             target_socket = None
             if len(group_node.inputs) > 0:
                  target_socket = group_node.inputs[-1]
             
             if target_socket:
                 node_tree.links.new(obj_node.outputs[0], target_socket)
-                # 强制更新一下 group node 以生成新的插槽，以便下一个物体连接
                 group_node.update()
 
         return {'FINISHED'}
@@ -119,12 +125,39 @@ class SSMT_OT_CreateInternalSwitch(bpy.types.Operator):
         
         objects_with_sequence.sort(key=lambda x: x[0])
         
-        GlobalConfig.read_from_main_json()
-        workspace_name = f"Mod_{GlobalConfig.workspacename}" if GlobalConfig.workspacename else "SSMT_Mod_Logic"
-        node_tree = bpy.data.node_groups.get(workspace_name)
+        # 获取当前活动的蓝图树
+        node_tree = None
+        
+        # 1. 尝试从当前上下文获取蓝图树
+        space_data = getattr(context, "space_data", None)
+        if space_data and space_data.type == 'NODE_EDITOR':
+            node_tree = getattr(space_data, "edit_tree", None) or getattr(space_data, "node_tree", None)
+        
+        # 2. 如果当前不是节点编辑器，尝试查找当前打开的节点编辑器窗口
+        if not node_tree:
+            for window in context.window_manager.windows:
+                for area in window.screen.areas:
+                    if area.type == 'NODE_EDITOR':
+                        for space in area.spaces:
+                            if space.type == 'NODE_EDITOR':
+                                tree = getattr(space, "edit_tree", None) or getattr(space, "node_tree", None)
+                                if tree and tree.bl_idname == 'SSMTBlueprintTreeType':
+                                    node_tree = tree
+                                    break
+                        if node_tree:
+                            break
+                if node_tree:
+                    break
+        
+        # 3. 如果仍然找不到，使用默认的workspace蓝图
+        if not node_tree:
+            GlobalConfig.read_from_main_json()
+            workspace_name = f"Mod_{GlobalConfig.workspacename}" if GlobalConfig.workspacename else "SSMT_Mod_Logic"
+            node_tree = bpy.data.node_groups.get(workspace_name)
         
         if not node_tree or node_tree.bl_idname != 'SSMTBlueprintTreeType':
-            node_tree = bpy.data.node_groups.new(name=workspace_name, type='SSMTBlueprintTreeType')
+            self.report({'WARNING'}, "未找到有效的蓝图树，请先打开蓝图编辑器")
+            return {'CANCELLED'}
         
         nodes = node_tree.nodes
         links = node_tree.links
@@ -712,6 +745,11 @@ class SSMT_MT_NodeMenu_Advanced(bpy.types.Menu):
         layout = self.layout
         layout.operator("node.add_node", text="数据类型", icon='FILE_TEXT').type = "SSMTNode_DataType"
         layout.operator("node.add_node", text="多文件导出", icon='FILE_FOLDER').type = "SSMTNode_MultiFile_Export"
+        layout.operator("node.add_node", text="蓝图嵌套", icon='NODETREE').type = "SSMTNode_Blueprint_Nest"
+        layout.separator()
+        layout.operator("node.add_node", text="顶点组匹配", icon='GROUP').type = "SSMTNode_VertexGroupMatch"
+        layout.operator("node.add_node", text="顶点组处理", icon='GROUP').type = "SSMTNode_VertexGroupProcess"
+        layout.operator("node.add_node", text="映射表输入", icon='TEXT').type = "SSMTNode_VertexGroupMappingInput"
 
 
 class SSMT_MT_NodeMenu_Preset(bpy.types.Menu):
@@ -787,6 +825,7 @@ def register():
     bpy.utils.register_class(SSMT_MT_NodeMenu_Branch)
     bpy.utils.register_class(SSMT_MT_NodeMenu_ShapeKey)
     bpy.utils.register_class(SSMT_MT_NodeMenu_PostProcess)
+    bpy.utils.register_class(SSMTNode_Blueprint_Nest)
 
     bpy.types.NODE_MT_add.prepend(draw_node_add_menu)
     # 添加到 3D 视图物体右键菜单
@@ -799,6 +838,7 @@ def unregister():
     bpy.types.NODE_MT_add.remove(draw_node_add_menu)
     bpy.types.VIEW3D_MT_object_context_menu.remove(draw_objects_context_menu_add)
 
+    bpy.utils.unregister_class(SSMTNode_Blueprint_Nest)
     bpy.utils.unregister_class(SSMT_MT_NodeMenu_PostProcess)
     bpy.utils.unregister_class(SSMT_MT_NodeMenu_ShapeKey)
     bpy.utils.unregister_class(SSMT_MT_NodeMenu_Branch)

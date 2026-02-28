@@ -3,6 +3,8 @@ from .blueprint_node_obj import *
 from .blueprint_node_shapekey import *
 from .blueprint_node_menu import *
 from .blueprint_node_datatype import *
+from .blueprint_node_nest import *
+from .blueprint_nest_navigate import *
 from .blueprint_drag_drop import *
 from .blueprint_export_helper import *
 from .blueprint_export import *
@@ -17,3 +19,6 @@ from .blueprint_node_postprocess_resource_merge import *
 from .blueprint_node_postprocess_material import *
 from .blueprint_node_postprocess_health import *
 from .blueprint_node_postprocess_slider import *
+from .blueprint_node_vertex_group_match import *
+from .blueprint_node_vertex_group_process import *
+from .blueprint_node_vertex_group_mapping_input import *

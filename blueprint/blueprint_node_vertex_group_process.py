@@ -99,15 +99,26 @@ class SSMTNode_VertexGroupProcess(SSMTNodeBase):
 
     def get_merged_mapping_for_object(self, obj_name, mapping_nodes):
         merged_mapping = {}
+        exact_match_found = False
         
-        sorted_nodes = sorted(mapping_nodes, key=lambda x: x['index'])
+        def get_node_priority(node_info):
+            node = node_info['node']
+            exact_match = getattr(node, 'exact_hash_match', False)
+            return (0 if exact_match else 1, node_info['index'])
+        
+        sorted_nodes = sorted(mapping_nodes, key=get_node_priority)
         
         for node_info in sorted_nodes:
             node = node_info['node']
             target_hash = node_info['target_hash']
             node_type = node_info.get('type', 'match')
+            exact_match = getattr(node, 'exact_hash_match', False)
             
-            print(f"[VGProcess] 检查映射节点: {node.name}, 哈希: '{target_hash}', 物体名: '{obj_name}'")
+            print(f"[VGProcess] 检查映射节点: {node.name}, 哈希: '{target_hash}', 全匹配: {exact_match}, 物体名: '{obj_name}'")
+            
+            if exact_match_found and not exact_match:
+                print(f"[VGProcess] 已有全匹配映射表处理过此物体，跳过普通映射表")
+                continue
             
             if target_hash and not obj_name.startswith(target_hash):
                 print(f"[VGProcess] 哈希不匹配，跳过: '{target_hash}' vs '{obj_name}'")
@@ -121,17 +132,44 @@ class SSMTNode_VertexGroupProcess(SSMTNodeBase):
                     print(f"[VGProcess] 从映射输入节点获取到 {len(mapping)} 条映射")
                     merged_mapping.update(mapping)
             else:
-                target_obj_name = getattr(node, 'target_object', '')
+                mapping_text_name = getattr(node, 'mapping_text_name', '')
                 
-                text_name = f"VG_Match_{target_obj_name}"
-                text = bpy.data.texts.get(text_name)
-                
-                if text:
+                if mapping_text_name and mapping_text_name in bpy.data.texts:
+                    text = bpy.data.texts[mapping_text_name]
                     mapping = self.parse_mapping_text(text)
-                    print(f"[VGProcess] 从文本 '{text_name}' 解析到 {len(mapping)} 条映射")
+                    print(f"[VGProcess] 从节点存储的映射表 '{mapping_text_name}' 解析到 {len(mapping)} 条映射")
                     merged_mapping.update(mapping)
                 else:
-                    print(f"[VGProcess] 警告: 未找到映射文本 '{text_name}'")
+                    target_obj_name = getattr(node, 'target_object', '')
+                    
+                    base_text_name = f"VG_Match_{target_obj_name}"
+                    
+                    if len(base_text_name) > 63:
+                        import hashlib
+                        hash_suffix = hashlib.md5(target_obj_name.encode()).hexdigest()[:8]
+                        base_text_name = f"VG_Match_{hash_suffix}"
+                    
+                    text = bpy.data.texts.get(base_text_name)
+                    
+                    if not text:
+                        suffix = 1
+                        while True:
+                            text_name = f"{base_text_name}_{suffix:03d}"
+                            text = bpy.data.texts.get(text_name)
+                            if text:
+                                break
+                            suffix += 1
+                    
+                    if text:
+                        mapping = self.parse_mapping_text(text)
+                        print(f"[VGProcess] 从文本 '{text.name}' 解析到 {len(mapping)} 条映射")
+                        merged_mapping.update(mapping)
+                    else:
+                        print(f"[VGProcess] 警告: 未找到映射文本 '{base_text_name}'")
+            
+            if exact_match and target_hash and obj_name.startswith(target_hash):
+                exact_match_found = True
+                print(f"[VGProcess] 全匹配映射表已处理，标记物体 '{obj_name}' 为已匹配")
         
         return merged_mapping
 

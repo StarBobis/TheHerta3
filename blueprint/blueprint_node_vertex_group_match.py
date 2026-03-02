@@ -63,6 +63,18 @@ class SSMTNode_VertexGroupMatch(SSMTNodeBase):
         default=""
     )
 
+    exact_hash_match: bpy.props.BoolProperty(
+        name="全匹配优先",
+        description="开启后此映射表具有更高优先级，且被匹配的物体不会再被后续映射表处理",
+        default=False
+    )
+
+    mapping_text_name: bpy.props.StringProperty(
+        name="映射表名称",
+        description="当前节点生成的映射表文本名称",
+        default=""
+    )
+
     def init(self, context):
         self.outputs.new('SSMTSocketObject', "Output")
         self.width = 300
@@ -91,6 +103,9 @@ class SSMTNode_VertexGroupMatch(SSMTNodeBase):
         
         row = box.row()
         row.prop(self, "target_hash")
+        
+        row = box.row()
+        row.prop(self, "exact_hash_match")
         
         layout.separator()
         row = layout.row(align=True)
@@ -354,7 +369,13 @@ class SSMTNode_VertexGroupMatch(SSMTNodeBase):
                 if len(sources) > 1:
                     many_to_one_count += 1
 
-        text_name = f"VG_Match_{target_obj.name}"
+        base_text_name = f"VG_Match_{target_obj.name}"
+        if len(base_text_name) > 63:
+            import hashlib
+            hash_suffix = hashlib.md5(target_obj.name.encode()).hexdigest()[:8]
+            base_text_name = f"VG_Match_{hash_suffix}"
+        
+        text_name = self._get_unique_mapping_text_name(base_text_name)
         
         if text_name in bpy.data.texts:
             text = bpy.data.texts[text_name]
@@ -380,7 +401,28 @@ class SSMTNode_VertexGroupMatch(SSMTNodeBase):
             if src_name not in rename_map:
                 text.write(f"# 未匹配: {src_name}\n")
 
+        if debug_parent:
+            debug_parent["vgtp_mapping_text"] = text_name
+            debug_parent["vgtp_match_threshold"] = self.match_threshold
+            debug_parent["vgtp_match_time"] = int(time.time())
+            debug_parent["vgtp_matched_count"] = matched_count
+            debug_parent["vgtp_total_count"] = len(source_centers)
+
+        self.mapping_text_name = text_name
+
         return rename_map, f"匹配完成！成功匹配 {matched_count}/{len(source_centers)} 个顶点组，映射表已保存到: {text_name}"
+    
+    def _get_unique_mapping_text_name(self, base_name):
+        """获取唯一的映射表文本名称，如果已存在则添加后缀"""
+        if base_name not in bpy.data.texts:
+            return base_name
+        
+        suffix = 1
+        while True:
+            text_name = f"{base_name}_{suffix:03d}"
+            if text_name not in bpy.data.texts:
+                return text_name
+            suffix += 1
 
 
 class SSMT_OT_VertexGroupMatchExecute(bpy.types.Operator):
@@ -435,13 +477,18 @@ class SSMT_OT_VertexGroupMatchClear(bpy.types.Operator):
         target_obj = bpy.data.objects.get(node.target_object)
         
         if source_obj and target_obj:
-            text_name = f"VG_Match_{target_obj.name}"
-            
-            debug_parent_prefix = f"Debug_Match_{source_obj.name}_to_{target_obj.name}"
             debug_objects_to_remove = []
+            mapping_texts_to_remove = set()
+            
             for obj in bpy.data.objects:
-                if obj.name.startswith(debug_parent_prefix):
-                    debug_objects_to_remove.append(obj)
+                if obj.name.startswith("Debug_Match_"):
+                    obj_source = obj.get("vgtp_source_name", "")
+                    obj_target = obj.get("vgtp_target_name", "")
+                    if obj_source == source_obj.name and obj_target == target_obj.name:
+                        debug_objects_to_remove.append(obj)
+                        obj_mapping_text = obj.get("vgtp_mapping_text", "")
+                        if obj_mapping_text:
+                            mapping_texts_to_remove.add(obj_mapping_text)
             
             for debug_parent in debug_objects_to_remove:
                 children_to_remove = list(debug_parent.children)
@@ -449,12 +496,19 @@ class SSMT_OT_VertexGroupMatchClear(bpy.types.Operator):
                     bpy.data.objects.remove(child, do_unlink=True)
                 bpy.data.objects.remove(debug_parent, do_unlink=True)
             
-            if text_name in bpy.data.texts:
-                text = bpy.data.texts[text_name]
-                bpy.data.texts.remove(text)
-                self.report({'INFO'}, f"已清除映射表和调试物体: {text_name}")
+            if node.mapping_text_name:
+                mapping_texts_to_remove.add(node.mapping_text_name)
+            
+            for text_name in mapping_texts_to_remove:
+                if text_name in bpy.data.texts:
+                    bpy.data.texts.remove(bpy.data.texts[text_name])
+            
+            node.mapping_text_name = ""
+            
+            if mapping_texts_to_remove or debug_objects_to_remove:
+                self.report({'INFO'}, f"已清除 {len(mapping_texts_to_remove)} 个映射表和 {len(debug_objects_to_remove)} 个调试物体")
             else:
-                self.report({'INFO'}, f"已清除调试物体")
+                self.report({'INFO'}, f"未找到需要清除的内容")
         else:
             self.report({'WARNING'}, "请先设置源物体和目标物体")
         
@@ -486,10 +540,12 @@ class SSMT_OT_VertexGroupMatchSync(bpy.types.Operator):
     def poll(cls, context):
         return len(context.selected_objects) >= 2
 
-    def find_mapping_text(self, source_obj_name, target_obj_name):
-        """查找对应的映射表文本"""
-        text_name = f"VG_Match_{target_obj_name}"
-        return bpy.data.texts.get(text_name)
+    def find_mapping_text_from_debug_parent(self, debug_parent):
+        """从调试父级的自定义属性获取映射表文本"""
+        mapping_text_name = debug_parent.get("vgtp_mapping_text", "")
+        if mapping_text_name and mapping_text_name in bpy.data.texts:
+            return bpy.data.texts[mapping_text_name]
+        return None
 
     def update_mapping_text(self, text, source_vg_name, target_vg_name):
         """更新映射表中的条目 - 根据源名称找到对应行，替换等号后的目标名称"""
@@ -562,13 +618,26 @@ class SSMT_OT_VertexGroupMatchSync(bpy.types.Operator):
             self.report({'ERROR'}, "无法确定关联的源物体")
             return {'CANCELLED'}
 
-        mapping_text = self.find_mapping_text(source_obj_name, target_obj_name)
+        mapping_text = self.find_mapping_text_from_debug_parent(debug_parent)
         if not mapping_text:
-            mapping_text = bpy.data.texts.new(f"VG_Match_{target_obj_name}")
+            import hashlib
+            base_name = f"VG_Match_{target_obj_name}"
+            if len(base_name) > 63:
+                hash_suffix = hashlib.md5(target_obj_name.encode()).hexdigest()[:8]
+                base_name = f"VG_Match_{hash_suffix}"
+            
+            suffix = 1
+            text_name = base_name
+            while text_name in bpy.data.texts:
+                text_name = f"{base_name}_{suffix:03d}"
+                suffix += 1
+            
+            mapping_text = bpy.data.texts.new(text_name)
             mapping_text.write(f"# 顶点组名称映射表\n")
             mapping_text.write(f"# 源物体: {source_obj_name}\n")
             mapping_text.write(f"# 目标物体: {target_obj_name}\n")
             mapping_text.write(f"# 格式: 源名称=目标名称\n")
+            debug_parent["vgtp_mapping_text"] = text_name
 
         for src in source_empties:
             if src.parent != debug_parent:
@@ -636,10 +705,12 @@ class SSMT_OT_VertexGroupMatchDeleteConnection(bpy.types.Operator):
         selected_objects = context.selected_objects
         return any(obj.type == 'CURVE' and obj.name.startswith("Match_") for obj in selected_objects)
 
-    def find_mapping_text(self, source_obj_name, target_obj_name):
-        """查找对应的映射表文本"""
-        text_name = f"VG_Match_{target_obj_name}"
-        return bpy.data.texts.get(text_name)
+    def find_mapping_text_from_debug_parent(self, debug_parent):
+        """从调试父级的自定义属性获取映射表文本"""
+        mapping_text_name = debug_parent.get("vgtp_mapping_text", "")
+        if mapping_text_name and mapping_text_name in bpy.data.texts:
+            return bpy.data.texts[mapping_text_name]
+        return None
 
     def remove_from_mapping_text(self, text, source_vg_name):
         """从映射表中移除条目"""
@@ -686,8 +757,15 @@ class SSMT_OT_VertexGroupMatchDeleteConnection(bpy.types.Operator):
 
             source_vg_name = match_result.group(1)
             
+            debug_parent = active_obj.parent
+            
             source_empty_name = f"Source_{source_vg_name}"
-            source_empty = bpy.data.objects.get(source_empty_name)
+            source_empty = None
+            if debug_parent:
+                for child in debug_parent.children:
+                    if child.name == source_empty_name:
+                        source_empty = child
+                        break
             
             if source_empty:
                 source_empty["is_connected"] = False
@@ -698,14 +776,11 @@ class SSMT_OT_VertexGroupMatchDeleteConnection(bpy.types.Operator):
                     mat.diffuse_color = (0.0, 1.0, 0.2, 1.0)
                 source_empty.data.materials.clear()
                 source_empty.data.materials.append(mat)
-                
-                source_obj, target_obj, debug_parent = find_debug_info(source_empty)
-                if debug_parent:
-                    source_obj_name = debug_parent.get("vgtp_source_name")
-                    target_obj_name = debug_parent.get("vgtp_target_name")
-                    mapping_text = self.find_mapping_text(source_obj_name, target_obj_name)
-                    if mapping_text:
-                        self.remove_from_mapping_text(mapping_text, source_vg_name)
+            
+            if debug_parent:
+                mapping_text = self.find_mapping_text_from_debug_parent(debug_parent)
+                if mapping_text:
+                    self.remove_from_mapping_text(mapping_text, source_vg_name)
             
             bpy.data.objects.remove(active_obj)
             deleted_count += 1
@@ -902,17 +977,21 @@ class SSMT_OT_VertexGroupMatchQuickWeight(bpy.types.Operator):
         if existing_temp_obj and existing_temp_obj.get("vgtp_is_temp_merge"):
             bpy.data.objects.remove(existing_temp_obj, do_unlink=True)
         
-        source_empty_name = f"Source_{source_vg_name}"
-        target_empty_name = f"Target_{target_vg_name}"
-
-        source_empty = bpy.data.objects.get(source_empty_name)
-        target_empty = bpy.data.objects.get(target_empty_name)
-
-        if not source_empty or not target_empty:
-            self.report({'ERROR'}, "无法找到关联的源或目标调试物体")
+        debug_parent = active_curve.parent
+        if not debug_parent:
+            self.report({'ERROR'}, "无法找到连接线的父级调试组")
             return {'CANCELLED'}
-
-        source_obj, target_obj, debug_parent = find_debug_info(source_empty)
+        
+        source_obj_name = debug_parent.get("vgtp_source_name")
+        target_obj_name = debug_parent.get("vgtp_target_name")
+        
+        if not source_obj_name or not target_obj_name:
+            self.report({'ERROR'}, "调试组缺少源物体或目标物体信息")
+            return {'CANCELLED'}
+        
+        source_obj = bpy.data.objects.get(source_obj_name)
+        target_obj = bpy.data.objects.get(target_obj_name)
+        
         if not source_obj or not target_obj:
             self.report({'ERROR'}, "无法找到关联的源或目标物体")
             return {'CANCELLED'}

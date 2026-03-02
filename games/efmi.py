@@ -122,10 +122,11 @@ class ModModelEFMI:
                 texture_override_ib_section.new_line()
                 continue
 
-            # if ZZZ ,use run = CommandListSkinTexture solve slot check problems.
-            if GlobalConfig.logic_name == LogicName.ZZMI:
-                texture_override_ib_section.append(self.vlr_filter_index_indent + "run = CommandListSkinTexture")
-
+            # Nico:
+            # EFMI加载器中，提供了对贴图槽位的统一校验，以及提供了基于ShaderRegex的全局Check
+            # 所以无需生成VSCheck.ini，也无需进行手动的贴图槽位Check了，节省了一些Mod制作步骤，在此进行同步
+            texture_override_ib_section.append(self.vlr_filter_index_indent + "run = CommandList\\EFMIv1\\OverrideTextures")
+            
             
             # 遍历获取所有在当前分类hash下进行替换的分类，并添加对应的资源替换
             for original_category_name, draw_category_name in d3d11GameType.CategoryDrawCategoryDict.items():

@@ -252,6 +252,19 @@ class SSMTNode_VertexGroupProcess(SSMTNodeBase):
         
         print(f"[VGProcess] 两阶段重命名: {len(rename_pairs)} 个顶点组")
         
+        target_names = {new_name for _, new_name in rename_pairs}
+        conflict_names = []
+        for vg in obj.vertex_groups:
+            if vg.name in target_names and vg.name not in {old_name for old_name, _ in rename_pairs}:
+                conflict_names.append(vg.name)
+        
+        for conflict_name in conflict_names:
+            vg = obj.vertex_groups.get(conflict_name)
+            if vg:
+                temp_name = f"{temp_prefix}conflict_{conflict_name}"
+                vg.name = temp_name
+                print(f"[VGProcess] 冲突处理: 已存在的 {conflict_name} -> {temp_name}")
+        
         for old_name, new_name in rename_pairs:
             vg = obj.vertex_groups.get(old_name)
             if vg:
@@ -264,11 +277,6 @@ class SSMTNode_VertexGroupProcess(SSMTNodeBase):
             temp_name = f"{temp_prefix}{old_name}"
             vg = obj.vertex_groups.get(temp_name)
             if vg:
-                if new_name in obj.vertex_groups:
-                    existing_vg = obj.vertex_groups[new_name]
-                    existing_vg.name = f"{temp_prefix}conflict_{new_name}"
-                    print(f"[VGProcess] 冲突处理: 已存在的 {new_name} -> {existing_vg.name}")
-                
                 vg.name = new_name
                 renamed_count += 1
                 print(f"[VGProcess] 阶段2: {temp_name} -> {new_name}")

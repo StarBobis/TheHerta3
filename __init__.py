@@ -26,6 +26,8 @@ from .blueprint import blueprint_node_postprocess_slider
 from .blueprint import blueprint_node_vertex_group_match
 from .blueprint import blueprint_node_vertex_group_process
 from .blueprint import blueprint_node_vertex_group_mapping_input
+from .blueprint import blueprint_node_object_name_modify
+from .blueprint import blueprint_nest_navigate
 
 # 自动更新功能
 from . import addon_updater_ops
@@ -170,11 +172,15 @@ def register():
     blueprint_node_vertex_group_match.register()
     blueprint_node_vertex_group_process.register()
     blueprint_node_vertex_group_mapping_input.register()
+    blueprint_node_object_name_modify.register()
+    blueprint_nest_navigate.register()
 
 
 
 def unregister():
     # 蓝图系统
+    blueprint_nest_navigate.unregister()
+    blueprint_node_object_name_modify.unregister()
     blueprint_node_vertex_group_match.unregister()
     blueprint_node_vertex_group_process.unregister()
     blueprint_node_vertex_group_mapping_input.unregister()

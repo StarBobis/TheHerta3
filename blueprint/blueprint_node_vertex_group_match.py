@@ -109,17 +109,27 @@ class SSMTNode_VertexGroupMatch(SSMTNodeBase):
         
         layout.separator()
         row = layout.row(align=True)
-        row.operator("ssmt.vertex_group_match_execute", text="执行匹配", icon='PLAY')
-        row.operator("ssmt.vertex_group_match_clear", text="清除映射", icon='X')
+        op = row.operator("ssmt.vertex_group_match_execute", text="执行匹配", icon='PLAY')
+        op.node_name = self.name
+        op = row.operator("ssmt.vertex_group_match_clear", text="清除映射", icon='X')
+        op.node_name = self.name
         
         layout.separator()
         row = layout.row(align=True)
-        row.operator("ssmt.vertex_group_match_sync", text="同步选中", icon='LINKED')
-        row.operator("ssmt.vertex_group_match_delete_connection", text="删除连接", icon='X')
+        op = row.operator("ssmt.vertex_group_match_toggle_debug", text="显示/隐藏调试", icon='HIDE_OFF')
+        op.node_name = self.name
         
         layout.separator()
         row = layout.row(align=True)
-        row.operator("ssmt.vertex_group_match_detect_multi", text="检测多连接", icon='VIEWZOOM')
+        op = row.operator("ssmt.vertex_group_match_sync", text="同步选中", icon='LINKED')
+        op.node_name = self.name
+        op = row.operator("ssmt.vertex_group_match_delete_connection", text="删除连接", icon='X')
+        op.node_name = self.name
+        
+        layout.separator()
+        row = layout.row(align=True)
+        op = row.operator("ssmt.vertex_group_match_detect_multi", text="检测多连接", icon='VIEWZOOM')
+        op.node_name = self.name
         
         layout.separator()
         box = layout.box()
@@ -430,6 +440,8 @@ class SSMT_OT_VertexGroupMatchExecute(bpy.types.Operator):
     bl_idname = "ssmt.vertex_group_match_execute"
     bl_label = "执行顶点组匹配"
     bl_options = {'REGISTER', 'INTERNAL'}
+    
+    node_name: bpy.props.StringProperty(default="")
 
     @classmethod
     def poll(cls, context):
@@ -437,13 +449,21 @@ class SSMT_OT_VertexGroupMatchExecute(bpy.types.Operator):
         return space_data and space_data.type == 'NODE_EDITOR'
 
     def execute(self, context):
-        selected_nodes = [node for node in context.selected_nodes if node.bl_idname == 'SSMTNode_VertexGroupMatch']
+        node = None
+        if self.node_name:
+            space_data = getattr(context, "space_data", None)
+            if space_data and hasattr(space_data, 'node_tree') and space_data.node_tree:
+                node = space_data.node_tree.nodes.get(self.node_name)
         
-        if not selected_nodes:
+        if not node:
+            selected_nodes = [n for n in context.selected_nodes if n.bl_idname == 'SSMTNode_VertexGroupMatch']
+            if selected_nodes:
+                node = selected_nodes[0]
+        
+        if not node or node.bl_idname != 'SSMTNode_VertexGroupMatch':
             self.report({'WARNING'}, "请选中顶点组匹配节点")
             return {'CANCELLED'}
         
-        node = selected_nodes[0]
         rename_map, message = node.execute_match(context)
         
         if rename_map is None:
@@ -459,6 +479,8 @@ class SSMT_OT_VertexGroupMatchClear(bpy.types.Operator):
     bl_idname = "ssmt.vertex_group_match_clear"
     bl_label = "清除顶点组映射表"
     bl_options = {'REGISTER', 'INTERNAL'}
+    
+    node_name: bpy.props.StringProperty(default="")
 
     @classmethod
     def poll(cls, context):
@@ -466,13 +488,21 @@ class SSMT_OT_VertexGroupMatchClear(bpy.types.Operator):
         return space_data and space_data.type == 'NODE_EDITOR'
 
     def execute(self, context):
-        selected_nodes = [node for node in context.selected_nodes if node.bl_idname == 'SSMTNode_VertexGroupMatch']
+        node = None
+        if self.node_name:
+            space_data = getattr(context, "space_data", None)
+            if space_data and hasattr(space_data, 'node_tree') and space_data.node_tree:
+                node = space_data.node_tree.nodes.get(self.node_name)
         
-        if not selected_nodes:
+        if not node:
+            selected_nodes = [n for n in context.selected_nodes if n.bl_idname == 'SSMTNode_VertexGroupMatch']
+            if selected_nodes:
+                node = selected_nodes[0]
+        
+        if not node or node.bl_idname != 'SSMTNode_VertexGroupMatch':
             self.report({'WARNING'}, "请选中顶点组匹配节点")
             return {'CANCELLED'}
         
-        node = selected_nodes[0]
         source_obj = bpy.data.objects.get(node.source_object)
         target_obj = bpy.data.objects.get(node.target_object)
         
@@ -515,6 +545,67 @@ class SSMT_OT_VertexGroupMatchClear(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class SSMT_OT_VertexGroupMatchToggleDebug(bpy.types.Operator):
+    '''显示/隐藏调试物体'''
+    bl_idname = "ssmt.vertex_group_match_toggle_debug"
+    bl_label = "显示/隐藏调试物体"
+    bl_options = {'REGISTER', 'INTERNAL'}
+    
+    node_name: bpy.props.StringProperty(default="")
+
+    @classmethod
+    def poll(cls, context):
+        space_data = getattr(context, "space_data", None)
+        return space_data and space_data.type == 'NODE_EDITOR'
+
+    def execute(self, context):
+        node = None
+        if self.node_name:
+            space_data = getattr(context, "space_data", None)
+            if space_data and hasattr(space_data, 'node_tree') and space_data.node_tree:
+                node = space_data.node_tree.nodes.get(self.node_name)
+        
+        if not node:
+            selected_nodes = [n for n in context.selected_nodes if n.bl_idname == 'SSMTNode_VertexGroupMatch']
+            if selected_nodes:
+                node = selected_nodes[0]
+        
+        if not node or node.bl_idname != 'SSMTNode_VertexGroupMatch':
+            self.report({'WARNING'}, "请选中顶点组匹配节点")
+            return {'CANCELLED'}
+        
+        source_obj = bpy.data.objects.get(node.source_object)
+        target_obj = bpy.data.objects.get(node.target_object)
+        
+        if not source_obj or not target_obj:
+            self.report({'WARNING'}, "请先设置源物体和目标物体")
+            return {'CANCELLED'}
+        
+        debug_objects = []
+        for obj in bpy.data.objects:
+            if obj.name.startswith("Debug_Match_"):
+                obj_source = obj.get("vgtp_source_name", "")
+                obj_target = obj.get("vgtp_target_name", "")
+                if obj_source == source_obj.name and obj_target == target_obj.name:
+                    debug_objects.append(obj)
+        
+        if not debug_objects:
+            self.report({'INFO'}, "未找到关联的调试物体，请先执行匹配")
+            return {'CANCELLED'}
+        
+        first_debug = debug_objects[0]
+        is_hidden = first_debug.hide_get()
+        
+        for debug_parent in debug_objects:
+            debug_parent.hide_set(not is_hidden)
+            for child in debug_parent.children:
+                child.hide_set(not is_hidden)
+        
+        action = "显示" if is_hidden else "隐藏"
+        self.report({'INFO'}, f"已{action} {len(debug_objects)} 个调试物体组")
+        return {'FINISHED'}
+
+
 def find_debug_info(source_empty):
     """从调试物体查找关联的源物体、目标物体和调试父级"""
     debug_parent = source_empty.parent
@@ -535,6 +626,8 @@ class SSMT_OT_VertexGroupMatchSync(bpy.types.Operator):
     bl_idname = "ssmt.vertex_group_match_sync"
     bl_label = "同步选中的顶点组关联"
     bl_options = {'REGISTER', 'UNDO'}
+    
+    node_name: bpy.props.StringProperty(default="")
 
     @classmethod
     def poll(cls, context):
@@ -699,6 +792,8 @@ class SSMT_OT_VertexGroupMatchDeleteConnection(bpy.types.Operator):
     bl_idname = "ssmt.vertex_group_match_delete_connection"
     bl_label = "删除连接线"
     bl_options = {'REGISTER', 'UNDO'}
+    
+    node_name: bpy.props.StringProperty(default="")
 
     @classmethod
     def poll(cls, context):
@@ -794,6 +889,8 @@ class SSMT_OT_VertexGroupMatchDetectMulti(bpy.types.Operator):
     bl_idname = "ssmt.vertex_group_match_detect_multi"
     bl_label = "检测多分块连接"
     bl_options = {'REGISTER', 'UNDO'}
+    
+    node_name: bpy.props.StringProperty(default="")
 
     def execute(self, context):
         selected_objects = context.selected_objects
@@ -1188,6 +1285,7 @@ classes = (
     SSMTNode_VertexGroupMatch,
     SSMT_OT_VertexGroupMatchExecute,
     SSMT_OT_VertexGroupMatchClear,
+    SSMT_OT_VertexGroupMatchToggleDebug,
     SSMT_OT_VertexGroupMatchSync,
     SSMT_OT_VertexGroupMatchDeleteConnection,
     SSMT_OT_VertexGroupMatchDetectMulti,

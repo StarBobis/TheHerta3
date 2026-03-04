@@ -475,13 +475,14 @@ class SSMT_OT_CheckObjectNameChanges(bpy.types.Operator):
 def register():
     global _node_selection_timer, _object_name_check_timer
     bpy.utils.register_class(SSMT_OT_CheckObjectNameChanges)
-    _initialize_workspace_cache()
     bpy.app.handlers.depsgraph_update_post.append(object_visibility_handler)
     bpy.app.handlers.depsgraph_update_post.append(object_selection_handler)
     bpy.app.handlers.depsgraph_update_post.append(workspace_object_added_handler)
     
     _node_selection_timer = bpy.app.timers.register(check_node_selection_changes, persistent=True)
     _object_name_check_timer = bpy.app.timers.register(check_object_name_changes, persistent=True)
+    
+    bpy.app.timers.register(_initialize_workspace_cache, first_interval=0.1)
 
 
 def unregister():

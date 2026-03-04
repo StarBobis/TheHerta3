@@ -747,6 +747,8 @@ class SSMT_MT_NodeMenu_Advanced(bpy.types.Menu):
         layout.operator("node.add_node", text="多文件导出", icon='FILE_FOLDER').type = "SSMTNode_MultiFile_Export"
         layout.operator("node.add_node", text="蓝图嵌套", icon='NODETREE').type = "SSMTNode_Blueprint_Nest"
         layout.separator()
+        layout.operator("node.add_node", text="物体名称修改", icon='GROUP').type = "SSMTNode_Object_Name_Modify"
+        layout.separator()
         layout.operator("node.add_node", text="顶点组匹配", icon='GROUP').type = "SSMTNode_VertexGroupMatch"
         layout.operator("node.add_node", text="顶点组处理", icon='GROUP').type = "SSMTNode_VertexGroupProcess"
         layout.operator("node.add_node", text="映射表输入", icon='TEXT').type = "SSMTNode_VertexGroupMappingInput"

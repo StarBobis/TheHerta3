@@ -202,6 +202,10 @@ class BluePrintModel:
 
                     key_tmp_value = key_tmp_value + 1
 
+        elif unknown_node.bl_idname == "SSMTNode_Object_Name_Modify":
+            # 物体名称修改节点：透传连接的节点，在导出时会修改物体名称
+            self.parse_current_node(unknown_node, chain_key_list)
+
         elif unknown_node.bl_idname == "SSMTNode_Object_Info":
             obj_model = ObjDataModel(obj_name=unknown_node.object_name)
             
@@ -209,19 +213,14 @@ class BluePrintModel:
             obj_model.component_count = int(unknown_node.component) 
             obj_model.obj_alias_name = unknown_node.alias_name
             
-            # 使用原始名称作为 INI 注释中的显示名称
             if hasattr(unknown_node, 'original_object_name') and unknown_node.original_object_name:
                 obj_model.display_name = unknown_node.original_object_name
 
             obj_model.condition = M_Condition(work_key_list=copy.deepcopy(chain_key_list))
             
-            # 每遇到一个obj，都把这个obj加入顺序渲染列表
             self.ordered_draw_obj_data_model_list.append(obj_model)
 
         elif unknown_node.bl_idname == "SSMTNode_MultiFile_Export":
-            # 多文件导出节点：创建一个占位的 ObjDataModel
-            # 实际的物体信息会在导出时根据当前导出次数动态更新
-            # 先使用第一个物体的信息创建占位对象
             if len(unknown_node.object_list) > 0:
                 first_item = unknown_node.object_list[0]
                 obj_model = ObjDataModel(obj_name=first_item.object_name)
@@ -229,7 +228,6 @@ class BluePrintModel:
                 obj_model.component_count = int(first_item.component) if first_item.component else 0
                 obj_model.obj_alias_name = first_item.alias_name
                 
-                # 使用原始名称作为 INI 注释中的显示名称
                 if hasattr(first_item, 'original_object_name') and first_item.original_object_name:
                     obj_model.display_name = first_item.original_object_name
                 
@@ -334,14 +332,12 @@ class BluePrintModel:
                 multifile_object_info = multifile_node.get_current_object_info(export_index)
                 
                 if multifile_object_info:
-                    # 更新物体信息
                     obj_name = multifile_object_info["object_name"]
                     obj_model.obj_name = obj_name
                     obj_model.draw_ib = multifile_object_info["draw_ib"]
                     obj_model.component_count = int(multifile_object_info["component"]) if multifile_object_info["component"] else 0
                     obj_model.obj_alias_name = multifile_object_info["alias_name"]
                     
-                    # 使用原始名称作为 INI 注释中的显示名称
                     original_name = multifile_object_info.get("original_object_name", obj_name)
                     if original_name:
                         obj_model.display_name = original_name

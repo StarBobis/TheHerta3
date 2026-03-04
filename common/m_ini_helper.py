@@ -69,7 +69,7 @@ class M_IniHelper:
                     drawindexed_instanced_obj = M_DrawIndexedInstanced()
                     
                     drawindexed_instanced_obj.IndexCountPerInstance = obj_model.drawindexed_obj.DrawNumber
-                    drawindexed_instanced_obj.StartIndexLocation = obj_model.drawindexed_obj.DrawStartIndex
+                    drawindexed_instanced_obj.StartIndexLocation = obj_model.drawindexed_obj.DrawOffsetIndex
 
                     drawindexed_str_list.append("  " + drawindexed_instanced_obj.get_draw_str())
                 drawindexed_str_list.append("endif")
@@ -80,7 +80,7 @@ class M_IniHelper:
                     
                     drawindexed_instanced_obj = M_DrawIndexedInstanced()
                     drawindexed_instanced_obj.IndexCountPerInstance = obj_model.drawindexed_obj.DrawNumber
-                    drawindexed_instanced_obj.StartIndexLocation = obj_model.drawindexed_obj.DrawStartIndex
+                    drawindexed_instanced_obj.StartIndexLocation = obj_model.drawindexed_obj.DrawOffsetIndex
 
                     drawindexed_str_list.append("  " + drawindexed_instanced_obj.get_draw_str())
             drawindexed_str_list.append("")

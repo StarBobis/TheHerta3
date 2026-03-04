@@ -261,12 +261,8 @@ def unregister_keymaps():
 
 
 def register():
-    bpy.utils.register_class(SSMT_OT_BlueprintNestNavigate)
-    bpy.utils.register_class(SSMT_OT_CreateBlueprintFromNest)
     register_keymaps()
 
 
 def unregister():
     unregister_keymaps()
-    bpy.utils.unregister_class(SSMT_OT_CreateBlueprintFromNest)
-    bpy.utils.unregister_class(SSMT_OT_BlueprintNestNavigate)

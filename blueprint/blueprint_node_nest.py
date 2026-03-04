@@ -57,11 +57,3 @@ class SSMTNode_Blueprint_Nest(SSMTNodeBase):
                 layout.label(text="警告: 选中的不是SSMT蓝图", icon='ERROR')
             else:
                 layout.label(text="警告: 蓝图不存在", icon='ERROR')
-
-
-def register():
-    bpy.utils.register_class(SSMTNode_Blueprint_Nest)
-
-
-def unregister():
-    bpy.utils.unregister_class(SSMTNode_Blueprint_Nest)

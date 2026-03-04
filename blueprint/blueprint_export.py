@@ -403,7 +403,9 @@ class SSMTGenerateModBlueprint(bpy.types.Operator):
         """
         from ..utils.obj_utils import mesh_triangulate_beauty
         
+        tree = BlueprintExportHelper.get_current_blueprint_tree()
         vg_process_nodes = self._get_vg_process_nodes()
+        name_modify_nodes = self._get_name_modify_nodes()
         
         copy_mapping = {}
         print(f"开始创建三角化副本...")
@@ -445,11 +447,68 @@ class SSMTGenerateModBlueprint(bpy.types.Operator):
                 
                 node_or_item.original_object_name = original_name
                 copy_mapping[original_name] = (copy_obj, node_or_item)
-                node_or_item.object_name = copy_obj.name
                 
-                start_operation("VertexGroupProcess", obj_name)
-                self._apply_vg_process_nodes(copy_obj, vg_process_nodes)
-                end_operation("VertexGroupProcess")
+                current_name = original_name
+                processing_chain = self._get_processing_chain_for_object(original_name, tree)
+                
+                if processing_chain:
+                    print(f"[ProcessingChain] 物体 {original_name} 开始按处理链执行，共 {len(processing_chain)} 个节点")
+                    
+                    for idx, (node, node_type) in enumerate(processing_chain):
+                        if node_type == 'name_modify':
+                            print(f"[ProcessingChain] 步骤 {idx + 1}: 名称修改节点 {node.name}")
+                            if hasattr(node, 'is_valid') and node.is_valid():
+                                new_name = node.get_modified_object_name(current_name)
+                                if new_name != current_name:
+                                    print(f"[ProcessingChain] 名称修改: {current_name} -> {new_name}")
+                                    old_copy_name = copy_obj.name
+                                    copy_obj.name = new_name
+                                    print(f"[ProcessingChain] 副本名称: {old_copy_name} -> {copy_obj.name}")
+                                    current_name = new_name
+                                    if hasattr(node_or_item, 'original_object_name'):
+                                        node_or_item.original_object_name = new_name
+                                else:
+                                    print(f"[ProcessingChain] 名称未变化")
+                        
+                        elif node_type == 'vg_process':
+                            print(f"[ProcessingChain] 步骤 {idx + 1}: 顶点组处理节点 {node.name}，当前名称: {current_name}")
+                            start_operation(f"VGProcess_{node.name}", obj_name)
+                            try:
+                                stats = node.process_object(copy_obj)
+                                if any(v > 0 for v in stats.values()):
+                                    print(f"[ProcessingChain] {copy_obj.name}: 重命名={stats['renamed']}, 合并={stats['merged']}, 清理={stats['cleaned']}, 填充={stats['filled']}")
+                            except Exception as e:
+                                print(f"[ProcessingChain] 处理物体 {copy_obj.name} 时出错: {e}")
+                                import traceback
+                                traceback.print_exc()
+                            end_operation(f"VGProcess_{node.name}")
+                    
+                    node_or_item.object_name = copy_obj.name
+                else:
+                    if name_modify_nodes:
+                        print(f"[NameModify] 开始应用名称修改节点，共 {len(name_modify_nodes)} 个")
+                        for idx, name_modify_node in enumerate(name_modify_nodes):
+                            print(f"[NameModify] 应用第 {idx + 1} 个名称修改节点: {name_modify_node.name}")
+                            if hasattr(name_modify_node, 'is_valid') and name_modify_node.is_valid():
+                                new_name = name_modify_node.get_modified_object_name(current_name)
+                                if new_name != current_name:
+                                    print(f"[NameModify] 节点 {name_modify_node.name}: {current_name} -> {new_name}")
+                                    old_copy_name = copy_obj.name
+                                    copy_obj.name = new_name
+                                    print(f"[NameModify] 副本名称: {old_copy_name} -> {copy_obj.name}")
+                                    current_name = new_name
+                                    if hasattr(node_or_item, 'original_object_name'):
+                                        node_or_item.original_object_name = new_name
+                                else:
+                                    print(f"[NameModify] 节点 {name_modify_node.name}: 名称未变化")
+                            else:
+                                print(f"[NameModify] 节点 {name_modify_node.name}: 无效或为空，跳过")
+                    
+                    node_or_item.object_name = copy_obj.name
+                    
+                    start_operation("VertexGroupProcess", obj_name)
+                    self._apply_vg_process_nodes(copy_obj, vg_process_nodes)
+                    end_operation("VertexGroupProcess")
                 
                 start_operation("Triangulate", obj_name)
                 mesh_triangulate_beauty(copy_obj)
@@ -543,7 +602,7 @@ class SSMTGenerateModBlueprint(bpy.types.Operator):
                 
                 node_or_item.original_object_name = original_name
                 copy_mapping[original_name] = (copy_obj, node_or_item)
-                node_or_item.object_name = copy_obj.name
+                
                 print(f"[ParallelPreprocess] 加载预处理结果: {original_name} -> {copy_obj.name}")
             else:
                 print(f"[ParallelPreprocess] 警告: 副本 {copy_name} 未在预处理结果中找到")
@@ -553,12 +612,72 @@ class SSMTGenerateModBlueprint(bpy.types.Operator):
             manager.cleanup()
             return None
         
-        vg_process_nodes = self._get_vg_process_nodes()
+        tree = BlueprintExportHelper.get_current_blueprint_tree()
         
-        if vg_process_nodes:
-            print(f"[ParallelPreprocess] 开始执行顶点组处理...")
-            for original_name, (copy_obj, node_or_item) in copy_mapping.items():
-                self._apply_vg_process_nodes(copy_obj, vg_process_nodes)
+        print(f"[ParallelPreprocess] 开始按处理链执行...")
+        for original_name, (copy_obj, node_or_item) in copy_mapping.items():
+            current_name = original_name
+            processing_chain = self._get_processing_chain_for_object(original_name, tree)
+            
+            if processing_chain:
+                print(f"[ParallelPreprocess][ProcessingChain] 物体 {original_name} 开始按处理链执行，共 {len(processing_chain)} 个节点")
+                
+                for idx, (node, node_type) in enumerate(processing_chain):
+                    if node_type == 'name_modify':
+                        print(f"[ParallelPreprocess][ProcessingChain] 步骤 {idx + 1}: 名称修改节点 {node.name}")
+                        if hasattr(node, 'is_valid') and node.is_valid():
+                            new_name = node.get_modified_object_name(current_name)
+                            if new_name != current_name:
+                                print(f"[ParallelPreprocess][ProcessingChain] 名称修改: {current_name} -> {new_name}")
+                                old_copy_name = copy_obj.name
+                                copy_obj.name = new_name
+                                print(f"[ParallelPreprocess][ProcessingChain] 副本名称: {old_copy_name} -> {copy_obj.name}")
+                                current_name = new_name
+                                if hasattr(node_or_item, 'original_object_name'):
+                                    node_or_item.original_object_name = new_name
+                            else:
+                                print(f"[ParallelPreprocess][ProcessingChain] 名称未变化")
+                    
+                    elif node_type == 'vg_process':
+                        print(f"[ParallelPreprocess][ProcessingChain] 步骤 {idx + 1}: 顶点组处理节点 {node.name}，当前名称: {current_name}")
+                        start_operation(f"VGProcess_{node.name}", original_name)
+                        try:
+                            stats = node.process_object(copy_obj)
+                            if any(v > 0 for v in stats.values()):
+                                print(f"[ParallelPreprocess][ProcessingChain] {copy_obj.name}: 重命名={stats['renamed']}, 合并={stats['merged']}, 清理={stats['cleaned']}, 填充={stats['filled']}")
+                        except Exception as e:
+                            print(f"[ParallelPreprocess][ProcessingChain] 处理物体 {copy_obj.name} 时出错: {e}")
+                            import traceback
+                            traceback.print_exc()
+                        end_operation(f"VGProcess_{node.name}")
+                
+                node_or_item.object_name = copy_obj.name
+            else:
+                name_modify_nodes = self._get_name_modify_nodes()
+                if name_modify_nodes:
+                    print(f"[ParallelPreprocess][NameModify] 开始应用名称修改节点，共 {len(name_modify_nodes)} 个")
+                    for idx, name_modify_node in enumerate(name_modify_nodes):
+                        print(f"[ParallelPreprocess][NameModify] 应用第 {idx + 1} 个名称修改节点: {name_modify_node.name}")
+                        if hasattr(name_modify_node, 'is_valid') and name_modify_node.is_valid():
+                            new_name = name_modify_node.get_modified_object_name(current_name)
+                            if new_name != current_name:
+                                print(f"[ParallelPreprocess][NameModify] 节点 {name_modify_node.name}: {current_name} -> {new_name}")
+                                old_copy_name = copy_obj.name
+                                copy_obj.name = new_name
+                                print(f"[ParallelPreprocess][NameModify] 副本名称: {old_copy_name} -> {copy_obj.name}")
+                                current_name = new_name
+                                if hasattr(node_or_item, 'original_object_name'):
+                                    node_or_item.original_object_name = new_name
+                            else:
+                                print(f"[ParallelPreprocess][NameModify] 节点 {name_modify_node.name}: 名称未变化")
+                        else:
+                            print(f"[ParallelPreprocess][NameModify] 节点 {name_modify_node.name}: 无效或为空，跳过")
+                
+                node_or_item.object_name = copy_obj.name
+                
+                vg_process_nodes = self._get_vg_process_nodes()
+                if vg_process_nodes:
+                    self._apply_vg_process_nodes(copy_obj, vg_process_nodes)
         
         start_operation("ParallelCleanup")
         manager.cleanup()
@@ -646,6 +765,78 @@ class SSMTGenerateModBlueprint(bpy.types.Operator):
         
         return mapping_texts
     
+    def _get_name_modify_nodes(self):
+        """获取所有名称修改节点（按照连接顺序）"""
+        result = []
+        
+        tree = BlueprintExportHelper.get_current_blueprint_tree()
+        if not tree:
+            return result
+        
+        visited = set()
+        
+        def collect_name_modify_nodes_in_order(node, current_tree):
+            """按照连接顺序收集名称修改节点"""
+            if node in visited:
+                return
+            visited.add(node)
+            
+            # 如果是名称修改节点，添加到结果中
+            if node.bl_idname == 'SSMTNode_Object_Name_Modify':
+                result.append(node)
+                print(f"[NameModify] 找到名称修改节点: {node.name}")
+            
+            # 递归检查连接的节点
+            for input_socket in node.inputs:
+                if input_socket.is_linked:
+                    for link in input_socket.links:
+                        from_node = link.from_node
+                        collect_name_modify_nodes_in_order(from_node, current_tree)
+        
+        def collect_nested_blueprint_nodes(nest_node, current_tree):
+            """递归收集嵌套蓝图中的名称修改节点"""
+            blueprint_name = getattr(nest_node, 'blueprint_name', '')
+            if not blueprint_name:
+                return
+            
+            if blueprint_name in visited:
+                return
+            
+            visited.add(blueprint_name)
+            
+            nested_tree = bpy.data.node_groups.get(blueprint_name)
+            if not nested_tree or nested_tree.bl_idname != 'SSMTBlueprintTreeType':
+                return
+            
+            print(f"[NameModify] 扫描嵌套蓝图: {blueprint_name}")
+            
+            nested_output_nodes = [n for n in nested_tree.nodes if n.bl_idname == 'SSMTNode_Result_Output']
+            
+            if not nested_output_nodes:
+                print(f"[NameModify] 警告: 嵌套蓝图 {blueprint_name} 没有输出节点")
+                return
+            
+            for nested_output_node in nested_output_nodes:
+                collect_name_modify_nodes_in_order(nested_output_node, nested_tree)
+            
+            for nested_node in nested_tree.nodes:
+                if nested_node.bl_idname == 'SSMTNode_Blueprint_Nest':
+                    collect_nested_blueprint_nodes(nested_node, nested_tree)
+        
+        output_nodes = [n for n in tree.nodes if n.bl_idname == 'SSMTNode_Result_Output']
+        for output_node in output_nodes:
+            collect_name_modify_nodes_in_order(output_node, tree)
+        
+        for node in tree.nodes:
+            if node.bl_idname == 'SSMTNode_Blueprint_Nest':
+                collect_nested_blueprint_nodes(node, tree)
+        
+        # 反转结果，因为是从输出节点开始递归的，所以需要反转顺序
+        result.reverse()
+        
+        print(f"[NameModify] 共找到 {len(result)} 个名称修改节点，顺序: {[n.name for n in result]}")
+        return result
+    
     def _get_vg_process_nodes_for_object(self, obj_name, vg_process_nodes):
         """获取应该应用于指定物体的顶点组处理节点列表"""
         result = []
@@ -723,6 +914,96 @@ class SSMTGenerateModBlueprint(bpy.types.Operator):
         print(f"[VGProcess] 顶点组处理节点 '{vg_process_node.name}' 连接的物体: {connected_objects}")
         
         return obj_name in connected_objects
+    
+    def _get_processing_chain_for_object(self, obj_name, tree):
+        """
+        获取指定物体经过的处理链（按连接顺序）
+        返回: [(节点, 节点类型), ...] 其中节点类型为 'name_modify' 或 'vg_process'
+        """
+        result = []
+        visited = set()
+        
+        def find_object_node(node, current_tree, depth=0):
+            """查找物体节点"""
+            if node in visited:
+                return None
+            visited.add(node)
+            
+            if node.bl_idname == 'SSMTNode_Object_Info':
+                found_name = getattr(node, 'object_name', '')
+                if found_name == obj_name:
+                    return node
+            elif node.bl_idname == 'SSMTNode_MultiFile_Export':
+                object_list = getattr(node, 'object_list', [])
+                for item in object_list:
+                    item_name = getattr(item, 'object_name', '')
+                    if item_name == obj_name:
+                        return node
+            elif node.bl_idname == 'SSMTNode_Blueprint_Nest':
+                blueprint_name = getattr(node, 'blueprint_name', '')
+                if blueprint_name:
+                    nested_tree = bpy.data.node_groups.get(blueprint_name)
+                    if nested_tree and nested_tree.bl_idname == 'SSMTBlueprintTreeType':
+                        for nested_node in nested_tree.nodes:
+                            if nested_node.bl_idname == 'SSMTNode_Result_Output':
+                                found = find_object_node(nested_node, nested_tree, depth+1)
+                                if found:
+                                    return found
+            
+            for input_socket in node.inputs:
+                for link in input_socket.links:
+                    found = find_object_node(link.from_node, current_tree, depth+1)
+                    if found:
+                        return found
+            return None
+        
+        def collect_processing_chain(node, current_tree, chain, visited_nodes):
+            """从物体节点开始，收集处理链"""
+            if node in visited_nodes:
+                return
+            visited_nodes.add(node)
+            
+            for output_socket in node.outputs:
+                for link in output_socket.links:
+                    to_node = link.to_node
+                    if to_node.bl_idname == 'SSMTNode_Object_Name_Modify':
+                        chain.append((to_node, 'name_modify'))
+                        collect_processing_chain(to_node, current_tree, chain, visited_nodes)
+                    elif to_node.bl_idname == 'SSMTNode_VertexGroupProcess':
+                        chain.append((to_node, 'vg_process'))
+                        collect_processing_chain(to_node, current_tree, chain, visited_nodes)
+                    elif to_node.bl_idname == 'SSMTNode_Object_Group':
+                        collect_processing_chain(to_node, current_tree, chain, visited_nodes)
+                    elif to_node.bl_idname == 'SSMTNode_ToggleKey':
+                        collect_processing_chain(to_node, current_tree, chain, visited_nodes)
+                    elif to_node.bl_idname == 'SSMTNode_SwitchKey':
+                        collect_processing_chain(to_node, current_tree, chain, visited_nodes)
+                    elif to_node.bl_idname == 'SSMTNode_Result_Output':
+                        collect_processing_chain(to_node, current_tree, chain, visited_nodes)
+                    elif to_node.bl_idname == 'SSMTNode_Blueprint_Nest':
+                        blueprint_name = getattr(to_node, 'blueprint_name', '')
+                        if blueprint_name:
+                            nested_tree = bpy.data.node_groups.get(blueprint_name)
+                            if nested_tree and nested_tree.bl_idname == 'SSMTBlueprintTreeType':
+                                for nested_node in nested_tree.nodes:
+                                    if nested_node.bl_idname == 'SSMTNode_Result_Output':
+                                        collect_processing_chain(nested_node, nested_tree, chain, visited_nodes)
+                    else:
+                        collect_processing_chain(to_node, current_tree, chain, visited_nodes)
+        
+        output_nodes = [n for n in tree.nodes if n.bl_idname == 'SSMTNode_Result_Output']
+        for output_node in output_nodes:
+            visited.clear()
+            object_node = find_object_node(output_node, tree)
+            if object_node:
+                chain = []
+                collect_processing_chain(object_node, tree, chain, set())
+                if chain:
+                    result = chain
+                    break
+        
+        print(f"[ProcessingChain] 物体 {obj_name} 的处理链: {[(n.name, t) for n, t in result]}")
+        return result
     
     def _apply_vg_process_nodes(self, obj, vg_process_nodes):
         """应用顶点组处理节点到物体"""

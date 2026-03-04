@@ -52,7 +52,7 @@ class M_DrawIndexedInstanced:
 
         # 一般使用默认值INSTANCE_COUNT
         if self.InstanceCount == 0:
-            draw_str += "INSTANCE_COUNT"
+            draw_str += "INSTANCE_COUNT,"
         else:
             draw_str += str(self.InstanceCount) + ","
 

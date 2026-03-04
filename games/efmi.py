@@ -85,18 +85,36 @@ class ModModelEFMI:
                 category_original_slot = d3d11GameType.CategoryExtractSlotDict[original_category_name]
                 texture_override_ib_section.append(category_original_slot + " = Resource" + draw_ib + original_category_name)
 
+            if Properties_GenerateMod.add_rain_effect():
+                texture_override_ib_section.append(self.vlr_filter_index_indent + "vb3 = Resource" + draw_ib + "Position")
 
-            # Add ib replace
             texture_override_ib_section.append(self.vlr_filter_index_indent + "ib = " + ib_resource_name)
 
-            # Add slot style texture slot replace.
             if not Properties_GenerateMod.forbid_auto_texture_ini():
                 texture_markup_info_list = draw_ib_model.import_config.partname_texturemarkinfolist_dict.get(part_name,None)
-                # It may not have auto texture
                 if texture_markup_info_list is not None:
-                    for texture_markup_info in texture_markup_info_list:
-                        if texture_markup_info.mark_type == "Slot":
-                            texture_override_ib_section.append(self.vlr_filter_index_indent + texture_markup_info.mark_slot + " = " + texture_markup_info.get_resource_name())
+                    if Properties_GenerateMod.use_rabbitfx_slot():
+                        for texture_markup_info in texture_markup_info_list:
+                            if texture_markup_info.mark_type == "Slot":
+                                if texture_markup_info.mark_name == "DiffuseMap":
+                                    texture_override_ib_section.append(self.vlr_filter_index_indent + "Resource\\RabbitFx\\Diffuse = ref " + texture_markup_info.get_resource_name())
+                                elif texture_markup_info.mark_name == "LightMap":
+                                    texture_override_ib_section.append(self.vlr_filter_index_indent + "Resource\\RabbitFx\\LightMap = ref " + texture_markup_info.get_resource_name())
+                                elif texture_markup_info.mark_name == "NormalMap":
+                                    texture_override_ib_section.append(self.vlr_filter_index_indent + "Resource\\RabbitFx\\NormalMap = ref " + texture_markup_info.get_resource_name())
+                        
+                        texture_override_ib_section.append(self.vlr_filter_index_indent + "run = CommandList\\RabbitFx\\SetTextures")
+                        
+                        for texture_markup_info in texture_markup_info_list:
+                            if texture_markup_info.mark_type == "Slot":
+                                if texture_markup_info.mark_name in ["DiffuseMap", "LightMap", "NormalMap"]:
+                                    pass
+                                else:
+                                    texture_override_ib_section.append(self.vlr_filter_index_indent + texture_markup_info.mark_slot + " = " + texture_markup_info.get_resource_name())
+                    else:
+                        for texture_markup_info in texture_markup_info_list:
+                            if texture_markup_info.mark_type == "Slot":
+                                texture_override_ib_section.append(self.vlr_filter_index_indent + texture_markup_info.mark_slot + " = " + texture_markup_info.get_resource_name())
 
             # 如果不使用GPU-Skinning即为Object类型，此时需要在ib下面替换对应槽位
             if not d3d11GameType.GPU_PreSkinning:

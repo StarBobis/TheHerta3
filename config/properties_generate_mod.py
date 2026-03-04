@@ -72,6 +72,34 @@ class Properties_GenerateMod(bpy.types.PropertyGroup):
         '''
         return bpy.context.scene.properties_generate_mod.generate_branch_mod_gui
     
+    add_rain_effect: bpy.props.BoolProperty(
+        name="添加雨水效果",
+        description="在生成的INI中添加vb3以实现雨水效果",
+        default=False
+    ) # type: ignore
+
+
+    @classmethod
+    def add_rain_effect(cls):
+        '''
+        bpy.context.scene.properties_generate_mod.add_rain_effect
+        '''
+        return bpy.context.scene.properties_generate_mod.add_rain_effect
+    
+    use_rabbitfx_slot: bpy.props.BoolProperty(
+        name="使用RabbitFX槽位写法",
+        description="对DiffuseMap/LightMap/NormalMap使用RabbitFX槽位写法，其他贴图类型仍使用PS-t槽位",
+        default=False
+    ) # type: ignore
+
+
+    @classmethod
+    def use_rabbitfx_slot(cls):
+        '''
+        bpy.context.scene.properties_generate_mod.use_rabbitfx_slot
+        '''
+        return bpy.context.scene.properties_generate_mod.use_rabbitfx_slot
+    
 
     recalculate_tangent: bpy.props.BoolProperty(
         name="向量归一化法线存入TANGENT(全局)",

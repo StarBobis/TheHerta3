@@ -421,6 +421,10 @@ class SSMTNode_Result_Output(SSMTNodeBase):
         if GlobalConfig.logic_name == LogicName.GIMI:
             layout.prop(context.scene.properties_generate_mod, "gimi_use_orfix")
 
+        if GlobalConfig.logic_name == LogicName.EFMI:
+            layout.prop(context.scene.properties_generate_mod, "add_rain_effect", text="添加雨水效果(vb3)")
+            layout.prop(context.scene.properties_generate_mod, "use_rabbitfx_slot", text="使用RabbitFX槽位写法")
+
         layout.prop(context.scene.properties_generate_mod, "generate_branch_mod_gui",text="生成分支架构Mod面板(测试中)")
 
         layout.prop(context.scene.properties_generate_mod, "open_mod_folder_after_generate_mod",text="生成Mod后打开Mod所在文件夹")

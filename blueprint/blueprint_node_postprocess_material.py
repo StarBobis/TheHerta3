@@ -171,7 +171,7 @@ class SSMTNode_PostProcess_Material(SSMTNode_PostProcess_Base):
                                 object_to_diffuse_swapkey, material_group_to_swapkey,
                                 swap_key_prefix, next_swap_key_num, used_swap_keys):
         generated_lines = []
-        brightness_param_name = r"$\RabbitFx\brightness"
+        brightness_param_name = r"$\RabbitFX\brightness"
 
         if len(matching_materials) == 1:
             material = matching_materials[0]
@@ -262,7 +262,7 @@ class SSMTNode_PostProcess_Material(SSMTNode_PostProcess_Base):
             for texture_type in ['Glowmap', 'FXMap']:
                 matching_materials = self.find_matching_materials(obj, texture_type)
                 if matching_materials:
-                    param_name = f"Resource\\RabbitFx\\{texture_type}"
+                    param_name = f"Resource\\RabbitFX\\{texture_type}"
                     generated_rabbitfx_style = True
                     if texture_type == 'Glowmap': generated_glowmap = True
                     if texture_type == 'FXMap': generated_fxmap = True
@@ -272,13 +272,13 @@ class SSMTNode_PostProcess_Material(SSMTNode_PostProcess_Base):
                         swap_key_prefix, next_swap_key_num, used_swap_keys)
                     new_lines_for_this_mesh.extend(generated_lines)
             if generated_zzmi_style: new_lines_for_this_mesh.append("run = CommandList\\ZZMI\\SetTextures")
-            if generated_rabbitfx_style: new_lines_for_this_mesh.append("run = CommandList\\RabbitFx\\SetTextures")
+            if generated_rabbitfx_style: new_lines_for_this_mesh.append("run = CommandList\\RabbitFX\\Run")
             lines[insert_index + 1:insert_index + 1] = new_lines_for_this_mesh
             reset_lines = []
-            if generated_glowmap: reset_lines.extend(["Resource\\RabbitFx\\Glowmap = ref null", r"$\RabbitFx\brightness = 0"])
-            if generated_fxmap: reset_lines.append("Resource\\RabbitFx\\FXMap = ref null")
+            if generated_glowmap: reset_lines.extend(["Resource\\RabbitFX\\Glowmap = ref null", r"$\RabbitFX\brightness = 0"])
+            if generated_fxmap: reset_lines.append("Resource\\RabbitFX\\FXMap = ref null")
             if reset_lines:
-                reset_lines.append("run = CommandList\\RabbitFx\\SetTextures")
+                reset_lines.append("run = CommandList\\RabbitFX\\Run")
                 draw_idx = -1
                 search_end_idx = len(lines)
                 for i in range(insert_index + 1, len(lines)):
@@ -318,12 +318,12 @@ class SSMTNode_PostProcess_Material(SSMTNode_PostProcess_Base):
                     block_to_move = lines[start_move_idx:end_move_idx]
                     filtered_block_to_move = [
                         line for line in block_to_move
-                        if not any(keyword in line for keyword in ["Resource\\RabbitFx\\Glowmap = ref null", r"$\RabbitFx\brightness = 0", "Resource\\RabbitFx\\FXMap = ref null"])
+                        if not any(keyword in line for keyword in ["Resource\\RabbitFX\\Glowmap = ref null", r"$\RabbitFX\brightness = 0", "Resource\\RabbitFX\\FXMap = ref null"])
                     ]
                     final_block = []
                     for line in filtered_block_to_move:
-                        if "run = CommandList\\RabbitFx\\SetTextures" in line:
-                            has_resource_before = any("Resource\\RabbitFx" in prev_line for prev_line in final_block)
+                        if "run = CommandList\\RabbitFX\\Run" in line:
+                            has_resource_before = any("Resource\\RabbitFX" in prev_line for prev_line in final_block)
                             if has_resource_before:
                                 final_block.append(line)
                         else:

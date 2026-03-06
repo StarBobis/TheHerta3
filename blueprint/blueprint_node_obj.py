@@ -495,9 +495,11 @@ class SSMT_OT_View_Group_Objects(bpy.types.Operator):
 
         objects_to_show = set()
         checked_nodes = set()
+        visited_blueprints = set()
 
         def collect_objects(current_node):
-            if current_node in checked_nodes: return
+            if current_node in checked_nodes: 
+                return
             checked_nodes.add(current_node)
 
             if getattr(current_node, "bl_idname", "") == 'SSMTNode_Object_Info':
@@ -506,6 +508,15 @@ class SSMT_OT_View_Group_Objects(bpy.types.Operator):
                     obj = bpy.data.objects.get(obj_name)
                     if obj:
                         objects_to_show.add(obj)
+            
+            elif getattr(current_node, "bl_idname", "") == 'SSMTNode_Blueprint_Nest':
+                blueprint_name = getattr(current_node, "blueprint_name", "")
+                if blueprint_name and blueprint_name not in visited_blueprints:
+                    visited_blueprints.add(blueprint_name)
+                    nested_tree = bpy.data.node_groups.get(blueprint_name)
+                    if nested_tree and nested_tree.bl_idname == 'SSMTBlueprintTreeType':
+                        for nested_node in nested_tree.nodes:
+                            collect_objects(nested_node)
 
             if hasattr(current_node, "inputs"):
                 for inp in current_node.inputs:
@@ -519,10 +530,14 @@ class SSMT_OT_View_Group_Objects(bpy.types.Operator):
             self.report({'WARNING'}, "No objects found in this group")
             return {'CANCELLED'}
 
+        def deselect_all_safe():
+            for o in bpy.context.selected_objects:
+                o.select_set(False)
+
         if context.mode != 'OBJECT':
             bpy.ops.object.mode_set(mode='OBJECT')
 
-        bpy.ops.object.select_all(action='DESELECT')
+        deselect_all_safe()
         for obj in objects_to_show:
             obj.select_set(True)
 

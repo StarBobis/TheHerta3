@@ -247,8 +247,12 @@ def mesh_triangulate_beauty(obj):
     original_selected = list(bpy.context.selected_objects)
     original_mode = obj.mode
     
+    def deselect_all_safe():
+        for o in bpy.context.selected_objects:
+            o.select_set(False)
+    
     try:
-        bpy.ops.object.select_all(action='DESELECT')
+        deselect_all_safe()
         obj.select_set(True)
         bpy.context.view_layer.objects.active = obj
         
@@ -262,14 +266,14 @@ def mesh_triangulate_beauty(obj):
     finally:
         if original_mode == 'EDIT':
             try:
-                bpy.ops.object.select_all(action='DESELECT')
+                deselect_all_safe()
                 obj.select_set(True)
                 bpy.context.view_layer.objects.active = obj
                 bpy.ops.object.mode_set(mode='EDIT')
             except:
                 pass
         
-        bpy.ops.object.select_all(action='DESELECT')
+        deselect_all_safe()
         for sel_obj in original_selected:
             if sel_obj:
                 try:

@@ -1,14 +1,150 @@
 # -*- coding: utf-8 -*-
+"""
+优化版顶点组匹配节点
+结合 KD-Tree 快速查询和 Chamfer 距离精确匹配
+"""
 import bpy
 import bmesh
 import re
 import time
+import numpy as np
 from bpy.types import PropertyGroup
 from mathutils import Vector, kdtree
+from typing import Dict, List, Tuple, Optional
 
 from .blueprint_node_base import SSMTNodeBase
 
 _keymaps = []
+
+
+class VertexGroupMatcherOptimized:
+    """优化版顶点组匹配器：结合 KD-Tree 预筛选和 Chamfer 距离精确匹配"""
+    
+    def __init__(self, candidates_count: int = 3, chunk_size: int = 256):
+        self.candidates_count = candidates_count
+        self.chunk_size = chunk_size
+    
+    def get_vertex_positions(self, obj, use_shape_key: bool = False, context=None) -> np.ndarray:
+        """获取物体所有顶点的世界坐标"""
+        if use_shape_key and context:
+            depsgraph = context.evaluated_depsgraph_get()
+            eval_obj = obj.evaluated_get(depsgraph)
+            positions = np.array([
+                (eval_obj.matrix_world @ v.co)[:]
+                for v in eval_obj.data.vertices
+            ], dtype=np.float32)
+        else:
+            positions = np.array([
+                (obj.matrix_world @ v.co)[:]
+                for v in obj.data.vertices
+            ], dtype=np.float32)
+        return positions
+    
+    def get_vg_point_clouds(self, obj, positions: np.ndarray) -> Dict[str, np.ndarray]:
+        """获取每个顶点组影响的所有顶点点云"""
+        vg_points = {}
+        vg_weights = {}
+        
+        for vg in obj.vertex_groups:
+            vg_points[vg.name] = []
+            vg_weights[vg.name] = []
+        
+        for vert_idx, vert in enumerate(obj.data.vertices):
+            for vgroup in vert.groups:
+                try:
+                    vg = obj.vertex_groups[vgroup.group]
+                    weight = vgroup.weight
+                    if weight > 0:
+                        vg_points[vg.name].append(positions[vert_idx])
+                        vg_weights[vg.name].append(weight)
+                except (IndexError, RuntimeError):
+                    continue
+        
+        result = {}
+        for name, points in vg_points.items():
+            if points:
+                result[name] = {
+                    'points': np.array(points, dtype=np.float32),
+                    'weights': np.array(vg_weights[name], dtype=np.float32),
+                    'centroid': np.mean(points, axis=0)
+                }
+        return result
+    
+    def calculate_chamfer_distance(self, points_a: np.ndarray, points_b: np.ndarray) -> float:
+        """计算双向 Chamfer 距离（分块计算避免内存溢出）"""
+        def min_distances(pa, pb):
+            chunks = []
+            for start in range(0, len(pa), self.chunk_size):
+                end = min(start + self.chunk_size, len(pa))
+                diff = pa[start:end, None, :] - pb[None, :, :]
+                dist = np.min(np.linalg.norm(diff, axis=2), axis=1)
+                chunks.append(dist)
+            return np.concatenate(chunks)
+        
+        if len(points_a) == 0 or len(points_b) == 0:
+            return float('inf')
+        
+        dist_ab = min_distances(points_a, points_b)
+        dist_ba = min_distances(points_b, points_a)
+        
+        return float(np.mean(dist_ab) + np.mean(dist_ba))
+    
+    def build_kdtree(self, vg_data: Dict) -> Tuple[kdtree.KDTree, List[str]]:
+        """构建顶点组质心的 KD-Tree"""
+        names = list(vg_data.keys())
+        size = len(names)
+        kd = kdtree.KDTree(size)
+        
+        for i, name in enumerate(names):
+            centroid = vg_data[name]['centroid']
+            kd.insert(centroid, i)
+        
+        kd.balance()
+        return kd, names
+    
+    def match(self, source_vg: Dict, target_vg: Dict, threshold: float = 0.1) -> Dict[str, Tuple[str, float]]:
+        """
+        匹配源物体和目标物体的顶点组
+        
+        Args:
+            source_vg: 源物体顶点组数据 {name: {'points': ndarray, 'weights': ndarray, 'centroid': ndarray}}
+            target_vg: 目标物体顶点组数据
+            threshold: Chamfer 距离阈值
+            
+        Returns:
+            Dict[str, Tuple[str, float]]: {源顶点组名: (目标顶点组名, Chamfer距离)}
+        """
+        kd_tree, target_names = self.build_kdtree(target_vg)
+        mapping = {}
+        
+        for src_name, src_data in source_vg.items():
+            src_centroid = Vector(src_data['centroid'])
+            src_points = src_data['points']
+            
+            found = kd_tree.find_range(src_centroid, threshold * 10)
+            
+            if not found:
+                continue
+            
+            candidates = sorted(found, key=lambda x: x[2])[:self.candidates_count]
+            
+            best_match = None
+            best_distance = float('inf')
+            
+            for _, idx, _ in candidates:
+                tgt_name = target_names[idx]
+                tgt_points = target_vg[tgt_name]['points']
+                
+                chamfer_dist = self.calculate_chamfer_distance(src_points, tgt_points)
+                
+                if chamfer_dist < best_distance and chamfer_dist < threshold:
+                    best_distance = chamfer_dist
+                    best_match = tgt_name
+            
+            if best_match:
+                mapping[src_name] = (best_match, best_distance)
+        
+        return mapping
 
 
 class SSMTNode_VertexGroupMatch(SSMTNodeBase):
@@ -43,6 +179,28 @@ class SSMTNode_VertexGroupMatch(SSMTNodeBase):
         name="使用形态键",
         description="计算顶点组中心时考虑形态键变形",
         default=False
+    )
+
+    chamfer_threshold: bpy.props.FloatProperty(
+        name="Chamfer阈值",
+        description="Chamfer距离阈值，用于精确匹配筛选",
+        default=0.1,
+        min=0.01,
+        max=10.0
+    )
+
+    candidates_count: bpy.props.IntProperty(
+        name="候选数量",
+        description="KD-Tree预筛选后保留的候选数量",
+        default=3,
+        min=1,
+        max=10
+    )
+
+    use_chamfer_matching: bpy.props.BoolProperty(
+        name="使用Chamfer匹配",
+        description="开启后使用Chamfer距离进行精确匹配，关闭则仅使用中心点距离",
+        default=True
     )
 
     create_debug_objects: bpy.props.BoolProperty(
@@ -91,6 +249,16 @@ class SSMTNode_VertexGroupMatch(SSMTNodeBase):
         
         row = box.row()
         row.prop(self, "match_threshold")
+        
+        row = box.row()
+        row.prop(self, "use_chamfer_matching")
+        
+        if self.use_chamfer_matching:
+            row = box.row()
+            row.prop(self, "chamfer_threshold")
+            
+            row = box.row()
+            row.prop(self, "candidates_count")
         
         row = box.row()
         row.prop(self, "use_shape_key")
@@ -195,7 +363,7 @@ class SSMTNode_VertexGroupMatch(SSMTNodeBase):
             return parts[0].strip(), parts[1].strip()
         return name, name
 
-    def create_debug_object(self, name, location, parent, is_connected=False):
+    def create_debug_object(self, name, location, parent, is_connected=False, distance=None):
         """创建调试物体"""
         is_source = name.startswith("Source_")
 
@@ -231,16 +399,21 @@ class SSMTNode_VertexGroupMatch(SSMTNodeBase):
         debug_obj.parent = parent
         debug_obj["original_vg_name"] = name.split('_', 1)[1]
         debug_obj["is_connected"] = is_connected
+        if distance is not None:
+            debug_obj["chamfer_distance"] = distance
         debug_obj.show_name = True
         bpy.context.scene.collection.objects.link(debug_obj)
         return debug_obj
 
-    def create_match_curves(self, source_centers, target_centers, rename_map, parent, one_to_many_connections=None, target_to_sources=None):
+    def create_match_curves(self, source_centers, target_centers, rename_map, parent, 
+                           one_to_many_connections=None, target_to_sources=None, distances=None):
         """创建匹配连接线"""
         if one_to_many_connections is None:
             one_to_many_connections = {}
         if target_to_sources is None:
             target_to_sources = {}
+        if distances is None:
+            distances = {}
         
         for src_name, src_data in source_centers.items():
             if src_name in rename_map:
@@ -287,6 +460,9 @@ class SSMTNode_VertexGroupMatch(SSMTNodeBase):
                         curve_obj.data.materials.clear()
                         curve_obj.data.materials.append(mat)
                         curve_obj["is_one_to_many_connection"] = False
+                    
+                    if src_name in distances:
+                        curve_obj["chamfer_distance"] = distances[src_name]
                     
                     bpy.context.scene.collection.objects.link(curve_obj)
 
@@ -340,28 +516,38 @@ class SSMTNode_VertexGroupMatch(SSMTNodeBase):
             for name, data in target_centers.items():
                 self.create_debug_object(f"Target_{name}", data['center'], debug_parent, is_connected=False)
 
-        kd_tree, positions = self.optimize_matching(target_centers)
         rename_map = {}
         target_to_sources = {}
         matched_count = 0
-        
-        for src_name, src_data in source_centers.items():
-            src_center = src_data['center']
-            found_targets = kd_tree.find_range(src_center, self.match_threshold)
+        distances = {}
+
+        if self.use_chamfer_matching:
+            matcher = VertexGroupMatcherOptimized(
+                candidates_count=self.candidates_count,
+                chunk_size=256
+            )
             
-            if found_targets:
-                _, index, _ = found_targets[0]
-                closest_name = positions[index][0]
-                new_name = f"{src_name}={closest_name}" if self.rename_format else closest_name
+            source_positions = matcher.get_vertex_positions(source_obj, self.use_shape_key, context)
+            target_positions = matcher.get_vertex_positions(target_obj, self.use_shape_key, context)
+            
+            source_vg_data = matcher.get_vg_point_clouds(source_obj, source_positions)
+            target_vg_data = matcher.get_vg_point_clouds(target_obj, target_positions)
+            
+            chamfer_mapping = matcher.match(source_vg_data, target_vg_data, self.chamfer_threshold)
+            
+            for src_name, (tgt_name, chamfer_dist) in chamfer_mapping.items():
+                new_name = f"{src_name}={tgt_name}" if self.rename_format else tgt_name
                 rename_map[src_name] = new_name
+                distances[src_name] = chamfer_dist
                 matched_count += 1
                 
-                if closest_name not in target_to_sources:
-                    target_to_sources[closest_name] = []
-                target_to_sources[closest_name].append(src_name)
+                if tgt_name not in target_to_sources:
+                    target_to_sources[tgt_name] = []
+                target_to_sources[tgt_name].append(src_name)
                 
                 if self.create_debug_objects and src_name in source_debug_objects:
                     source_debug_objects[src_name]["is_connected"] = True
+                    source_debug_objects[src_name]["chamfer_distance"] = chamfer_dist
                     mat_name = "VGTP_Debug_Blue"
                     mat = bpy.data.materials.get(mat_name)
                     if not mat:
@@ -369,10 +555,37 @@ class SSMTNode_VertexGroupMatch(SSMTNodeBase):
                         mat.diffuse_color = (0.0, 0.2, 1.0, 1.0)
                     source_debug_objects[src_name].data.materials.clear()
                     source_debug_objects[src_name].data.materials.append(mat)
+        else:
+            kd_tree, positions = self.optimize_matching(target_centers)
+            
+            for src_name, src_data in source_centers.items():
+                src_center = src_data['center']
+                found_targets = kd_tree.find_range(src_center, self.match_threshold)
+                
+                if found_targets:
+                    _, index, _ = found_targets[0]
+                    closest_name = positions[index][0]
+                    new_name = f"{src_name}={closest_name}" if self.rename_format else closest_name
+                    rename_map[src_name] = new_name
+                    matched_count += 1
+                    
+                    if closest_name not in target_to_sources:
+                        target_to_sources[closest_name] = []
+                    target_to_sources[closest_name].append(src_name)
+                    
+                    if self.create_debug_objects and src_name in source_debug_objects:
+                        source_debug_objects[src_name]["is_connected"] = True
+                        mat_name = "VGTP_Debug_Blue"
+                        mat = bpy.data.materials.get(mat_name)
+                        if not mat:
+                            mat = bpy.data.materials.new(name=mat_name)
+                            mat.diffuse_color = (0.0, 0.2, 1.0, 1.0)
+                        source_debug_objects[src_name].data.materials.clear()
+                        source_debug_objects[src_name].data.materials.append(mat)
 
         if self.create_debug_objects and matched_count > 0:
             one_to_many_connections = {}
-            self.create_match_curves(source_centers, target_centers, rename_map, debug_parent, one_to_many_connections, target_to_sources)
+            self.create_match_curves(source_centers, target_centers, rename_map, debug_parent, one_to_many_connections, target_to_sources, distances)
             
             many_to_one_count = 0
             for target_name, sources in target_to_sources.items():
@@ -397,15 +610,20 @@ class SSMTNode_VertexGroupMatch(SSMTNodeBase):
         text.write(f"# 源物体: {source_obj.name}\n")
         text.write(f"# 目标物体: {target_obj.name}\n")
         text.write(f"# 匹配阈值: {self.match_threshold}\n")
+        text.write(f"# 使用Chamfer匹配: {self.use_chamfer_matching}\n")
+        if self.use_chamfer_matching:
+            text.write(f"# Chamfer阈值: {self.chamfer_threshold}\n")
         text.write(f"# 匹配时间: {int(time.time())}\n")
         text.write(f"# 成功匹配: {matched_count}/{len(source_centers)}\n")
         text.write(f"# 格式: 源名称=目标名称\n")
 
         for src_name, tgt_name in rename_map.items():
             if self.rename_format and "=" in tgt_name:
-                text.write(f"{tgt_name}\n")
+                dist_info = f"  # Chamfer距离: {distances[src_name]:.6f}" if src_name in distances else ""
+                text.write(f"{tgt_name}{dist_info}\n")
             else:
-                text.write(f"{src_name}={tgt_name}\n")
+                dist_info = f"  # Chamfer距离: {distances[src_name]:.6f}" if src_name in distances else ""
+                text.write(f"{src_name}={tgt_name}{dist_info}\n")
 
         for src_name in source_centers:
             if src_name not in rename_map:
@@ -417,6 +635,7 @@ class SSMTNode_VertexGroupMatch(SSMTNodeBase):
             debug_parent["vgtp_match_time"] = int(time.time())
             debug_parent["vgtp_matched_count"] = matched_count
             debug_parent["vgtp_total_count"] = len(source_centers)
+            debug_parent["vgtp_use_chamfer"] = self.use_chamfer_matching
 
         self.mapping_text_name = text_name
 

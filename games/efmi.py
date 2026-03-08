@@ -30,6 +30,7 @@ class ModModelEFMI:
         
         # (4) 跨IB信息
         self.cross_ib_info_dict = self.branch_model.cross_ib_info_dict
+        self.cross_ib_method_dict = self.branch_model.cross_ib_method_dict
         self.has_cross_ib = len(self.cross_ib_info_dict) > 0
 
     def parse_draw_ib_draw_ib_model_dict(self):
@@ -255,7 +256,7 @@ class ModModelEFMI:
 
  
 
-    def add_unity_vs_texture_override_ib_sections(self, config_ini_builder:M_IniBuilder, commandlist_ini_builder:M_IniBuilder, draw_ib_model:DrawIBModel, is_cross_ib_source=False, is_cross_ib_target=False, source_ib_list_for_target=None):
+    def add_unity_vs_texture_override_ib_sections(self, config_ini_builder:M_IniBuilder, commandlist_ini_builder:M_IniBuilder, draw_ib_model:DrawIBModel, is_cross_ib_source=False, is_cross_ib_target=False, source_ib_list_for_target=None, part_name=None):
         if source_ib_list_for_target is None:
             source_ib_list_for_target = []
         
@@ -264,111 +265,111 @@ class ModModelEFMI:
         
         d3d11GameType = draw_ib_model.d3d11GameType
 
-        for count_i, part_name in enumerate(draw_ib_model.import_config.part_name_list):
-            match_first_index = draw_ib_model.import_config.match_first_index_list[count_i]
+        match_first_index = draw_ib_model.import_config.match_first_index_list[draw_ib_model.import_config.part_name_list.index(part_name)]
+        style_part_name = "Component" + part_name
 
-            style_part_name = "Component" + part_name
+        texture_override_name_suffix = "IB_" + draw_ib + "_" + draw_ib_model.draw_ib_alias + "_" + style_part_name
 
-            
-            texture_override_name_suffix = "IB_" + draw_ib + "_" + draw_ib_model.draw_ib_alias + "_" + style_part_name
-
-            ib_resource_name = ""
-            ib_resource_name = draw_ib_model.PartName_IBResourceName_Dict.get(part_name,None)
+        ib_resource_name = ""
+        ib_resource_name = draw_ib_model.PartName_IBResourceName_Dict.get(part_name,None)
             
 
-            texture_override_ib_section.append("[TextureOverride_" + texture_override_name_suffix + "]")
-            texture_override_ib_section.append("hash = " + draw_ib)
-            texture_override_ib_section.append("match_first_index = " + match_first_index)
+        texture_override_ib_section.append("[TextureOverride_" + texture_override_name_suffix + "]")
+        texture_override_ib_section.append("hash = " + draw_ib)
+        texture_override_ib_section.append("match_first_index = " + match_first_index)
 
-            if self.vlr_filter_index_indent != "":
-                texture_override_ib_section.append("if vb0 == " + str(3000 + M_GlobalKeyCounter.generated_mod_number))
+        if self.vlr_filter_index_indent != "":
+            texture_override_ib_section.append("if vb0 == " + str(3000 + M_GlobalKeyCounter.generated_mod_number))
 
-            texture_override_ib_section.append(self.vlr_filter_index_indent + "handling = skip")
-            
-            if is_cross_ib_target:
-                texture_override_ib_section.append(self.vlr_filter_index_indent + "analyse_options = deferred_ctx_immediate dump_rt dump_cb dump_vb dump_ib buf txt dds dump_tex dds symlink")
+        texture_override_ib_section.append(self.vlr_filter_index_indent + "handling = skip")
+        
+        if is_cross_ib_target:
+            texture_override_ib_section.append(self.vlr_filter_index_indent + "analyse_options = deferred_ctx_immediate dump_rt dump_cb dump_vb dump_ib buf txt dds dump_tex dds symlink")
 
-            ib_buf = draw_ib_model.componentname_ibbuf_dict.get("Component " + part_name,None)
-            if ib_buf is None or len(ib_buf) == 0:
-                texture_override_ib_section.append("ib = null")
-                texture_override_ib_section.new_line()
-                continue
+        ib_buf = draw_ib_model.componentname_ibbuf_dict.get("Component " + part_name,None)
+        if ib_buf is None or len(ib_buf) == 0:
+            texture_override_ib_section.append("ib = null")
+            texture_override_ib_section.new_line()
+            config_ini_builder.append_section(texture_override_ib_section)
+            return
 
-            texture_override_ib_section.append(self.vlr_filter_index_indent + "run = CommandList\\EFMIv1\\OverrideTextures")
+        texture_override_ib_section.append(self.vlr_filter_index_indent + "run = CommandList\\EFMIv1\\OverrideTextures")
 
-            if not Properties_GenerateMod.forbid_auto_texture_ini():
-                texture_markup_info_list = draw_ib_model.import_config.partname_texturemarkinfolist_dict.get(part_name,None)
-                if texture_markup_info_list is not None:
-                    if Properties_GenerateMod.use_rabbitfx_slot():
-                        for texture_markup_info in texture_markup_info_list:
-                            if texture_markup_info.mark_type == "Slot":
-                                if texture_markup_info.mark_name == "DiffuseMap":
-                                    texture_override_ib_section.append(self.vlr_filter_index_indent + "Resource\\RabbitFx\\Diffuse = ref " + texture_markup_info.get_resource_name())
-                                elif texture_markup_info.mark_name == "LightMap":
-                                    texture_override_ib_section.append(self.vlr_filter_index_indent + "Resource\\RabbitFx\\LightMap = ref " + texture_markup_info.get_resource_name())
-                                elif texture_markup_info.mark_name == "NormalMap":
-                                    texture_override_ib_section.append(self.vlr_filter_index_indent + "Resource\\RabbitFx\\NormalMap = ref " + texture_markup_info.get_resource_name())
-                        
-                        texture_override_ib_section.append(self.vlr_filter_index_indent + "run = CommandList\\RabbitFx\\SetTextures")
-                        
-                        for texture_markup_info in texture_markup_info_list:
-                            if texture_markup_info.mark_type == "Slot":
-                                if texture_markup_info.mark_name in ["DiffuseMap", "LightMap", "NormalMap"]:
-                                    pass
-                                else:
-                                    texture_override_ib_section.append(self.vlr_filter_index_indent + texture_markup_info.mark_slot + " = " + texture_markup_info.get_resource_name())
-                    else:
-                        for texture_markup_info in texture_markup_info_list:
-                            if texture_markup_info.mark_type == "Slot":
-                                texture_override_ib_section.append(self.vlr_filter_index_indent + texture_markup_info.mark_slot + " = " + texture_markup_info.get_resource_name())
-
-            for original_category_name, draw_category_name in d3d11GameType.CategoryDrawCategoryDict.items():
-                category_original_slot = d3d11GameType.CategoryExtractSlotDict[original_category_name]
-                texture_override_ib_section.append(self.vlr_filter_index_indent + category_original_slot + " = Resource" + draw_ib + original_category_name)
-
-            if Properties_GenerateMod.add_rain_effect():
-                texture_override_ib_section.append(self.vlr_filter_index_indent + "vb3 = Resource" + draw_ib + "Position")
-
-            texture_override_ib_section.append(self.vlr_filter_index_indent + "ib = " + ib_resource_name)
-
-            if not d3d11GameType.GPU_PreSkinning:
-                for category_name in d3d11GameType.OrderedCategoryNameList:
-                    category_hash = draw_ib_model.import_config.category_hash_dict[category_name]
-                    category_slot = d3d11GameType.CategoryExtractSlotDict[category_name]
-
-                    for original_category_name, draw_category_name in d3d11GameType.CategoryDrawCategoryDict.items():
-                        if original_category_name == draw_category_name:
-                            category_original_slot = d3d11GameType.CategoryExtractSlotDict[original_category_name]
-                            texture_override_ib_section.append(self.vlr_filter_index_indent + category_original_slot + " = Resource" + draw_ib + original_category_name)
-
-
-            component_name = "Component " + part_name 
-            component_model = draw_ib_model.component_name_component_model_dict[component_name]
-
-            if is_cross_ib_source and self.has_cross_ib:
-                cross_ib_lines = self.generate_cross_ib_block_for_source(draw_ib, component_model)
-                for line in cross_ib_lines:
-                    texture_override_ib_section.append(self.vlr_filter_index_indent + line)
-            
-            elif is_cross_ib_target and self.has_cross_ib and source_ib_list_for_target:
-                all_cross_ib_objects = []
-                all_non_cross_ib_objects = []
-                
-                for source_ib in source_ib_list_for_target:
-                    source_ib_model = self.drawib_drawibmodel_dict.get(source_ib)
-                    source_component_model = None
-                    if source_ib_model:
-                        for src_part_name in source_ib_model.import_config.part_name_list:
-                            src_component_name = "Component " + src_part_name
-                            if src_component_name in source_ib_model.component_name_component_model_dict:
-                                source_component_model = source_ib_model.component_name_component_model_dict[src_component_name]
-                                break
+        if not Properties_GenerateMod.forbid_auto_texture_ini():
+            texture_markup_info_list = draw_ib_model.import_config.partname_texturemarkinfolist_dict.get(part_name,None)
+            if texture_markup_info_list is not None:
+                if Properties_GenerateMod.use_rabbitfx_slot():
+                    for texture_markup_info in texture_markup_info_list:
+                        if texture_markup_info.mark_type == "Slot":
+                            if texture_markup_info.mark_name == "DiffuseMap":
+                                texture_override_ib_section.append(self.vlr_filter_index_indent + "Resource\\RabbitFx\\Diffuse = ref " + texture_markup_info.get_resource_name())
+                            elif texture_markup_info.mark_name == "LightMap":
+                                texture_override_ib_section.append(self.vlr_filter_index_indent + "Resource\\RabbitFx\\LightMap = ref " + texture_markup_info.get_resource_name())
+                            elif texture_markup_info.mark_name == "NormalMap":
+                                texture_override_ib_section.append(self.vlr_filter_index_indent + "Resource\\RabbitFx\\NormalMap = ref " + texture_markup_info.get_resource_name())
                     
-                    if source_component_model:
-                        cross_objs, _ = self._split_objects_by_cross_ib(
-                            source_component_model.final_ordered_draw_obj_model_list
-                        )
-                        all_cross_ib_objects.extend(cross_objs)
+                    texture_override_ib_section.append(self.vlr_filter_index_indent + "run = CommandList\\RabbitFx\\SetTextures")
+                    
+                    for texture_markup_info in texture_markup_info_list:
+                        if texture_markup_info.mark_type == "Slot":
+                            if texture_markup_info.mark_name in ["DiffuseMap", "LightMap", "NormalMap"]:
+                                pass
+                            else:
+                                texture_override_ib_section.append(self.vlr_filter_index_indent + texture_markup_info.mark_slot + " = " + texture_markup_info.get_resource_name())
+                else:
+                    for texture_markup_info in texture_markup_info_list:
+                        if texture_markup_info.mark_type == "Slot":
+                            texture_override_ib_section.append(self.vlr_filter_index_indent + texture_markup_info.mark_slot + " = " + texture_markup_info.get_resource_name())
+
+        for original_category_name, draw_category_name in d3d11GameType.CategoryDrawCategoryDict.items():
+            category_original_slot = d3d11GameType.CategoryExtractSlotDict[original_category_name]
+            texture_override_ib_section.append(self.vlr_filter_index_indent + category_original_slot + " = Resource" + draw_ib + original_category_name)
+
+        if Properties_GenerateMod.add_rain_effect():
+            texture_override_ib_section.append(self.vlr_filter_index_indent + "vb3 = Resource" + draw_ib + "Position")
+
+        texture_override_ib_section.append(self.vlr_filter_index_indent + "ib = " + ib_resource_name)
+
+        if not d3d11GameType.GPU_PreSkinning:
+            for category_name in d3d11GameType.OrderedCategoryNameList:
+                category_hash = draw_ib_model.import_config.category_hash_dict[category_name]
+                category_slot = d3d11GameType.CategoryExtractSlotDict[category_name]
+
+                for original_category_name, draw_category_name in d3d11GameType.CategoryDrawCategoryDict.items():
+                    if original_category_name == draw_category_name:
+                        category_original_slot = d3d11GameType.CategoryExtractSlotDict[original_category_name]
+                        texture_override_ib_section.append(self.vlr_filter_index_indent + category_original_slot + " = Resource" + draw_ib + original_category_name)
+
+
+        component_name = "Component " + part_name 
+        component_model = draw_ib_model.component_name_component_model_dict[component_name]
+
+        if is_cross_ib_source and self.has_cross_ib:
+            cross_ib_lines = self.generate_cross_ib_block_for_source(draw_ib, component_model)
+            for line in cross_ib_lines:
+                texture_override_ib_section.append(self.vlr_filter_index_indent + line)
+        
+        elif is_cross_ib_target and self.has_cross_ib and source_ib_list_for_target:
+            all_cross_ib_objects = []
+            all_non_cross_ib_objects = []
+            
+            for source_ib in source_ib_list_for_target:
+                source_hash, source_component_index = source_ib.split("_")
+                source_component_index = int(source_component_index)
+                source_ib_model = self.drawib_drawibmodel_dict.get(source_hash)
+                source_component_model = None
+                if source_ib_model:
+                    if source_component_index <= len(source_ib_model.import_config.part_name_list):
+                        src_part_name = source_ib_model.import_config.part_name_list[source_component_index - 1]
+                        src_component_name = "Component " + src_part_name
+                        if src_component_name in source_ib_model.component_name_component_model_dict:
+                            source_component_model = source_ib_model.component_name_component_model_dict[src_component_name]
+                
+                if source_component_model:
+                    cross_objs, _ = self._split_objects_by_cross_ib(
+                        source_component_model.final_ordered_draw_obj_model_list
+                    )
+                    all_cross_ib_objects.extend(cross_objs)
                 
                 cross_ib_objects_in_target, non_cross_ib_objects_in_target = self._split_objects_by_cross_ib(
                     component_model.final_ordered_draw_obj_model_list
@@ -405,14 +406,16 @@ class ModModelEFMI:
                             texture_override_ib_section.append(self.vlr_filter_index_indent + drawindexed_str)
                 
                 for source_ib in source_ib_list_for_target:
-                    source_ib_model = self.drawib_drawibmodel_dict.get(source_ib)
+                    source_hash, source_component_index = source_ib.split("_")
+                    source_component_index = int(source_component_index)
+                    source_ib_model = self.drawib_drawibmodel_dict.get(source_hash)
                     source_component_model = None
                     if source_ib_model:
-                        for src_part_name in source_ib_model.import_config.part_name_list:
+                        if source_component_index <= len(source_ib_model.import_config.part_name_list):
+                            src_part_name = source_ib_model.import_config.part_name_list[source_component_index - 1]
                             src_component_name = "Component " + src_part_name
                             if src_component_name in source_ib_model.component_name_component_model_dict:
                                 source_component_model = source_ib_model.component_name_component_model_dict[src_component_name]
-                                break
                     
                     cross_objs, _ = self._split_objects_by_cross_ib(
                         source_component_model.final_ordered_draw_obj_model_list if source_component_model else []
@@ -421,20 +424,22 @@ class ModModelEFMI:
                     if not cross_objs:
                         continue
                     
-                    texture_override_ib_section.append(self.vlr_filter_index_indent + f";跨 IB 身份块,绘制 {source_ib} 需要跨 Ib 的物体引用")
+                    texture_override_ib_section.append(self.vlr_filter_index_indent + f";跨 IB 身份块,绘制 {source_hash} 需要跨 Ib 的物体引用")
                     texture_override_ib_section.append(self.vlr_filter_index_indent + "if vs == 202 || vs == 203")
-                    texture_override_ib_section.append(self.vlr_filter_index_indent + f"    cs-t2 = ResourceID_{source_ib}")
+                    texture_override_ib_section.append(self.vlr_filter_index_indent + f"    cs-t2 = ResourceID_{source_hash}")
                     texture_override_ib_section.append(self.vlr_filter_index_indent + "    run = CustomShader_RedirectCB1")
                     texture_override_ib_section.append(self.vlr_filter_index_indent + "    ;跨 IB 块数据区域")
-                    texture_override_ib_section.append(self.vlr_filter_index_indent + f"    vb0 = Resource{source_ib}Position")
-                    texture_override_ib_section.append(self.vlr_filter_index_indent + f"    vb1 = Resource{source_ib}Texcoord")
-                    texture_override_ib_section.append(self.vlr_filter_index_indent + f"    vb2 = Resource{source_ib}Blend")
-                    texture_override_ib_section.append(self.vlr_filter_index_indent + f"    vb3 = Resource{source_ib}Position")
+                    texture_override_ib_section.append(self.vlr_filter_index_indent + f"    vb0 = Resource{source_hash}Position")
+                    texture_override_ib_section.append(self.vlr_filter_index_indent + f"    vb1 = Resource{source_hash}Texcoord")
+                    texture_override_ib_section.append(self.vlr_filter_index_indent + f"    vb2 = Resource{source_hash}Blend")
+                    texture_override_ib_section.append(self.vlr_filter_index_indent + f"    vb3 = Resource{source_hash}Position")
                     
                     if source_ib_model:
-                        for partname, ib_resource_name in source_ib_model.PartName_IBResourceName_Dict.items():
-                            texture_override_ib_section.append(self.vlr_filter_index_indent + f"    ib = {ib_resource_name}")
-                            break
+                        if source_component_index <= len(source_ib_model.import_config.part_name_list):
+                            src_part_name = source_ib_model.import_config.part_name_list[source_component_index - 1]
+                            ib_resource_name = source_ib_model.PartName_IBResourceName_Dict.get(src_part_name)
+                            if ib_resource_name:
+                                texture_override_ib_section.append(self.vlr_filter_index_indent + f"    ib = {ib_resource_name}")
                     
                     texture_override_ib_section.append(self.vlr_filter_index_indent + ";所有需要跨 Ib 的物体引用")
                     
@@ -449,11 +454,6 @@ class ModModelEFMI:
                 texture_override_ib_section.append(self.vlr_filter_index_indent + "post vs-cb1 = null")
                 texture_override_ib_section.append(self.vlr_filter_index_indent + "post vs-t0 = null")
                 texture_override_ib_section.append(self.vlr_filter_index_indent + "post cs-t2 = null")
-            
-            else:
-                drawindexed_str_list = M_IniHelper.get_drawindexed_instanced_str_list(component_model.final_ordered_draw_obj_model_list)
-                for drawindexed_str in drawindexed_str_list:
-                    texture_override_ib_section.append(drawindexed_str)
             
             if self.vlr_filter_index_indent:
                 texture_override_ib_section.append("endif")
@@ -595,6 +595,14 @@ class ModModelEFMI:
         EFMI
         '''
         config_ini_builder = M_IniBuilder()
+        
+        if self.has_cross_ib:
+            for node_name, cross_ib_method in self.cross_ib_method_dict.items():
+                if cross_ib_method != 'END_FIELD':
+                    print(f"[CrossIB] 警告: 节点 {node_name} 使用的跨 IB 方式 '{cross_ib_method}' 不适用于 EFMI 模式")
+                    print(f"[CrossIB] EFMI 模式只支持 'END_FIELD' (终末地跨 IB) 方式")
+                    self.has_cross_ib = False
+                    break
 
         if self.has_cross_ib:
             self.add_cross_ib_present_section(config_ini_builder)
@@ -606,23 +614,30 @@ class ModModelEFMI:
         for draw_ib, draw_ib_model in self.drawib_drawibmodel_dict.items():
             print("Generating Config INI for DrawIB: " + draw_ib)
 
-            is_source_ib = draw_ib in self.cross_ib_info_dict
-            
-            source_ib_list_for_target = []
-            for source_ib, target_ib_list in self.cross_ib_info_dict.items():
-                if draw_ib in target_ib_list:
-                    source_ib_list_for_target.append(source_ib)
-            
-            is_target_ib = len(source_ib_list_for_target) > 0
+            for count_i, part_name in enumerate(draw_ib_model.import_config.part_name_list):
+                component_index = count_i + 1
+                current_ib_key = f"{draw_ib}_{component_index}"
+                
+                is_source_ib = current_ib_key in self.cross_ib_info_dict
+                
+                source_ib_list_for_target = []
+                for source_ib, target_ib_list in self.cross_ib_info_dict.items():
+                    if current_ib_key in target_ib_list:
+                        source_ib_list_for_target.append(source_ib)
+                
+                is_target_ib = len(source_ib_list_for_target) > 0
 
-            self.add_unity_vs_texture_override_ib_sections(
-                config_ini_builder=config_ini_builder,
-                commandlist_ini_builder=config_ini_builder,
-                draw_ib_model=draw_ib_model,
-                is_cross_ib_source=is_source_ib,
-                is_cross_ib_target=is_target_ib,
-                source_ib_list_for_target=source_ib_list_for_target
-            )
+                if is_source_ib or is_target_ib:
+                    self.add_unity_vs_texture_override_ib_sections(
+                        config_ini_builder=config_ini_builder,
+                        commandlist_ini_builder=config_ini_builder,
+                        draw_ib_model=draw_ib_model,
+                        is_cross_ib_source=is_source_ib,
+                        is_cross_ib_target=is_target_ib,
+                        source_ib_list_for_target=source_ib_list_for_target,
+                        part_name=part_name
+                    )
+            
             self.add_unity_vs_resource_vb_sections(ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)
             self.add_resource_texture_sections(ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)
 

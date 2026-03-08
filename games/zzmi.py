@@ -33,6 +33,11 @@ class ModModelZZMI:
         # (3) 这些属性用于ini生成
         self.vlr_filter_index_indent = ""
         self.texture_hash_filter_index_dict = {}
+        
+        # (4) 跨IB信息
+        self.cross_ib_info_dict = self.branch_model.cross_ib_info_dict
+        self.cross_ib_method_dict = self.branch_model.cross_ib_method_dict
+        self.has_cross_ib = len(self.cross_ib_info_dict) > 0
 
     def parse_draw_ib_draw_ib_model_dict(self):
         '''
@@ -110,13 +115,26 @@ class ModModelZZMI:
 
         for count_i,part_name in enumerate(draw_ib_model.import_config.part_name_list):
             match_first_index = draw_ib_model.import_config.match_first_index_list[count_i]
-            # part_name = draw_ib_model.import_config.part_name_list[count_i]
             style_part_name = "Component" + part_name
             texture_override_name_suffix = "IB_" + draw_ib + "_" + draw_ib_model.draw_ib_alias + "_" + style_part_name
 
-            # 读取使用的IBResourceName，如果读取不到，就使用默认的
             ib_resource_name = draw_ib_model.PartName_IBResourceName_Dict.get(part_name,"")
             
+            component_index = count_i + 1
+            current_ib_key = f"{draw_ib}_{component_index}"
+            
+            is_cross_ib_source = current_ib_key in self.cross_ib_info_dict
+            is_cross_ib_target = any(current_ib_key in targets for targets in self.cross_ib_info_dict.values())
+            source_ib_list_for_target = []
+            if is_cross_ib_target:
+                for source_ib, target_ib_list in self.cross_ib_info_dict.items():
+                    if current_ib_key in target_ib_list:
+                        source_ib_list_for_target.append(source_ib)
+            
+            if is_cross_ib_source and count_i == 0:
+                for source_ib_key in [current_ib_key]:
+                    source_hash = source_ib_key.split("_")[0]
+                    texture_override_ib_section.append("[ResourceBodyVB_" + source_hash + "]")
 
             texture_override_ib_section.append("[TextureOverride_" + texture_override_name_suffix + "]")
             texture_override_ib_section.append("hash = " + draw_ib)
@@ -125,33 +143,21 @@ class ModModelZZMI:
             if self.vlr_filter_index_indent != "":
                 texture_override_ib_section.append("if vb0 == " + str(3000 + M_GlobalKeyCounter.generated_mod_number))
 
-            # texture_override_ib_section.append(self.vlr_filter_index_indent + "handling = skip")
+            if is_cross_ib_source:
+                texture_override_ib_section.append("ResourceBodyVB_" + draw_ib + " = copy vb0")
 
-            # If ib buf is emprt, continue to avoid add ib resource replace.
             ib_buf = draw_ib_model.componentname_ibbuf_dict.get("Component " + part_name,None)
             if ib_buf is None or len(ib_buf) == 0:
-                # 不导出对应部位时，要写ib = null，否则在部分场景会发生卡顿，原因未知但是这就是解决方案。
                 texture_override_ib_section.append("ib = null")
                 texture_override_ib_section.new_line()
                 continue
 
-
-            # Add ib replace
             texture_override_ib_section.append(self.vlr_filter_index_indent + "ib = " + ib_resource_name)
-
 
             print("Test: ZZZ")
             if GlobalConfig.logic_name == LogicName.ZZMI:
-                # 绝区零的SlotFix必须得按照他的使用顺序来，由波斯猫辛苦测试得出，比如正确的顺序为：
-                # 1. Resource\ZZMI\Diffuse = ref DiffuseMap (也就是SlotFix代码部分)
-                # 2. run = CommandList\\ZZMI\\SetTextures
-                # 3. ps-t4 = ResourceNormalMap (也就是普通的槽位替换部分)
-                # 4. run = CommandListSkinTexture
-                # 不按照这个顺序来，则贴图显示就会有BUG。
-                
                 if not Properties_GenerateMod.forbid_auto_texture_ini():
                     texture_markup_info_list = draw_ib_model.import_config.partname_texturemarkinfolist_dict.get(part_name,None)
-                    # It may not have auto texture
                     if texture_markup_info_list is not None:
                         for texture_markup_info in texture_markup_info_list:
                             if texture_markup_info.mark_type == "Slot":
@@ -169,7 +175,6 @@ class ModModelZZMI:
                         texture_override_ib_section.append("run = CommandList\\ZZMI\\SetTextures")
 
                         for texture_markup_info in texture_markup_info_list:
-                            
                             if texture_markup_info.mark_type == "Slot":
                                 if texture_markup_info.mark_name == "DiffuseMap" and Properties_GenerateMod.zzz_use_slot_fix():
                                     pass
@@ -184,31 +189,67 @@ class ModModelZZMI:
                                 else:
                                     texture_override_ib_section.append(self.vlr_filter_index_indent + texture_markup_info.mark_slot + " = " + texture_markup_info.get_resource_name())
 
-                         
-
                 texture_markup_info_list = draw_ib_model.import_config.partname_texturemarkinfolist_dict.get(part_name,None)
                 if texture_markup_info_list is not None:
                     texture_override_ib_section.append("run = CommandListSkinTexture")
             else:
-                # Add slot style texture slot replace.
                 if not Properties_GenerateMod.forbid_auto_texture_ini():
                     texture_markup_info_list = draw_ib_model.import_config.partname_texturemarkinfolist_dict.get(part_name,None)
-                    # It may not have auto texture
                     if texture_markup_info_list is not None:
                         for texture_markup_info in texture_markup_info_list:
                             if texture_markup_info.mark_type == "Slot":
                                 texture_override_ib_section.append(self.vlr_filter_index_indent + texture_markup_info.mark_slot + " = " + texture_markup_info.get_resource_name())
 
-
-            # DrawIndexed部分
             component_name = "Component " + part_name
             component_model = draw_ib_model.component_name_component_model_dict[component_name]
 
-            drawindexed_str_list = M_IniHelper.get_drawindexed_str_list(component_model.final_ordered_draw_obj_model_list)
-            for drawindexed_str in drawindexed_str_list:
-                texture_override_ib_section.append(drawindexed_str)
+            if is_cross_ib_source:
+                non_cross_ib_objects = []
+                for obj_model in component_model.final_ordered_draw_obj_model_list:
+                    obj_name = obj_model.obj_name
+                    if obj_name not in self.branch_model.cross_ib_object_names:
+                        non_cross_ib_objects.append(obj_model)
+                
+                drawindexed_str_list = M_IniHelper.get_drawindexed_str_list(non_cross_ib_objects)
+                for drawindexed_str in drawindexed_str_list:
+                    texture_override_ib_section.append(drawindexed_str)
+            else:
+                drawindexed_str_list = M_IniHelper.get_drawindexed_str_list(component_model.final_ordered_draw_obj_model_list)
+                for drawindexed_str in drawindexed_str_list:
+                    texture_override_ib_section.append(drawindexed_str)
+            
+            if is_cross_ib_target and source_ib_list_for_target:
+                for source_ib_key in source_ib_list_for_target:
+                    source_hash, source_component_index = source_ib_key.split("_")
+                    source_component_index = int(source_component_index)
+                    source_ib_model = self.drawib_drawibmodel_dict.get(source_hash)
+                    source_component_model = None
+                    if source_ib_model:
+                        if source_component_index <= len(source_ib_model.import_config.part_name_list):
+                            src_part_name = source_ib_model.import_config.part_name_list[source_component_index - 1]
+                            src_component_name = "Component " + src_part_name
+                            if src_component_name in source_ib_model.component_name_component_model_dict:
+                                source_component_model = source_ib_model.component_name_component_model_dict[src_component_name]
+                    
+                    if source_component_model:
+                        source_ib_resource_name = source_ib_model.PartName_IBResourceName_Dict.get(part_name, "")
+                        texture_override_ib_section.append("ib = " + source_ib_resource_name)
+                        texture_override_ib_section.append("vb0 = ResourceBodyVB_" + source_hash)
+                        texture_override_ib_section.append("vb1 = Resource" + source_hash + "Texcoord")
+                        texture_override_ib_section.append("vb2 = Resource" + source_hash + "Blend")
+                        texture_override_ib_section.append("vb3 = ResourceBodyVB_" + source_hash)
+                        
+                        cross_ib_objects = []
+                        for obj_model in source_component_model.final_ordered_draw_obj_model_list:
+                            obj_name = obj_model.obj_name
+                            if obj_name in self.branch_model.cross_ib_object_names:
+                                cross_ib_objects.append(obj_model)
+                        
+                        if cross_ib_objects:
+                            drawindexed_str_list = M_IniHelper.get_drawindexed_str_list(cross_ib_objects)
+                            for drawindexed_str in drawindexed_str_list:
+                                texture_override_ib_section.append(drawindexed_str)
 
-            # 补全endif
             if self.vlr_filter_index_indent:
                 texture_override_ib_section.append("endif")
                 texture_override_ib_section.new_line()
@@ -278,6 +319,14 @@ class ModModelZZMI:
 
     def generate_unity_vs_config_ini(self):
         config_ini_builder = M_IniBuilder()
+        
+        if self.has_cross_ib:
+            for node_name, cross_ib_method in self.cross_ib_method_dict.items():
+                if cross_ib_method != 'VB_COPY':
+                    print(f"[CrossIB] 警告: 节点 {node_name} 使用的跨 IB 方式 '{cross_ib_method}' 不适用于 ZZMI 模式")
+                    print(f"[CrossIB] ZZMI 模式只支持 'VB_COPY' (VB 复制) 方式")
+                    self.has_cross_ib = False
+                    break
 
         M_IniHelper.generate_hash_style_texture_ini(ini_builder=config_ini_builder,drawib_drawibmodel_dict=self.drawib_drawibmodel_dict)
         

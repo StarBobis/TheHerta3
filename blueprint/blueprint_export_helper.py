@@ -482,7 +482,14 @@ class BlueprintExportHelper:
         cross_ib_nodes = BlueprintExportHelper.get_cross_ib_nodes()
         
         cross_ib_info_dict = {}
+        cross_ib_method_dict = {}
+        
         for node in cross_ib_nodes:
+            # 获取跨 IB 方式
+            cross_ib_method = getattr(node, 'cross_ib_method', 'END_FIELD')
+            cross_ib_method_dict[node.name] = cross_ib_method
+            
+            # 获取 IB 映射
             ib_mapping = node.get_ib_mapping_dict()
             for source_ib, target_ib_list in ib_mapping.items():
                 if source_ib not in cross_ib_info_dict:
@@ -491,7 +498,7 @@ class BlueprintExportHelper:
                     if target_ib not in cross_ib_info_dict[source_ib]:
                         cross_ib_info_dict[source_ib].append(target_ib)
         
-        return cross_ib_info_dict
+        return cross_ib_info_dict, cross_ib_method_dict
 
 
 

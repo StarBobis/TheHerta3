@@ -47,6 +47,9 @@ class BluePrintModel:
         
         # 连接到跨IB节点的物体名称集合
         self.cross_ib_object_names:set[str] = set()
+        
+        # 跨IB方式字典: {节点名称: 跨IB方式}
+        self.cross_ib_method_dict:dict[str,str] = {}
 
         # 从输出节点开始递归解析所有的节点
         tree = BlueprintExportHelper.get_current_blueprint_tree()
@@ -263,15 +266,19 @@ class BluePrintModel:
             # 跨IB节点：收集跨IB映射信息，继续传递解析
             self.cross_ib_nodes.append(unknown_node)
             
-            ib_mapping = unknown_node.get_ib_mapping_dict()
-            for source_ib, target_ib_list in ib_mapping.items():
-                if source_ib not in self.cross_ib_info_dict:
-                    self.cross_ib_info_dict[source_ib] = []
-                for target_ib in target_ib_list:
-                    if target_ib not in self.cross_ib_info_dict[source_ib]:
-                        self.cross_ib_info_dict[source_ib].append(target_ib)
+            # 保存跨 IB 方式
+            cross_ib_method = getattr(unknown_node, 'cross_ib_method', 'END_FIELD')
+            self.cross_ib_method_dict[unknown_node.name] = cross_ib_method
             
-            print(f"[CrossIB] 解析跨IB节点: {unknown_node.name}, 映射: {ib_mapping}")
+            ib_mapping = unknown_node.get_ib_mapping_dict()
+            for source_key, target_key_list in ib_mapping.items():
+                if source_key not in self.cross_ib_info_dict:
+                    self.cross_ib_info_dict[source_key] = []
+                for target_key in target_key_list:
+                    if target_key not in self.cross_ib_info_dict[source_key]:
+                        self.cross_ib_info_dict[source_key].append(target_key)
+            
+            print(f"[CrossIB] 解析跨IB节点: {unknown_node.name}, 方式: {cross_ib_method}, 映射: {ib_mapping}")
             
             # 收集连接到跨IB节点的物体信息
             connected_objects = self._collect_cross_ib_objects(unknown_node)

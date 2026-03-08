@@ -747,7 +747,7 @@ class SSMT_MT_NodeMenu_Advanced(bpy.types.Menu):
         layout.operator("node.add_node", text="多文件导出", icon='FILE_FOLDER').type = "SSMTNode_MultiFile_Export"
         layout.operator("node.add_node", text="蓝图嵌套", icon='NODETREE').type = "SSMTNode_Blueprint_Nest"
         layout.separator()
-        layout.operator("node.add_node", text="跨IB节点(终末地专用)", icon='ARROW_LEFTRIGHT').type = "SSMTNode_CrossIB"
+        layout.operator("node.add_node", text="跨IB节点", icon='ARROW_LEFTRIGHT').type = "SSMTNode_CrossIB"
         layout.separator()
         layout.operator("node.add_node", text="物体名称修改", icon='GROUP').type = "SSMTNode_Object_Name_Modify"
         layout.separator()

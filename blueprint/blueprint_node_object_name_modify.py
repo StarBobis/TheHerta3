@@ -48,7 +48,7 @@ class SSMTNode_Object_Name_Modify(SSMTNodeBase):
     
     def draw_buttons(self, context, layout):
         box = layout.box()
-        box.label(text="名称映射表:", icon='SORTALPHA')
+        box.label(text="名称映射表 (按顺序匹配):", icon='SORTALPHA')
         
         row = box.row()
         row.template_list("SSMT_UL_NameMapping", "", self, "mapping_list", self, "active_mapping_index", rows=3)
@@ -56,6 +56,9 @@ class SSMTNode_Object_Name_Modify(SSMTNodeBase):
         col = row.column(align=True)
         col.operator("ssmt.name_mapping_add", icon='ADD', text="")
         col.operator("ssmt.name_mapping_remove", icon='REMOVE', text="")
+        col.separator()
+        col.operator("ssmt.name_mapping_move_up", icon='TRIA_UP', text="")
+        col.operator("ssmt.name_mapping_move_down", icon='TRIA_DOWN', text="")
     
     def get_preview_info(self):
         """获取预览信息，递归获取所有连接的物体"""
@@ -242,12 +245,52 @@ class SSMT_OT_NameMappingRemove(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class SSMT_OT_NameMappingMoveUp(bpy.types.Operator):
+    bl_idname = "ssmt.name_mapping_move_up"
+    bl_label = "上移"
+    bl_description = "将选中的映射项向上移动（提高匹配优先级）"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    def execute(self, context):
+        node = context.active_node
+        if not node or node.bl_idname != 'SSMTNode_Object_Name_Modify':
+            self.report({'ERROR'}, "请先选择物体名称修改节点")
+            return {'CANCELLED'}
+        
+        if node.active_mapping_index > 0:
+            node.mapping_list.move(node.active_mapping_index, node.active_mapping_index - 1)
+            node.active_mapping_index -= 1
+        
+        return {'FINISHED'}
+
+
+class SSMT_OT_NameMappingMoveDown(bpy.types.Operator):
+    bl_idname = "ssmt.name_mapping_move_down"
+    bl_label = "下移"
+    bl_description = "将选中的映射项向下移动（降低匹配优先级）"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    def execute(self, context):
+        node = context.active_node
+        if not node or node.bl_idname != 'SSMTNode_Object_Name_Modify':
+            self.report({'ERROR'}, "请先选择物体名称修改节点")
+            return {'CANCELLED'}
+        
+        if node.active_mapping_index < len(node.mapping_list) - 1:
+            node.mapping_list.move(node.active_mapping_index, node.active_mapping_index + 1)
+            node.active_mapping_index += 1
+        
+        return {'FINISHED'}
+
+
 classes = (
     NameMappingItem,
     SSMT_UL_NameMapping,
     SSMTNode_Object_Name_Modify,
     SSMT_OT_NameMappingAdd,
     SSMT_OT_NameMappingRemove,
+    SSMT_OT_NameMappingMoveUp,
+    SSMT_OT_NameMappingMoveDown,
 )
 
 

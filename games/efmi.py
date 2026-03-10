@@ -454,16 +454,21 @@ class ModModelEFMI:
                 texture_override_ib_section.append(self.vlr_filter_index_indent + "post vs-cb1 = null")
                 texture_override_ib_section.append(self.vlr_filter_index_indent + "post vs-t0 = null")
                 texture_override_ib_section.append(self.vlr_filter_index_indent + "post cs-t2 = null")
+        
+        else:
+            drawindexed_str_list = M_IniHelper.get_drawindexed_str_list(component_model.final_ordered_draw_obj_model_list)
+            for drawindexed_str in drawindexed_str_list:
+                texture_override_ib_section.append(self.vlr_filter_index_indent + drawindexed_str)
+        
+        if self.vlr_filter_index_indent:
+            texture_override_ib_section.append("endif")
+            texture_override_ib_section.new_line()
+        
+        if len(self.branch_model.keyname_mkey_dict.keys()) != 0:
+            texture_override_ib_section.append("$active" + str(M_GlobalKeyCounter.generated_mod_number) + " = 1")
             
-            if self.vlr_filter_index_indent:
-                texture_override_ib_section.append("endif")
-                texture_override_ib_section.new_line()
-            
-            if len(self.branch_model.keyname_mkey_dict.keys()) != 0:
-                texture_override_ib_section.append("$active" + str(M_GlobalKeyCounter.generated_mod_number) + " = 1")
-                
-                if Properties_GenerateMod.generate_branch_mod_gui():
-                        texture_override_ib_section.append("$ActiveCharacter = 1")
+            if Properties_GenerateMod.generate_branch_mod_gui():
+                texture_override_ib_section.append("$ActiveCharacter = 1")
             
         config_ini_builder.append_section(texture_override_ib_section)
 
@@ -627,16 +632,15 @@ class ModModelEFMI:
                 
                 is_target_ib = len(source_ib_list_for_target) > 0
 
-                if is_source_ib or is_target_ib:
-                    self.add_unity_vs_texture_override_ib_sections(
-                        config_ini_builder=config_ini_builder,
-                        commandlist_ini_builder=config_ini_builder,
-                        draw_ib_model=draw_ib_model,
-                        is_cross_ib_source=is_source_ib,
-                        is_cross_ib_target=is_target_ib,
-                        source_ib_list_for_target=source_ib_list_for_target,
-                        part_name=part_name
-                    )
+                self.add_unity_vs_texture_override_ib_sections(
+                    config_ini_builder=config_ini_builder,
+                    commandlist_ini_builder=config_ini_builder,
+                    draw_ib_model=draw_ib_model,
+                    is_cross_ib_source=is_source_ib,
+                    is_cross_ib_target=is_target_ib,
+                    source_ib_list_for_target=source_ib_list_for_target,
+                    part_name=part_name
+                )
             
             self.add_unity_vs_resource_vb_sections(ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)
             self.add_resource_texture_sections(ini_builder=config_ini_builder,draw_ib_model=draw_ib_model)

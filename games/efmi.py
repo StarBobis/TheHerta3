@@ -164,9 +164,11 @@ class ModModelEFMI:
         
         all_ibs = set()
         for source_ib, target_ib_list in self.cross_ib_info_dict.items():
-            all_ibs.add(source_ib)
+            source_hash = source_ib.split("_")[0]
+            all_ibs.add(source_hash)
             for target_ib in target_ib_list:
-                all_ibs.add(target_ib)
+                target_hash = target_ib.split("_")[0]
+                all_ibs.add(target_hash)
         
         for draw_ib in self.drawib_drawibmodel_dict.keys():
             all_ibs.add(draw_ib)
@@ -370,90 +372,90 @@ class ModModelEFMI:
                         source_component_model.final_ordered_draw_obj_model_list
                     )
                     all_cross_ib_objects.extend(cross_objs)
+            
+            cross_ib_objects_in_target, non_cross_ib_objects_in_target = self._split_objects_by_cross_ib(
+                component_model.final_ordered_draw_obj_model_list
+            )
+            
+            texture_override_ib_section.append(self.vlr_filter_index_indent + ";跨 iB 区域(当前块身份绘制,所有需要跨 Ib 的物体引用)")
+            texture_override_ib_section.append(self.vlr_filter_index_indent + "if vs == 200 || vs == 201")
+            texture_override_ib_section.append(self.vlr_filter_index_indent + "    run = CustomShader_ExtractCB1")
+            texture_override_ib_section.append(self.vlr_filter_index_indent + f"    cs-t2 = ResourceID_{draw_ib}")
+            texture_override_ib_section.append(self.vlr_filter_index_indent + "    run = CustomShader_RecordBones")
+            texture_override_ib_section.append(self.vlr_filter_index_indent + "    run = CustomShader_RedirectCB1")
+            texture_override_ib_section.append(self.vlr_filter_index_indent + "    vs-t0 = ResourceFakeT0_SRV")
+            texture_override_ib_section.append(self.vlr_filter_index_indent + "    vs-cb1 = ResourceFakeCB1")
+            texture_override_ib_section.append(self.vlr_filter_index_indent + ";所有需要跨 Ib 的物体引用")
+            
+            if all_cross_ib_objects:
+                drawindexed_str_list = M_IniHelper.get_drawindexed_instanced_str_list(all_cross_ib_objects)
+                for drawindexed_str in drawindexed_str_list:
+                    if drawindexed_str.strip():
+                        texture_override_ib_section.append(self.vlr_filter_index_indent + drawindexed_str)
+            
+            texture_override_ib_section.append(self.vlr_filter_index_indent + "endif")
+            texture_override_ib_section.append(self.vlr_filter_index_indent + ";当前块身份,绘制当前块本身拥有的物体")
+            texture_override_ib_section.append(self.vlr_filter_index_indent + f"cs-t2 = ResourceID_{draw_ib}")
+            texture_override_ib_section.append(self.vlr_filter_index_indent + "run = CustomShader_RedirectCB1")
+            texture_override_ib_section.append(self.vlr_filter_index_indent + "vs-t0 = ResourceFakeT0_SRV")
+            texture_override_ib_section.append(self.vlr_filter_index_indent + "vs-cb1 = ResourceFakeCB1")
+            
+            all_target_objects = component_model.final_ordered_draw_obj_model_list
+            if all_target_objects:
+                drawindexed_str_list = M_IniHelper.get_drawindexed_instanced_str_list(all_target_objects)
+                for drawindexed_str in drawindexed_str_list:
+                    if drawindexed_str.strip():
+                        texture_override_ib_section.append(self.vlr_filter_index_indent + drawindexed_str)
+            
+            for source_ib in source_ib_list_for_target:
+                source_hash, source_component_index = source_ib.split("_")
+                source_component_index = int(source_component_index)
+                source_ib_model = self.drawib_drawibmodel_dict.get(source_hash)
+                source_component_model = None
+                if source_ib_model:
+                    if source_component_index <= len(source_ib_model.import_config.part_name_list):
+                        src_part_name = source_ib_model.import_config.part_name_list[source_component_index - 1]
+                        src_component_name = "Component " + src_part_name
+                        if src_component_name in source_ib_model.component_name_component_model_dict:
+                            source_component_model = source_ib_model.component_name_component_model_dict[src_component_name]
                 
-                cross_ib_objects_in_target, non_cross_ib_objects_in_target = self._split_objects_by_cross_ib(
-                    component_model.final_ordered_draw_obj_model_list
+                cross_objs, _ = self._split_objects_by_cross_ib(
+                    source_component_model.final_ordered_draw_obj_model_list if source_component_model else []
                 )
                 
-                texture_override_ib_section.append(self.vlr_filter_index_indent + ";跨 iB 区域(当前块身份绘制,所有需要跨 Ib 的物体引用)")
-                texture_override_ib_section.append(self.vlr_filter_index_indent + "if vs == 200 || vs == 201")
-                texture_override_ib_section.append(self.vlr_filter_index_indent + "    run = CustomShader_ExtractCB1")
-                texture_override_ib_section.append(self.vlr_filter_index_indent + f"    cs-t2 = ResourceID_{draw_ib}")
-                texture_override_ib_section.append(self.vlr_filter_index_indent + "    run = CustomShader_RecordBones")
+                if not cross_objs:
+                    continue
+                
+                texture_override_ib_section.append(self.vlr_filter_index_indent + f";跨 IB 身份块,绘制 {source_hash} 需要跨 Ib 的物体引用")
+                texture_override_ib_section.append(self.vlr_filter_index_indent + "if vs == 202 || vs == 203")
+                texture_override_ib_section.append(self.vlr_filter_index_indent + f"    cs-t2 = ResourceID_{source_hash}")
                 texture_override_ib_section.append(self.vlr_filter_index_indent + "    run = CustomShader_RedirectCB1")
-                texture_override_ib_section.append(self.vlr_filter_index_indent + "    vs-t0 = ResourceFakeT0_SRV")
-                texture_override_ib_section.append(self.vlr_filter_index_indent + "    vs-cb1 = ResourceFakeCB1")
+                texture_override_ib_section.append(self.vlr_filter_index_indent + "    ;跨 IB 块数据区域")
+                texture_override_ib_section.append(self.vlr_filter_index_indent + f"    vb0 = Resource{source_hash}Position")
+                texture_override_ib_section.append(self.vlr_filter_index_indent + f"    vb1 = Resource{source_hash}Texcoord")
+                texture_override_ib_section.append(self.vlr_filter_index_indent + f"    vb2 = Resource{source_hash}Blend")
+                texture_override_ib_section.append(self.vlr_filter_index_indent + f"    vb3 = Resource{source_hash}Position")
+                
+                if source_ib_model:
+                    if source_component_index <= len(source_ib_model.import_config.part_name_list):
+                        src_part_name = source_ib_model.import_config.part_name_list[source_component_index - 1]
+                        ib_resource_name = source_ib_model.PartName_IBResourceName_Dict.get(src_part_name)
+                        if ib_resource_name:
+                            texture_override_ib_section.append(self.vlr_filter_index_indent + f"    ib = {ib_resource_name}")
+                
                 texture_override_ib_section.append(self.vlr_filter_index_indent + ";所有需要跨 Ib 的物体引用")
                 
-                if all_cross_ib_objects:
-                    drawindexed_str_list = M_IniHelper.get_drawindexed_instanced_str_list(all_cross_ib_objects)
-                    for drawindexed_str in drawindexed_str_list:
-                        if drawindexed_str.strip():
-                            texture_override_ib_section.append(self.vlr_filter_index_indent + drawindexed_str)
+                drawindexed_str_list = M_IniHelper.get_drawindexed_instanced_str_list(cross_objs)
+                for drawindexed_str in drawindexed_str_list:
+                    if drawindexed_str.strip():
+                        texture_override_ib_section.append(self.vlr_filter_index_indent + drawindexed_str)
                 
                 texture_override_ib_section.append(self.vlr_filter_index_indent + "endif")
-                texture_override_ib_section.append(self.vlr_filter_index_indent + ";当前块身份,绘制当前块本身拥有的物体")
-                texture_override_ib_section.append(self.vlr_filter_index_indent + f"cs-t2 = ResourceID_{draw_ib}")
-                texture_override_ib_section.append(self.vlr_filter_index_indent + "run = CustomShader_RedirectCB1")
-                texture_override_ib_section.append(self.vlr_filter_index_indent + "vs-t0 = ResourceFakeT0_SRV")
-                texture_override_ib_section.append(self.vlr_filter_index_indent + "vs-cb1 = ResourceFakeCB1")
-                
-                all_target_objects = component_model.final_ordered_draw_obj_model_list
-                if all_target_objects:
-                    drawindexed_str_list = M_IniHelper.get_drawindexed_instanced_str_list(all_target_objects)
-                    for drawindexed_str in drawindexed_str_list:
-                        if drawindexed_str.strip():
-                            texture_override_ib_section.append(self.vlr_filter_index_indent + drawindexed_str)
-                
-                for source_ib in source_ib_list_for_target:
-                    source_hash, source_component_index = source_ib.split("_")
-                    source_component_index = int(source_component_index)
-                    source_ib_model = self.drawib_drawibmodel_dict.get(source_hash)
-                    source_component_model = None
-                    if source_ib_model:
-                        if source_component_index <= len(source_ib_model.import_config.part_name_list):
-                            src_part_name = source_ib_model.import_config.part_name_list[source_component_index - 1]
-                            src_component_name = "Component " + src_part_name
-                            if src_component_name in source_ib_model.component_name_component_model_dict:
-                                source_component_model = source_ib_model.component_name_component_model_dict[src_component_name]
-                    
-                    cross_objs, _ = self._split_objects_by_cross_ib(
-                        source_component_model.final_ordered_draw_obj_model_list if source_component_model else []
-                    )
-                    
-                    if not cross_objs:
-                        continue
-                    
-                    texture_override_ib_section.append(self.vlr_filter_index_indent + f";跨 IB 身份块,绘制 {source_hash} 需要跨 Ib 的物体引用")
-                    texture_override_ib_section.append(self.vlr_filter_index_indent + "if vs == 202 || vs == 203")
-                    texture_override_ib_section.append(self.vlr_filter_index_indent + f"    cs-t2 = ResourceID_{source_hash}")
-                    texture_override_ib_section.append(self.vlr_filter_index_indent + "    run = CustomShader_RedirectCB1")
-                    texture_override_ib_section.append(self.vlr_filter_index_indent + "    ;跨 IB 块数据区域")
-                    texture_override_ib_section.append(self.vlr_filter_index_indent + f"    vb0 = Resource{source_hash}Position")
-                    texture_override_ib_section.append(self.vlr_filter_index_indent + f"    vb1 = Resource{source_hash}Texcoord")
-                    texture_override_ib_section.append(self.vlr_filter_index_indent + f"    vb2 = Resource{source_hash}Blend")
-                    texture_override_ib_section.append(self.vlr_filter_index_indent + f"    vb3 = Resource{source_hash}Position")
-                    
-                    if source_ib_model:
-                        if source_component_index <= len(source_ib_model.import_config.part_name_list):
-                            src_part_name = source_ib_model.import_config.part_name_list[source_component_index - 1]
-                            ib_resource_name = source_ib_model.PartName_IBResourceName_Dict.get(src_part_name)
-                            if ib_resource_name:
-                                texture_override_ib_section.append(self.vlr_filter_index_indent + f"    ib = {ib_resource_name}")
-                    
-                    texture_override_ib_section.append(self.vlr_filter_index_indent + ";所有需要跨 Ib 的物体引用")
-                    
-                    drawindexed_str_list = M_IniHelper.get_drawindexed_instanced_str_list(cross_objs)
-                    for drawindexed_str in drawindexed_str_list:
-                        if drawindexed_str.strip():
-                            texture_override_ib_section.append(self.vlr_filter_index_indent + drawindexed_str)
-                    
-                    texture_override_ib_section.append(self.vlr_filter_index_indent + "endif")
-                
-                texture_override_ib_section.append(self.vlr_filter_index_indent + "")
-                texture_override_ib_section.append(self.vlr_filter_index_indent + "post vs-cb1 = null")
-                texture_override_ib_section.append(self.vlr_filter_index_indent + "post vs-t0 = null")
-                texture_override_ib_section.append(self.vlr_filter_index_indent + "post cs-t2 = null")
+            
+            texture_override_ib_section.append(self.vlr_filter_index_indent + "")
+            texture_override_ib_section.append(self.vlr_filter_index_indent + "post vs-cb1 = null")
+            texture_override_ib_section.append(self.vlr_filter_index_indent + "post vs-t0 = null")
+            texture_override_ib_section.append(self.vlr_filter_index_indent + "post cs-t2 = null")
         
         else:
             drawindexed_str_list = M_IniHelper.get_drawindexed_str_list(component_model.final_ordered_draw_obj_model_list)

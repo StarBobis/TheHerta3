@@ -583,7 +583,10 @@ class SSMTGenerateModBlueprint(bpy.types.Operator):
                         new_name = node.get_modified_object_name(current_name)
                         if new_name != current_name:
                             copy_obj.name = new_name
-                            print(f"[NameModify] {original_name}: {current_name} -> {new_name}")
+                            if hasattr(node_or_item, 'original_object_name'):
+                                clean_name = new_name.rstrip('_copy') if new_name.endswith('_copy') else new_name
+                                node_or_item.original_object_name = clean_name
+                                print(f"[NameModify] {original_name}: {current_name} -> {new_name} (INI: {clean_name})")
             
             elif node_type == 'vg_process':
                 start_operation(f"VGProcess_{node.name}", "batch")

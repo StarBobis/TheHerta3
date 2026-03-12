@@ -14,6 +14,7 @@ from ..utils.mesh_utils import MeshUtils
 from ..utils.log_utils import LOG
 from ..utils.vertexgroup_utils import VertexGroupUtils
 from ..utils.obj_utils import ObjUtils
+from ..utils.tbn_codec import TBNCodec
 
 from ..config.main_config import GlobalConfig, LogicName
 from ..config.properties_import_model import Properties_ImportModel
@@ -114,70 +115,33 @@ class MeshImporter:
                     print("燕云十六声法线处理")
                     normals = [(x[0] * 2 - 1, x[1] * 2 - 1, x[2] * 2 - 1) for x in data]
                 elif (mbf.fmt_file.logic_name == LogicName.AEMI or mbf.fmt_file.logic_name == LogicName.EFMI) and element.Format == "R32_UINT":
-                    # 对终末地压缩类型法线做特殊解压处理
-                    # 数据是以R32_UINT类型存储的，但是它实际上应该视为32位的内存块来解读
-                    print("终末地压缩法线处理(Endfield Packed Normals)")
+                    print("终末地压缩法线处理(Endfield Packed Normals) - 使用 TBNCodec")
                     
-                    # Ensure we work with uint32
                     raw = data
                     if raw.dtype != numpy.uint32:
                         raw = raw.view(numpy.uint32)
-
                     if raw.ndim > 1:
                         raw = raw[:, 0]
                     
-                    # Endfiled Octahedral Normal Encoding (10-10-Packed)
-                    # Based on HLSL logic
-                    
-                    mask_10bit = 0x3FF
-                    x_raw = raw & mask_10bit
-                    y_raw = (raw >> 10) & mask_10bit
-                    
-                    # Sign extension 10-bit -> signed int
-                    x_int = x_raw.astype(numpy.int32)
-                    y_int = y_raw.astype(numpy.int32)
-                    
-                    x_int = numpy.where(x_int >= 512, x_int - 1024, x_int)
-                    y_int = numpy.where(y_int >= 512, y_int - 1024, y_int)
-
-                    # Normalize to roughly [-1, 1]
-                    scale = 0.00195694715 
-                    x = x_int * scale
-                    y = y_int * scale
-
-                    # Reconstruct Z
-                    # r3.z = 1 - abs(x) - abs(y)
-                    z = 1.0 - numpy.abs(x) - numpy.abs(y)
-
-                    # Octahedral mapping wrap
-                    # if z < 0:
-                    #   x = (1 - abs(y)) * sign(x)
-                    #   y = (1 - abs(x)) * sign(y)
-                    t = z < 0
-                    
-                    sign_x = numpy.where(x_int >= 0, 1.0, -1.0)
-                    sign_y = numpy.where(y_int >= 0, 1.0, -1.0)
-                    
-                    wrapped_x = (1.0 - numpy.abs(y)) * sign_x
-                    wrapped_y = (1.0 - numpy.abs(x)) * sign_y
-                    
-                    nx = numpy.where(t, wrapped_x, x)
-                    ny = numpy.where(t, wrapped_y, y)
-                    nz = z
-
-                    # Normalize vector
-                    norm = numpy.sqrt(nx*nx + ny*ny + nz*nz)
-                    norm = numpy.where(norm == 0, 1.0, norm) # Avoid div by zero
-
-                    nx /= norm
-                    ny /= norm
-                    nz /= norm
-
-                    normals = numpy.column_stack((nx, ny, nz)).tolist()
-
+                    normals = TBNCodec.decode_octahedral_r32_uint(raw).tolist()
                     print("终末地压缩法线处理完成")
                 else:
                     normals = [(x[0], x[1], x[2]) for x in data]
+            elif element.SemanticName == "ENCODEDDATA":
+                if mbf.fmt_file.logic_name == LogicName.AEMI or mbf.fmt_file.logic_name == LogicName.EFMI:
+                    print("终末地 ENCODEDDATA 处理 - 使用 TBNCodec 解码 TBN 数据")
+                    use_normals = True
+                    
+                    raw = data
+                    if raw.dtype != numpy.uint32:
+                        raw = raw.view(numpy.uint32)
+                    if raw.ndim > 1:
+                        raw = raw[:, 0]
+                    
+                    normals = TBNCodec.decode_octahedral_r32_uint(raw).tolist()
+                    print("终末地 ENCODEDDATA 处理完成")
+                else:
+                    print(f"警告: ENCODEDDATA 元素仅在 EFMI/AEMI 格式中支持，当前游戏类型: {mbf.fmt_file.logic_name}")
             elif element.SemanticName == "TANGENT":
                 pass
             elif element.SemanticName == "BINORMAL":

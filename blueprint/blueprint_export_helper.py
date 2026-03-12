@@ -374,9 +374,9 @@ class BlueprintExportHelper:
     def get_postprocess_nodes():
         """获取连接到Generate Mod输出节点的所有后处理节点，按连接顺序返回
         
-        包括：
-        1. SSMTNode_Object_Name_Modify 节点（通过 Post Process 输出连接）- 优先收集
-        2. SSMTNode_PostProcess* 节点
+        支持两种连接方式：
+        1. 输出节点 → 物体重命名节点 → 形态键配置节点 → 材质转资源节点
+        2. 物体重命名节点 → 形态键配置节点 → 材质转资源节点 → 输出节点
         
         名称修改节点必须先于其他后处理节点执行，以便传递映射信息
         其他后处理节点按照连接顺序执行（从链条起点到终点）
@@ -392,8 +392,60 @@ class BlueprintExportHelper:
         name_modify_nodes = []
         postprocess_chain = []
         
-        def collect_name_modify_nodes(node, visited=None):
-            """递归收集名称修改节点"""
+        def collect_name_modify_nodes_forward(node, visited=None):
+            """从输出节点向前递归收集名称修改节点"""
+            if visited is None:
+                visited = set()
+            
+            if node.name in visited:
+                return
+            
+            visited.add(node.name)
+            
+            for input in node.inputs:
+                if input.is_linked:
+                    for link in input.links:
+                        source_node = link.from_node
+                        
+                        if source_node.mute:
+                            continue
+                        
+                        if source_node.bl_idname == 'SSMTNode_Object_Name_Modify':
+                            if input.name == "Post Process" or input.bl_idname == 'SSMTSocketPostProcess':
+                                if source_node not in name_modify_nodes:
+                                    name_modify_nodes.append(source_node)
+                                collect_name_modify_nodes_forward(source_node, visited)
+        
+        def collect_postprocess_chain_forward(node, visited=None, chain=None):
+            """从输出节点向前递归收集后处理节点链，按从起点到终点的顺序"""
+            if visited is None:
+                visited = set()
+            if chain is None:
+                chain = []
+            
+            if node.name in visited:
+                return chain
+            
+            visited.add(node.name)
+            
+            if node.bl_idname.startswith('SSMTNode_PostProcess'):
+                chain.insert(0, node)
+            
+            for input in node.inputs:
+                if input.is_linked:
+                    for link in input.links:
+                        source_node = link.from_node
+                        
+                        if source_node.mute:
+                            continue
+                        
+                        if source_node.bl_idname.startswith('SSMTNode_PostProcess'):
+                            collect_postprocess_chain_forward(source_node, visited, chain)
+            
+            return chain
+        
+        def collect_name_modify_nodes_backward(node, visited=None):
+            """从输出节点向后递归收集名称修改节点"""
             if visited is None:
                 visited = set()
             
@@ -414,10 +466,13 @@ class BlueprintExportHelper:
                             if output.name == "Post Process" or output.bl_idname == 'SSMTSocketPostProcess':
                                 if target_node not in name_modify_nodes:
                                     name_modify_nodes.append(target_node)
-                                collect_name_modify_nodes(target_node, visited)
+                                collect_name_modify_nodes_backward(target_node, visited)
         
-        def collect_postprocess_chain(node, visited=None, chain=None):
-            """递归收集后处理节点链，按从起点到终点的顺序"""
+        def collect_postprocess_chain_backward(node, visited=None, chain=None):
+            """从输出节点向后递归收集后处理节点链，按从起点到终点的顺序
+            
+            注意：需要穿过物体重命名节点继续收集后续的后处理节点
+            """
             if visited is None:
                 visited = set()
             if chain is None:
@@ -430,6 +485,9 @@ class BlueprintExportHelper:
             
             if node.bl_idname.startswith('SSMTNode_PostProcess'):
                 chain.append(node)
+            elif node.bl_idname == 'SSMTNode_Object_Name_Modify':
+                if node not in name_modify_nodes:
+                    name_modify_nodes.append(node)
             
             for output in node.outputs:
                 if output.is_linked:
@@ -440,21 +498,38 @@ class BlueprintExportHelper:
                             continue
                         
                         if target_node.bl_idname.startswith('SSMTNode_PostProcess'):
-                            collect_postprocess_chain(target_node, visited, chain)
+                            collect_postprocess_chain_backward(target_node, visited, chain)
+                        elif target_node.bl_idname == 'SSMTNode_Object_Name_Modify':
+                            if output.name == "Post Process" or output.bl_idname == 'SSMTSocketPostProcess':
+                                collect_postprocess_chain_backward(target_node, visited, chain)
             
             return chain
         
-        collect_name_modify_nodes(output_node)
+        collect_name_modify_nodes_forward(output_node)
         
-        for output in output_node.outputs:
-            if output.is_linked:
-                for link in output.links:
-                    target_node = link.to_node
-                    if target_node.bl_idname.startswith('SSMTNode_PostProcess') and not target_node.mute:
-                        chain = collect_postprocess_chain(target_node, set(), [])
+        for input in output_node.inputs:
+            if input.is_linked:
+                for link in input.links:
+                    source_node = link.from_node
+                    if source_node.bl_idname.startswith('SSMTNode_PostProcess') and not source_node.mute:
+                        chain = collect_postprocess_chain_forward(source_node, set(), [])
                         for node in chain:
                             if node not in postprocess_chain:
                                 postprocess_chain.append(node)
+        
+        if not postprocess_chain:
+            for output in output_node.outputs:
+                if output.is_linked:
+                    for link in output.links:
+                        target_node = link.to_node
+                        if not target_node.mute:
+                            if (target_node.bl_idname.startswith('SSMTNode_PostProcess') or 
+                                target_node.bl_idname == 'SSMTNode_Object_Name_Modify'):
+                                if output.name == "Post Process" or output.bl_idname == 'SSMTSocketPostProcess':
+                                    chain = collect_postprocess_chain_backward(target_node, set(), [])
+                                    for node in chain:
+                                        if node not in postprocess_chain:
+                                            postprocess_chain.append(node)
         
         postprocess_nodes = name_modify_nodes + postprocess_chain
         

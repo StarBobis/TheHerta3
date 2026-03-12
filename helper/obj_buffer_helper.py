@@ -6,6 +6,7 @@ from ..base.fatal import Fatal
 from ..utils.format_utils import FormatUtils
 from ..utils.vertexgroup_utils import VertexGroupUtils
 from ..utils.timer_utils import TimerUtils
+from ..utils.tbn_codec import TBNCodec
 
 from ..config.main_config import GlobalConfig, LogicName
 from ..config.properties_generate_mod import Properties_GenerateMod
@@ -77,7 +78,7 @@ class ObjBufferHelper:
         return positions
 
     @staticmethod
-    def _parse_normal(mesh_loops, mesh_loops_length, d3d11_element):
+    def _parse_normal(mesh_loops, mesh_loops_length, d3d11_element, has_encoded_data=False):
         # 统一获取法线数据
         normals = numpy.empty(mesh_loops_length * 3, dtype=numpy.float32)
         mesh_loops.foreach_get('normal', normals)
@@ -149,11 +150,9 @@ class ObjBufferHelper:
             return FormatUtils.convert_4x_float32_to_r8g8b8a8_unorm(result)
 
         elif d3d11_element.Format == "R32_UINT" and (GlobalConfig.logic_name == LogicName.AEMI or GlobalConfig.logic_name == LogicName.EFMI):
-             # 终末地 Octahedral Normal
-             # We need just float3 normals
-             raw_normals = normals.reshape(-1, 3)
-             # Must reshape to (N, 1) to match structured array shape if expected
-             return FormatUtils.convert_normals_to_endfield_octahedral_r32_uint(raw_normals).reshape(-1, 1)
+            print("终末地法线编码 - 使用 TBNCodec")
+            raw_normals = normals.reshape(-1, 3)
+            return TBNCodec.convert_normals_to_octahedral_r32_uint(raw_normals).reshape(-1, 1)
         
         else:
             # 将一维数组 reshape 成 (mesh_loops_length, 3) 形状的二维数组
@@ -247,6 +246,32 @@ class ObjBufferHelper:
             result = FormatUtils.convert_4x_float32_to_r16g16b16a16_snorm(result)
             
         return result
+
+    @staticmethod
+    def _parse_encoded_tbn(mesh_loops, mesh_loops_length, d3d11_element):
+        """
+        解析并编码 EFMI/AEMI 格式的 ENCODEDDATA (10-10-10-2 TBN 编码)
+        
+        该方法从 mesh.loops 中获取法线、切线和副切线符号，
+        并使用 TBNCodec 编码为 10-10-10-2 格式的 R32_UINT 数据
+        """
+        normals = numpy.empty(mesh_loops_length * 3, dtype=numpy.float32)
+        mesh_loops.foreach_get('normal', normals)
+        normals = normals.reshape(-1, 3)
+
+        tangents = numpy.empty(mesh_loops_length * 3, dtype=numpy.float32)
+        mesh_loops.foreach_get("tangent", tangents)
+        tangents = tangents.reshape(-1, 3)
+
+        bitangent_signs = numpy.empty(mesh_loops_length, dtype=numpy.float32)
+        mesh_loops.foreach_get("bitangent_sign", bitangent_signs)
+        bitangent_signs *= -1
+
+        encoded_data = TBNCodec.encode_tbn_data(normals, tangents, bitangent_signs)
+        
+        print(f"终末地 TBN 编码完成: {len(encoded_data)} 个顶点")
+        
+        return encoded_data.reshape(-1, 1)
 
     @staticmethod
     def _parse_color(mesh, mesh_loops_length, d3d11_element_name, d3d11_element):
@@ -435,6 +460,9 @@ class ObjBufferHelper:
             blendweights_dict, blendindices_dict = VertexGroupUtils.get_blendweights_blendindices_v3(mesh=mesh,normalize_weights = normalize_weights)
 
 
+        # 检查是否存在 ENCODEDDATA 元素 (用于 EFMI/AEMI 格式的 TBN 编码)
+        has_encoded_data = 'ENCODEDDATA' in d3d11_game_type.ElementNameD3D11ElementDict
+
         # 对每一种Element都获取对应的数据
         for d3d11_element_name in d3d11_game_type.OrderedFullElementList:
             d3d11_element = d3d11_game_type.ElementNameD3D11ElementDict[d3d11_element_name]
@@ -445,13 +473,22 @@ class ObjBufferHelper:
                 data = ObjBufferHelper._parse_position(mesh_vertices, mesh_vertices_length, loop_vertex_indices, d3d11_element)
 
             elif d3d11_element_name == 'NORMAL':
-                data = ObjBufferHelper._parse_normal(mesh_loops, mesh_loops_length, d3d11_element)
+                if has_encoded_data and (GlobalConfig.logic_name == LogicName.EFMI or GlobalConfig.logic_name == LogicName.AEMI):
+                    pass
+                else:
+                    data = ObjBufferHelper._parse_normal(mesh_loops, mesh_loops_length, d3d11_element, has_encoded_data)
 
             elif d3d11_element_name == 'TANGENT':
-                data = ObjBufferHelper._parse_tangent(mesh_loops, mesh_loops_length, d3d11_element)
+                if has_encoded_data and (GlobalConfig.logic_name == LogicName.EFMI or GlobalConfig.logic_name == LogicName.AEMI):
+                    pass
+                else:
+                    data = ObjBufferHelper._parse_tangent(mesh_loops, mesh_loops_length, d3d11_element)
 
             elif d3d11_element_name.startswith('BINORMAL'):
-                data = ObjBufferHelper._parse_binormal(mesh_loops, mesh_loops_length, d3d11_element)
+                if has_encoded_data and (GlobalConfig.logic_name == LogicName.EFMI or GlobalConfig.logic_name == LogicName.AEMI):
+                    pass
+                else:
+                    data = ObjBufferHelper._parse_binormal(mesh_loops, mesh_loops_length, d3d11_element)
             
             elif d3d11_element_name.startswith('COLOR'):
                 data = ObjBufferHelper._parse_color(mesh, mesh_loops_length, d3d11_element_name, d3d11_element)
@@ -464,6 +501,13 @@ class ObjBufferHelper:
                 
             elif d3d11_element_name.startswith('BLENDWEIGHT'):
                 data = ObjBufferHelper._parse_blendweight(blendweights_dict, d3d11_element)
+
+            elif d3d11_element_name == 'ENCODEDDATA':
+                if GlobalConfig.logic_name == LogicName.EFMI or GlobalConfig.logic_name == LogicName.AEMI:
+                    data = ObjBufferHelper._parse_encoded_tbn(mesh_loops, mesh_loops_length, d3d11_element)
+                else:
+                    print(f"警告: ENCODEDDATA 元素仅在 EFMI/AEMI 格式中支持，当前游戏类型: {GlobalConfig.logic_name}")
+                    data = None
 
             if data is not None:
                 original_elementname_data_dict[d3d11_element_name] = data

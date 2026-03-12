@@ -4,6 +4,8 @@ import struct
 import math
 import numpy
 
+from .tbn_codec import TBNCodec
+
 
 # This used to catch any exception in run time and raise it to blender output console.
 class Fatal(Exception):
@@ -229,66 +231,10 @@ class FormatUtils:
         Compress float3 normals to Endfield specific R32_UINT octahedral format.
         输入: (N, 3) float32 normals
         输出: (N,) uint32 packed data
+        
+        Note: 此方法已迁移至 TBNCodec, 保留此接口以兼容旧代码
         """
-        # Ensure input is float32
-        # n is reference, we copy to avoid modifying original info
-        n = numpy.array(input_normals, dtype=numpy.float32)
-        
-        # 1. L1 Normalize
-        # Avoid division by zero
-        l1_norm = numpy.abs(n[:, 0]) + numpy.abs(n[:, 1]) + numpy.abs(n[:, 2])
-        l1_norm = numpy.where(l1_norm == 0, 1.0, l1_norm) 
-        
-        n /= l1_norm[:, numpy.newaxis]
-        
-        x = n[:, 0]
-        y = n[:, 1]
-        z = n[:, 2]
-        
-        # 2. Octahedral wrap for z < 0
-        neg_z = z < 0
-        
-        # sign(x) : 1 if x >= 0 else -1
-        sign_x = numpy.where(x >= 0, 1.0, -1.0)
-        sign_y = numpy.where(y >= 0, 1.0, -1.0)
-        
-        # tx = (1 - abs(y)) * sign(x)
-        # ty = (1 - abs(x)) * sign(y)
-        tx = (1.0 - numpy.abs(y)) * sign_x
-        ty = (1.0 - numpy.abs(x)) * sign_y
-        
-        x = numpy.where(neg_z, tx, x)
-        y = numpy.where(neg_z, ty, y)
-        
-        # 3. Quantize to [-511, 511] (Based on scale 0.00195694715 ~= 1/511)
-        # However, 10-bit signed range [-512, 511]. 
-        scale = 511.0
-        
-        xq = numpy.round(x * scale).astype(numpy.int32)
-        yq = numpy.round(y * scale).astype(numpy.int32)
-        
-        # Clamp to 10-bit signed range [-512, 511]
-        xq = numpy.clip(xq, -512, 511)
-        yq = numpy.clip(yq, -512, 511)
-        
-        # 4. Bit packing
-        # Convert to 10-bit uint representation (Two's complement logic is handled by & 0x3FF)
-        xu = xq & 0x3FF
-        yu = yq & 0x3FF
-        
-        # Shift Y by 10, X at lowest
-        # HLSL: r0.y (X) = raw & 1023
-        # HLSL: raw >> 10 (Y) & 1023
-        packed = xu | (yu << 10)
-
-        # Critical: Set Bit 30 (0x40000000) to 1 to enable decompression in shader
-        # Shader logic: r0.xy = (int2)v2.xx & int2(0x40000000,1023);
-        #               r0.x = cmp(0 < (uint)r0.x); -> Checks bit 30
-        #               r0.xyz = r0.xxx ? r0.yzw (decompressed) : v2.xyz;
-        packed |= 0x40000000
-        
-        # Result is uint32
-        return packed.astype(numpy.uint32)
+        return TBNCodec.convert_normals_to_octahedral_r32_uint(input_normals)
 
     @classmethod    
     def convert_4x_float32_to_r8g8b8a8_unorm_blendweights(cls, input_array):

@@ -34,7 +34,14 @@ class SSMTNode_PostProcess_Material(SSMTNode_PostProcess_Base):
         应用名称映射（由名称修改节点调用）
         
         Args:
-            mapping: 字典，格式为 {配置表中的名称片段: 场景中的名称片段}
+            mapping: 字典，格式为 {原始物体名称: 修改后的物体名称}
+                    例如: {"046400d3": "e6ff7471"}
+                    
+        注意：
+        - 正向映射: 用于配置文本（如Shape_Key_Classification）中查找
+          将配置文本中的原始名称转换为INI中的修改后名称
+        - 反向映射: 用于材质转资源节点在场景中查找物体
+          将INI中的修改后名称转换回场景中的原始名称
         """
         global _name_mapping_cache, _reverse_name_mapping_cache
         
@@ -42,12 +49,12 @@ class SSMTNode_PostProcess_Material(SSMTNode_PostProcess_Base):
         _name_mapping_cache[node_key] = mapping.copy()
         _reverse_name_mapping_cache[node_key] = {}
         
-        for config_name, scene_name in mapping.items():
-            _reverse_name_mapping_cache[node_key][scene_name] = config_name
+        for original_name, new_name in mapping.items():
+            _reverse_name_mapping_cache[node_key][new_name] = original_name
         
         print(f"[MaterialToResource] 已应用名称映射: {len(mapping)} 条规则")
-        for config_name, scene_name in mapping.items():
-            print(f"  配置表 '{config_name}' -> 场景 '{scene_name}'")
+        for original_name, new_name in mapping.items():
+            print(f"  原始 '{original_name}' -> 修改后 '{new_name}'")
 
     def _get_name_mapping(self):
         """获取当前节点的名称映射"""
@@ -73,25 +80,33 @@ class SSMTNode_PostProcess_Material(SSMTNode_PostProcess_Base):
         return match.group(1) if match else None
 
     def find_object_by_mesh_name(self, mesh_name):
+        """
+        根据mesh名称查找场景中的物体
+        
+        注意：INI中的mesh名称可能已被物体重命名节点修改，
+        而场景中的物体名称是原始名称（副本已被删除），
+        所以需要使用反转映射来查找。
+        """
+        reverse_mapping = self._get_reverse_name_mapping()
         name_mapping = self._get_name_mapping()
         
-        if name_mapping:
-            print(f"[MaterialToResource] 查找物体 '{mesh_name}'，名称映射: {name_mapping}")
+        if reverse_mapping:
+            print(f"[MaterialToResource] 查找物体 '{mesh_name}'，反转映射: {reverse_mapping}")
         
         potential_names = [mesh_name]
         
-        if name_mapping:
-            for config_name, scene_name in name_mapping.items():
-                if config_name in mesh_name:
-                    new_name = mesh_name.replace(config_name, scene_name)
-                    if new_name not in potential_names:
-                        potential_names.append(new_name)
+        if reverse_mapping:
+            for new_name, original_name in reverse_mapping.items():
+                if new_name in mesh_name:
+                    original_mesh_name = mesh_name.replace(new_name, original_name)
+                    if original_mesh_name not in potential_names:
+                        potential_names.append(original_mesh_name)
         
         for name in potential_names:
             obj = bpy.data.objects.get(name)
             if obj:
                 if name != mesh_name:
-                    print(f"[MaterialToResource] 通过名称映射找到物体: '{mesh_name}' -> '{name}'")
+                    print(f"[MaterialToResource] 通过反转映射找到物体: '{mesh_name}' -> '{name}'")
                 else:
                     print(f"[MaterialToResource] 直接找到物体: '{mesh_name}'")
                 return obj
@@ -103,13 +118,13 @@ class SSMTNode_PostProcess_Material(SSMTNode_PostProcess_Base):
                 print(f"[MaterialToResource] 通过清理哈希前缀找到物体: '{mesh_name}' -> '{clean_name}'")
                 return obj
             
-            if name_mapping:
-                for config_name, scene_name in name_mapping.items():
-                    if config_name in clean_name:
-                        new_name = clean_name.replace(config_name, scene_name)
-                        obj = bpy.data.objects.get(new_name)
+            if reverse_mapping:
+                for new_name, original_name in reverse_mapping.items():
+                    if new_name in clean_name:
+                        original_clean_name = clean_name.replace(new_name, original_name)
+                        obj = bpy.data.objects.get(original_clean_name)
                         if obj:
-                            print(f"[MaterialToResource] 通过清理后名称的映射找到物体: '{clean_name}' -> '{new_name}'")
+                            print(f"[MaterialToResource] 通过清理后名称的反转映射找到物体: '{clean_name}' -> '{original_clean_name}'")
                             return obj
         
         print(f"[MaterialToResource] 未找到物体: '{mesh_name}'，尝试过的名称: {potential_names}")

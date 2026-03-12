@@ -178,7 +178,7 @@ class SSMTNode_Object_Name_Modify(SSMTNodeBase):
         """获取映射字典（用于后处理阶段）
         
         返回格式：{配置表中的名称片段: 场景中的名称片段}
-        材质转资源节点会使用这个映射来查找物体
+        用于将配置表中的原始名称转换为场景中的新名称
         """
         mapping = {}
         for item in self.mapping_list:
@@ -187,9 +187,9 @@ class SSMTNode_Object_Name_Modify(SSMTNodeBase):
             
             if original and new:
                 if self.reverse_mapping:
-                    mapping[original] = new
-                else:
                     mapping[new] = original
+                else:
+                    mapping[original] = new
         return mapping
     
     def is_valid(self):

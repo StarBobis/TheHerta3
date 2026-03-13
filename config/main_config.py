@@ -91,9 +91,9 @@ class GlobalConfig:
                 main_setting_file = open(main_json_path)
                 main_setting_json = json.load(main_setting_file)
                 main_setting_file.close()
-                cls.workspacename = main_setting_json.get("workspaceName","")
-                cls.gamename = main_setting_json.get("currentConfigName","")
-                cls.dbmtlocation = main_setting_json.get("cacheDir","") + "\\"
+                cls.workspacename = main_setting_json.get("CurrentWorkSpace","")
+                cls.gamename = main_setting_json.get("CurrentGameName","")
+                cls.dbmtlocation = main_setting_json.get("DBMTWorkFolder","") + "\\"
                 cls.ssmt_version_number = main_setting_json.get("VersionNumber",0)
             else:
                 print("Can't find: " + main_json_path)

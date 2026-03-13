@@ -48,11 +48,14 @@ def ImprotFromWorkSpaceSSMTBlueprint(self, context):
 
         if not os.path.exists(import_drawib_folder_path):
             self.report({'ERROR'},"目标DrawIB "+draw_ib+" 的提取文件夹不存在,请检查你的工作空间中的DrawIB列表是否正确或者是否忘记点击提取模型: " + import_drawib_folder_path)
-
+            continue
+        
         # 导入时，要按照先GPU类型，再CPU类型进行排序，虽然我们已经在提取模型端排序过了
         # 但是这里双重检查机制，确保没问题
         gpu_import_folder_path_list = []
         cpu_import_folder_path_list = []
+
+        
 
         dirs = os.listdir(import_drawib_folder_path)
         for dirname in dirs:

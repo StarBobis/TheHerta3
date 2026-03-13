@@ -438,8 +438,12 @@ class SSMTNode_MultiFile_Export(SSMTNodeBase):
     
     def get_current_object_info(self, export_index):
         """获取当前导出次数对应的物体信息"""
-        if export_index < 0 or export_index >= len(self.object_list):
+        if export_index < 0:
             return None
+        
+        # 如果索引超出范围，使用最后一个物体
+        if export_index >= len(self.object_list):
+            export_index = len(self.object_list) - 1
         
         item = self.object_list[export_index]
         return {

@@ -462,7 +462,11 @@ class BluePrintModel:
                     if original_name:
                         obj_model.display_name = original_name
                     
-                    LOG.info(f"多文件导出节点更新物体: {obj_name} (第{export_index + 1}次导出)")
+                    # 检查是否使用了最后一个物体
+                    if export_index >= len(multifile_node.object_list):
+                        LOG.info(f"多文件导出节点在第{export_index + 1}次导出时使用最后一个物体: {obj_name}")
+                    else:
+                        LOG.info(f"多文件导出节点更新物体: {obj_name} (第{export_index + 1}次导出)")
                 else:
                     # 如果没有对应的物体信息，跳过这个对象
                     LOG.warning(f"多文件导出节点在第{export_index + 1}次导出时没有对应的物体，跳过")

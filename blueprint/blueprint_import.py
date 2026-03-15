@@ -19,6 +19,7 @@ def ImportFromWorkSpaceSSMT4(self, context):
     '''
     第四代工作空间导入逻辑
     文件夹命名格式：DrawIB-IndexCount-FirstIndex
+    返回: 成功导入的对象数量
     '''
     
     set_importing_state(True)
@@ -31,6 +32,7 @@ def ImportFromWorkSpaceSSMT4(self, context):
     workspace_subfolders = [f.path for f in os.scandir(current_workspace_folder) if f.is_dir() and '-' in f.name]
 
     foldername_gametypename_dict = {}
+    imported_count = 0
 
     for import_folder_path in workspace_subfolders:
         import_folder_name = os.path.basename(import_folder_path)
@@ -95,6 +97,7 @@ def ImportFromWorkSpaceSSMT4(self, context):
                     work_game_type = ""
                     
             foldername_gametypename_dict[import_folder_name] = work_game_type
+            imported_count += 1
             self.report({'INFO'}, "成功导入" + import_folder_name + " 的数据类型: " + gametype_name)
             break
 
@@ -181,12 +184,15 @@ def ImportFromWorkSpaceSSMT4(self, context):
         traceback.print_exc()
     
     refresh_workspace_cache()
+    
+    return imported_count
 
 
 def ImprotFromWorkSpaceSSMT3(self, context):
     '''
     第三代工作空间导入逻辑
     文件夹命名格式：DrawIB（只有 Hash）
+    返回: 成功导入的对象数量
     '''
     
     set_importing_state(True)
@@ -199,6 +205,7 @@ def ImprotFromWorkSpaceSSMT3(self, context):
     draw_ib_pair_list:list[DrawIBPair] = ConfigUtils.get_extract_drawib_list_from_workspace_config_json()
 
     draw_ib_gametypename_dict = {}
+    imported_count = 0
     
     for draw_ib_pair in draw_ib_pair_list:
         draw_ib = draw_ib_pair.DrawIB
@@ -258,6 +265,7 @@ def ImprotFromWorkSpaceSSMT3(self, context):
             tmp_json = ConfigUtils.read_tmp_json(import_folder_path)
             work_game_type = tmp_json.get("WorkGameType","")
             draw_ib_gametypename_dict[draw_ib] = work_game_type
+            imported_count += 1
             self.report({'INFO'}, "成功导入DrawIB " + draw_ib + " 的数据类型: " + gametype_name)
             break
 
@@ -352,14 +360,30 @@ def ImprotFromWorkSpaceSSMT3(self, context):
         traceback.print_exc()
     
     refresh_workspace_cache()
+    
+    return imported_count
 
 
 def ImprotFromWorkSpaceSSMTBlueprint(self, context):
     '''
     根据 SSMT4 开关选择不同的导入逻辑
+    当开启SSMT4时，首先尝试第四代导入，如果失败则回退到第三代
     '''
     if Properties_ImportModel.use_ssmt4():
-        ImportFromWorkSpaceSSMT4(self, context)
+        print("SSMT4模式: 尝试使用第四代导入逻辑...")
+        imported_count = ImportFromWorkSpaceSSMT4(self, context)
+        
+        if imported_count == 0:
+            print("SSMT4模式: 第四代导入未成功导入任何模型，尝试回退到第三代导入逻辑...")
+            self.report({'WARNING'}, "第四代导入未成功，尝试回退到第三代导入逻辑...")
+            imported_count = ImprotFromWorkSpaceSSMT3(self, context)
+            
+            if imported_count > 0:
+                self.report({'INFO'}, f"成功使用第三代导入逻辑导入了 {imported_count} 个模型")
+            else:
+                self.report({'ERROR'}, "第四代和第三代导入均未成功导入任何模型")
+        else:
+            self.report({'INFO'}, f"成功使用第四代导入逻辑导入了 {imported_count} 个模型")
     else:
         ImprotFromWorkSpaceSSMT3(self, context)
 
